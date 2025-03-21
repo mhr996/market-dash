@@ -9,6 +9,8 @@ import Sidebar from '@/components/layouts/sidebar';
 import Portals from '@/components/portals';
 
 export default function DefaultLayout({ children }: { children: React.ReactNode }) {
+  
+
     return (
         <>
             {/* BEGIN MAIN CONTAINER */}
