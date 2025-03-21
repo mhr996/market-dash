@@ -1,7 +1,7 @@
 'use client';
 import { PropsWithChildren, useEffect, useState } from 'react';
 import { useDispatch, useSelector } from 'react-redux';
-import { useRouter } from 'next/navigation';
+import { useRouter, usePathname } from 'next/navigation';
 import { IRootState } from '@/store';
 import { toggleRTL, toggleTheme, toggleMenu, toggleLayout, toggleAnimation, toggleNavbar, toggleSemidark } from '@/store/themeConfigSlice';
 import Loading from '@/components/layouts/loading';
@@ -12,13 +12,12 @@ function App({ children }: PropsWithChildren) {
     const themeConfig = useSelector((state: IRootState) => state.themeConfig);
     const dispatch = useDispatch();
     const router = useRouter();
+    const pathname = usePathname();
     const { initLocale } = getTranslation();
     const [isLoading, setIsLoading] = useState(true);
 
     useEffect(() => {
-        const checkAuth = async () => {
-            const { user, error } = await getCurrentUser();
-
+        const initTheme = () => {
             // Theme configuration
             dispatch(toggleTheme(localStorage.getItem('theme') || themeConfig.theme));
             dispatch(toggleMenu(localStorage.getItem('menu') || themeConfig.menu));
@@ -29,11 +28,20 @@ function App({ children }: PropsWithChildren) {
             dispatch(toggleSemidark(localStorage.getItem('semidark') || themeConfig.semidark));
             // locale
             initLocale(themeConfig.locale);
+        };
 
-            if (error || !user) {
-                router.push('/login');
+        const checkAuth = async () => {
+            initTheme();
+
+            const publicPages = ['/login', '/register'];
+            if (publicPages.includes(pathname)) {
                 setIsLoading(false);
                 return;
+            }
+
+            const { user, error } = await getCurrentUser();
+            if (error || !user) {
+                router.push('/login');
             } else {
                 setIsLoading(false);
             }
@@ -44,6 +52,7 @@ function App({ children }: PropsWithChildren) {
         dispatch,
         initLocale,
         router,
+        pathname,
         themeConfig.theme,
         themeConfig.menu,
         themeConfig.layout,
