@@ -187,13 +187,8 @@ const Header = () => {
                                 </Link>
                             </li>
                             <li>
-                                <Link href="/apps/todolist" className="block rounded-full bg-white-light/40 p-2 hover:bg-white-light/90 hover:text-primary dark:bg-dark/40 dark:hover:bg-dark/60">
+                                <Link href="/add-product" className="block rounded-full bg-white-light/40 p-2 hover:bg-white-light/90 hover:text-primary dark:bg-dark/40 dark:hover:bg-dark/60">
                                     <IconEdit />
-                                </Link>
-                            </li>
-                            <li>
-                                <Link href="/apps/chat" className="block rounded-full bg-white-light/40 p-2 hover:bg-white-light/90 hover:text-primary dark:bg-dark/40 dark:hover:bg-dark/60">
-                                    <IconChatNotification />
                                 </Link>
                             </li>
                         </ul>
@@ -270,7 +265,7 @@ const Header = () => {
                                 btnClassName="block p-2 rounded-full bg-white-light/40 dark:bg-dark/40 hover:text-primary hover:bg-white-light/90 dark:hover:bg-dark/60"
                                 button={i18n.language && <img className="h-5 w-5 rounded-full object-cover" src={`/assets/images/flags/${i18n.language.toUpperCase()}.svg`} alt="flag" />}
                             >
-                                <ul className="grid w-[280px] grid-cols-2 gap-2 !px-2 font-semibold text-dark dark:text-white-dark dark:text-white-light/90">
+                                <ul className="grid w-[180px] grid-cols-1 gap-2 !px-2 font-semibold text-dark dark:text-white-dark dark:text-white-light/90">
                                     {themeConfig.languageList.map((item: any) => {
                                         return (
                                             <li key={item.code}>
@@ -443,23 +438,18 @@ const Header = () => {
                                         </div>
                                     </li>
                                     <li>
-                                        <Link href="/users/profile" className="dark:hover:text-white">
+                                        <Link href="/profile" className="dark:hover:text-white">
                                             <IconUser className="h-4.5 w-4.5 shrink-0 ltr:mr-2 rtl:ml-2" />
                                             Profile
                                         </Link>
                                     </li>
                                     <li>
-                                        <Link href="/apps/mailbox" className="dark:hover:text-white">
+                                        <Link href="/mailbox" className="dark:hover:text-white">
                                             <IconMail className="h-4.5 w-4.5 shrink-0 ltr:mr-2 rtl:ml-2" />
                                             Inbox
                                         </Link>
                                     </li>
-                                    <li>
-                                        <Link href="/auth/boxed-lockscreen" className="dark:hover:text-white">
-                                            <IconLockDots className="h-4.5 w-4.5 shrink-0 ltr:mr-2 rtl:ml-2" />
-                                            Lock Screen
-                                        </Link>
-                                    </li>
+                                  
                                     <li className="border-t border-white-light dark:border-white-light/10">
                                         <button onClick={handleSignOut} className="!py-3 text-danger flex w-full items-center">
                                             <IconLogout className="h-4.5 w-4.5 shrink-0 rotate-90 ltr:mr-2 rtl:ml-2" />
