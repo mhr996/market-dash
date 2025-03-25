@@ -41,15 +41,31 @@ const Header = () => {
     const router = useRouter();
     const { t, i18n } = getTranslation();
     const [user, setUser] = useState<{ user: any } | null>(null);
+    // New state for holding profile data
+    const [profile, setProfile] = useState<{ avatar_url: string | null }>({ avatar_url: null });
 
     useEffect(() => {
         const fetchUser = async () => {
-            const { data: user, error } = await supabase.auth.getUser();
-            if (user) setUser(user);
+            const { data: authUser, error } = await supabase.auth.getUser();
+            if (authUser) setUser(authUser);
         };
 
         fetchUser();
     }, []);
+
+    // Once user is available, fetch their profile from 'profiles' table.
+    useEffect(() => {
+        const fetchProfile = async () => {
+            if (user?.user?.id) {
+                const { data, error } = await supabase.from('profiles').select('avatar_url').eq('id', user.user.id).single();
+                if (data) {
+                    setProfile({ avatar_url: data.avatar_url });
+                }
+            }
+        };
+
+        fetchProfile();
+    }, [user]);
 
     const handleSignOut = async () => {
         await supabase.auth.signOut();
@@ -420,12 +436,18 @@ const Header = () => {
                                 offset={[0, 8]}
                                 placement={`${isRtl ? 'bottom-start' : 'bottom-end'}`}
                                 btnClassName="relative group block"
-                                button={<img className="h-9 w-9 rounded-full object-cover saturate-50 group-hover:saturate-100" src="/assets/images/user-profile.jpeg" alt="userProfile" />}
+                                button={
+                                    <img
+                                        className="h-9 w-9 rounded-full object-cover saturate-50 group-hover:saturate-100"
+                                        src={profile.avatar_url || '/assets/images/user-placeholder.webp'}
+                                        alt="userProfile"
+                                    />
+                                }
                             >
                                 <ul className="w-[230px] !py-0 font-semibold text-dark dark:text-white-dark dark:text-white-light/90">
                                     <li>
                                         <div className="flex items-center px-4 py-4">
-                                            <img className="h-10 w-10 rounded-md object-cover" src={'/assets/images/user-profile.jpeg'} alt="userProfile" />
+                                            <img className="h-10 w-10 rounded-md object-cover" src={profile.avatar_url || '/assets/images/user-placeholder.webp'} alt="userProfile" />
                                             <div className="truncate ltr:pl-4 rtl:pr-4">
                                                 <h4 className="text-base">
                                                     {user?.user?.user_metadata?.display_name || ''}
@@ -449,7 +471,7 @@ const Header = () => {
                                             Inbox
                                         </Link>
                                     </li>
-                                  
+
                                     <li className="border-t border-white-light dark:border-white-light/10">
                                         <button onClick={handleSignOut} className="!py-3 text-danger flex w-full items-center">
                                             <IconLogout className="h-4.5 w-4.5 shrink-0 rotate-90 ltr:mr-2 rtl:ml-2" />

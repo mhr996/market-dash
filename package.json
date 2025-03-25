@@ -20,6 +20,7 @@
         "@types/react-dom": "^18.3.0",
         "eslint": "8.57.0",
         "eslint-config-next": "14.2.13",
+        "highlight.js": "^11.11.1",
         "i18next": "^23.13.0",
         "next": "14.2.13",
         "ni18n": "^1.0.5",

@@ -9,7 +9,7 @@ import Link from 'next/link';
 import React from 'react';
 
 export const metadata: Metadata = {
-    title: 'Login Cover',
+    title: 'Login',
 };
 
 const CoverLogin = () => {
