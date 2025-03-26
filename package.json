@@ -11,6 +11,8 @@
     "dependencies": {
         "@emotion/react": "^11.10.6",
         "@headlessui/react": "^2.1.2",
+        "@mantine/core": "^5.10.5",
+        "@mantine/hooks": "^5.10.5",
         "@reduxjs/toolkit": "^2.2.7",
         "@supabase/auth-helpers-nextjs": "^0.10.0",
         "@supabase/supabase-js": "^2.49.1",
@@ -22,6 +24,8 @@
         "eslint-config-next": "14.2.13",
         "highlight.js": "^11.11.1",
         "i18next": "^23.13.0",
+        "lodash": "^4.17.21",
+        "mantine-datatable": "^1.7.35",
         "next": "14.2.13",
         "ni18n": "^1.0.5",
         "react": "18.3.1",

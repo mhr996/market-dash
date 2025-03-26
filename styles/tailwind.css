@@ -1,6 +1,46 @@
 /* Animate css */
 @import './animate.css';
+/* tippy css */
+@import './tippy.css';
 
+/* swiper css */
+@import './swiper.css';
+
+/* Elements - Progressbar */
+@import './progressbar.css';
+
+/* Data tables css */
+@import './datatables.css';
+
+/* scrumboard */
+@import './scrumboard.css';
+
+/* calendar css */
+@import './fullcalendar.css';
+
+/* sweetalert css */
+@import './sweetalert.css';
+
+/* flatpickr css */
+@import './flatpickr.css';
+
+/* quill-editor css */
+@import './quill-editor.css';
+
+/* markdown-editor css */
+@import './markdown-editor.css';
+
+/* file upload with preview */
+@import './file-upload-preview.css';
+
+/* dragndrop*/
+@import './dragndrop.css';
+
+/* form element*/
+@import './form-elements.css';
+
+/* Select2*/
+@import './select2.css';
 @tailwind base;
 @tailwind components;
 @tailwind utilities;
