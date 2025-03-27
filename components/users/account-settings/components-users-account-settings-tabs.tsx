@@ -3,7 +3,7 @@ import CountrySelect from '@/components/country-select/country-select';
 import IconDollarSignCircle from '@/components/icon/icon-dollar-sign-circle';
 import IconFacebook from '@/components/icon/icon-facebook';
 import IconGithub from '@/components/icon/icon-github';
-import IconHome from '@/components/icon/icon-home';
+import IconHome from '@/components/icon/icon-home'; 
 import IconInfoCircle from '@/components/icon/icon-info-circle';
 import IconLinkedin from '@/components/icon/icon-linkedin';
 import IconPhone from '@/components/icon/icon-phone';
