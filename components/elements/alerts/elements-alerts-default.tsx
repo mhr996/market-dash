@@ -1,6 +1,6 @@
 import IconX from '@/components/icon/icon-x';
 import PanelCodeHighlight from '@/components/panel-code-highlight';
-import React from 'react';
+import React, { useEffect } from 'react';
 
 interface AlertProps {
     type: 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'info';
@@ -19,8 +19,17 @@ const Alert: React.FC<AlertProps> = ({ type, message, title, onClose }) => {
         info: 'bg-info-light text-info dark:bg-info-dark-light',
     };
 
+    useEffect(() => {
+        if (onClose) {
+            const timer = setTimeout(() => {
+                onClose();
+            }, 4000);
+            return () => clearTimeout(timer);
+        }
+    }, [onClose]);
+
     return (
-        <div className={`flex items-center rounded p-3.5 ${alertClasses[type]}`}>
+        <div className={`flex items-center rounded p-3.5 mb-4 animate-fade-in ${alertClasses[type]}`}>
             <span className="ltr:pr-2 rtl:pl-2">
                 {title && <strong className="ltr:mr-1 rtl:ml-1">{title}!</strong>}
                 {message}

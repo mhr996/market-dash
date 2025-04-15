@@ -11,36 +11,48 @@ import supabase from '@/lib/supabase';
 import { Alert } from '@/components/elements/alerts/elements-alerts-default';
 import ConfirmModal from '@/components/modals/confirm-modal';
 
-const UsersList = () => {
-    const [items, setItems] = useState<
-        Array<{
-            id: number;
-            full_name: string;
-            email: string;
-            avatar_url: string | null;
-            registration_date?: number;
-            status?: string;
-            uid?: string;
-        }>
-    >([]);
+interface Category {
+    id: number;
+    title: string;
+    desc: string;
+    created_at: string;
+}
+
+interface Product {
+    id: string;
+    created_at: string;
+    shop: string;
+    title: string;
+    desc: string;
+    price: string;
+    images: string[];
+    category: number | null;
+    shops?: {
+        shop_name: string;
+    };
+    categories?: Category;
+}
+
+const ProductsList = () => {
+    const [items, setItems] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
 
     const [page, setPage] = useState(1);
     const PAGE_SIZES = [10, 20, 30, 50, 100];
     const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
-    const [initialRecords, setInitialRecords] = useState(sortBy(items, 'firstName'));
-    const [records, setRecords] = useState(initialRecords);
-    const [selectedRecords, setSelectedRecords] = useState<any>([]);
+    const [initialRecords, setInitialRecords] = useState<Product[]>([]);
+    const [records, setRecords] = useState<Product[]>([]);
+    const [selectedRecords, setSelectedRecords] = useState<Product[]>([]);
 
     const [search, setSearch] = useState('');
     const [sortStatus, setSortStatus] = useState<DataTableSortStatus>({
-        columnAccessor: 'firstName',
+        columnAccessor: 'title',
         direction: 'asc',
     });
 
-    // New state for confirm modal and alert.
+    // Modal and alert states
     const [showConfirmModal, setShowConfirmModal] = useState(false);
-    const [userToDelete, setUserToDelete] = useState<any>(null);
+    const [productToDelete, setProductToDelete] = useState<Product | null>(null);
     const [alert, setAlert] = useState<{ visible: boolean; message: string; type: 'success' | 'danger' }>({
         visible: false,
         message: '',
@@ -48,18 +60,19 @@ const UsersList = () => {
     });
 
     useEffect(() => {
-        const fetchUsers = async () => {
+        const fetchProducts = async () => {
             try {
-                const { data, error } = await supabase.from('profiles').select('*');
+                const { data, error } = await supabase.from('products').select('*, shops(shop_name), categories(*)');
                 if (error) throw error;
-                setItems(data);
+
+                setItems(data as Product[]);
             } catch (error) {
-                console.error('Error:', error);
+                console.error('Error fetching products:', error);
             } finally {
                 setLoading(false);
             }
         };
-        fetchUsers();
+        fetchProducts();
     }, []);
 
     useEffect(() => {
@@ -73,79 +86,67 @@ const UsersList = () => {
     }, [page, pageSize, initialRecords]);
 
     useEffect(() => {
-        setInitialRecords(() => {
-            return items.filter((item) => {
+        setInitialRecords(
+            items.filter((item) => {
                 return (
-                    item.full_name?.toLowerCase().includes(search.toLowerCase()) ||
-                    item.email?.toLowerCase().includes(search.toLowerCase()) ||
-                    (item.registration_date?.toString() || '').includes(search.toLowerCase())
+                    item.title.toLowerCase().includes(search.toLowerCase()) ||
+                    item.desc.toLowerCase().includes(search.toLowerCase()) ||
+                    item.shops?.shop_name.toLowerCase().includes(search.toLowerCase()) ||
+                    item.categories?.title.toLowerCase().includes(search.toLowerCase())
                 );
-            });
-        });
+            }),
+        );
     }, [items, search]);
 
     useEffect(() => {
-        const data2 = sortBy(initialRecords, sortStatus.columnAccessor);
-        setRecords(sortStatus.direction === 'desc' ? data2.reverse() : data2);
+        const sorted = sortBy(initialRecords, sortStatus.columnAccessor);
+        setRecords(sortStatus.direction === 'desc' ? sorted.reverse() : sorted);
         setPage(1);
-    }, [sortStatus]);
+    }, [sortStatus, initialRecords]);
 
-    // Modified deletion function. It sets the user to delete and shows the confirm modal.
-    const deleteRow = (id: number | null = null) => {
+    const deleteRow = (id: string | null = null) => {
         if (id) {
-            const user = items.find((user) => user.id === id);
-            if (user) {
-                setUserToDelete(user);
+            const product = items.find((p) => p.id === id);
+            if (product) {
+                setProductToDelete(product);
                 setShowConfirmModal(true);
             }
         }
     };
 
-    // Confirm deletion callback.
     const confirmDeletion = async () => {
-        if (!userToDelete || !userToDelete.id) return;
+        if (!productToDelete) return;
+        try {
+            // Delete images from storage first
+            if (productToDelete.images?.length) {
+                await Promise.all(
+                    productToDelete.images.map(async (imageUrl) => {
+                        const path = imageUrl.split('/').pop(); // Get filename from URL
+                        if (path) {
+                            await supabase.storage.from('products').remove([path]);
+                        }
+                    }),
+                );
+            }
 
-        setAlert({ visible: true, message: 'Deleting an Admin is not possible', type: 'danger' });
-        setShowConfirmModal(false);
-        setUserToDelete(null);
+            // Delete product record
+            const { error } = await supabase.from('products').delete().eq('id', productToDelete.id);
+            if (error) throw error;
 
-        // try {
-        //     // Delete from profiles table
-        //     const { error: profileError } = await supabase.from('profiles').delete().eq('id', userToDelete.id);
-        //     if (profileError) throw profileError;
-
-        //     // Delete account from supabase (admin API)
-        //     const { error: authError } = await supabase.auth.admin.deleteUser(userToDelete.id);
-        //     if (authError) throw authError;
-
-        //     // Remove the user from state arrays.
-        //     const updatedItems = items.filter((user) => user.id !== userToDelete.id);
-        //     setItems(updatedItems);
-        //     setInitialRecords(
-        //         updatedItems.filter((item) => {
-        //             return (
-        //                 item.full_name?.toLowerCase().includes(search.toLowerCase()) ||
-        //                 item.email?.toLowerCase().includes(search.toLowerCase()) ||
-        //                 (item.registration_date?.toLowerCase() || '').includes(search.toLowerCase())
-        //             );
-        //         }),
-        //     );
-        //     setSelectedRecords([]);
-        //     setSearch('');
-        //     // Optionally, a refresh of pagination can be done here.
-        //     setAlert({ visible: true, message: 'User deleted successfully.', type: 'success' });
-        // } catch (error) {
-        //     console.error('Deletion error:', error);
-        //     setAlert({ visible: true, message: 'Error deleting user.', type: 'danger' });
-        // } finally {
-        //     setShowConfirmModal(false);
-        //     setUserToDelete(null);
-        // }
+            const updatedItems = items.filter((p) => p.id !== productToDelete.id);
+            setItems(updatedItems);
+            setAlert({ visible: true, message: 'Product deleted successfully.', type: 'success' });
+        } catch (error) {
+            console.error('Deletion error:', error);
+            setAlert({ visible: true, message: 'Error deleting product.', type: 'danger' });
+        } finally {
+            setShowConfirmModal(false);
+            setProductToDelete(null);
+        }
     };
 
     return (
         <div className="panel border-white-light px-0 dark:border-[#1b2e4b]">
-            {/* Alert */}
             {alert.visible && (
                 <div className="mb-4 ml-4 max-w-96">
                     <Alert
@@ -163,7 +164,7 @@ const UsersList = () => {
                             <IconTrashLines />
                             Delete
                         </button>
-                        <Link href="/users/add" className="btn btn-primary gap-2">
+                        <Link href="/products/add" className="btn btn-primary gap-2">
                             <IconPlus />
                             Add New
                         </Link>
@@ -182,47 +183,52 @@ const UsersList = () => {
                                 accessor: 'id',
                                 title: 'ID',
                                 sortable: true,
-                                render: ({ id }) => <strong className="text-info">#{id.toString().slice(0, 6)}</strong>,
+                                render: ({ id }) => <strong className="text-info">#{id}</strong>,
                             },
                             {
-                                accessor: 'full_name',
+                                accessor: 'title',
+                                title: 'Product',
                                 sortable: true,
-                                render: ({ full_name, avatar_url }) => (
-                                    <div className="flex items-center font-semibold">
-                                        <div className="w-max rounded-full ltr:mr-2 rtl:ml-2 flex items-center justify-center">
-                                            <img className="h-8 w-8 rounded-full object-cover" src={avatar_url || `/assets/images/user-placeholder.webp`} alt="" />
+                                render: ({ title, images }) => {
+                                    let imageList = [];
+
+                                    try {
+                                        imageList = JSON.parse(images || '[]');
+                                    } catch (e) {
+                                        imageList = [];
+                                    }
+
+                                    return (
+                                        <div className="flex items-center font-semibold">
+                                            <div className="w-max rounded-full ltr:mr-2 rtl:ml-2">
+                                                <img className="h-8 w-8 rounded-md object-cover" src={imageList[0] || `/assets/images/product-placeholder.jpg`} alt={title} />
+                                            </div>
+                                            <div>{title}</div>
                                         </div>
-                                        <div>{full_name}</div>
-                                    </div>
-                                ),
+                                    );
+                                },
                             },
                             {
-                                accessor: 'email',
+                                accessor: 'price',
+                                title: 'Price',
+                                sortable: true,
+                                render: ({ price }) => <span>${parseFloat(price).toFixed(2)}</span>,
+                            },
+                            {
+                                accessor: 'shops.shop_name',
+                                title: 'Shop',
                                 sortable: true,
                             },
                             {
-                                accessor: 'uid',
-                                title: 'UID',
+                                accessor: 'categories.title',
+                                title: 'Category',
                                 sortable: true,
-                                render: ({ uid }) =>
-                                    uid ? (
-                                        <div className="relative group">
-                                            <span>{uid.substring(0, 8)}...</span>
-                                            <div className="absolute z-10 hidden group-hover:block bg-dark text-white text-xs rounded p-2 whitespace-nowrap">{uid}</div>
-                                        </div>
-                                    ) : (
-                                        'N/A'
-                                    ),
                             },
                             {
-                                accessor: 'registration_date',
+                                accessor: 'created_at',
+                                title: 'Created Date',
                                 sortable: true,
-                                render: ({ registration_date }) => <span>{registration_date ? new Date(registration_date).toLocaleDateString('TR') : ''}</span>,
-                            },
-                            {
-                                accessor: 'status',
-                                sortable: true,
-                                render: ({ status }) => <span className={`badge badge-outline-${status === 'Active' ? 'success' : 'danger'} `}>{status}</span>,
+                                render: ({ created_at }) => <span>{new Date(created_at).toLocaleDateString()}</span>,
                             },
                             {
                                 accessor: 'action',
@@ -231,15 +237,10 @@ const UsersList = () => {
                                 textAlignment: 'center',
                                 render: ({ id }) => (
                                     <div className="mx-auto flex w-max items-center gap-4">
-                                        <div
-                                            onClick={() => {
-                                                setAlert({ visible: true, message: "You can't edit an Admin User", type: 'danger' });
-                                            }}
-                                            className="flex hover:text-info"
-                                        >
+                                        <Link href={`/products/edit/${id}`} className="flex hover:text-info">
                                             <IconEdit className="h-4.5 w-4.5" />
-                                        </div>
-                                        <Link href={`/users/preview/${id}`} className="flex hover:text-primary">
+                                        </Link>
+                                        <Link href={`/products/preview/${id}`} className="flex hover:text-primary">
                                             <IconEye />
                                         </Link>
                                         <button type="button" className="flex hover:text-danger" onClick={() => deleteRow(id)}>
@@ -260,7 +261,7 @@ const UsersList = () => {
                         onSortStatusChange={setSortStatus}
                         selectedRecords={selectedRecords}
                         onSelectedRecordsChange={setSelectedRecords}
-                        paginationText={({ from, to, totalRecords }) => `Showing  ${from} to ${to} of ${totalRecords} entries`}
+                        paginationText={({ from, to, totalRecords }) => `Showing ${from} to ${to} of ${totalRecords} entries`}
                         minHeight={300}
                     />
 
@@ -268,14 +269,13 @@ const UsersList = () => {
                 </div>
             </div>
 
-            {/* Confirm Deletion Modal */}
             <ConfirmModal
                 isOpen={showConfirmModal}
                 title="Confirm Deletion"
-                message="Are you sure you want to delete this user?"
+                message="Are you sure you want to delete this product? This will also delete all associated images."
                 onCancel={() => {
                     setShowConfirmModal(false);
-                    setUserToDelete(null);
+                    setProductToDelete(null);
                 }}
                 onConfirm={confirmDeletion}
                 confirmLabel="Delete"
@@ -286,4 +286,4 @@ const UsersList = () => {
     );
 };
 
-export default UsersList;
+export default ProductsList;

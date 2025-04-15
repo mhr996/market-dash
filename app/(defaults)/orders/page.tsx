@@ -148,16 +148,7 @@ const OrdersList = () => {
 
                 <div className="invoice-table">
                     <div className="mb-4.5 flex flex-col gap-5 px-5 md:flex-row md:items-center">
-                        <div className="flex items-center gap-2">
-                            <button type="button" className="btn btn-danger gap-2">
-                                <IconTrashLines />
-                                Delete
-                            </button>
-                            <Link href="/orders/add" className="btn btn-primary gap-2">
-                                <IconPlus />
-                                Add New
-                            </Link>
-                        </div>
+                      
                         <div className="ltr:ml-auto rtl:mr-auto">
                             <input type="text" className="form-input w-auto" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} />
                         </div>

@@ -75,3 +75,11 @@ input[type='range']:active::-webkit-slider-thumb {
 .noUi-handle:after {
     @apply !h-1.5;
 }
+
+/* Remove default select arrow */
+select.form-select {
+    -webkit-appearance: none;
+    -moz-appearance: none;
+    appearance: none;
+    background-image: none !important;
+}

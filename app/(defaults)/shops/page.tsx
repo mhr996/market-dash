@@ -58,7 +58,6 @@ const ShopsList = () => {
                 const { data, error } = await supabase.from('shops').select('*, profiles(full_name)');
                 if (error) throw error;
                 setItems(data as Shop[]);
-                console.log('Fetched shops:', data);
             } catch (error) {
                 console.error('Error fetching shops:', error);
             } finally {
@@ -162,11 +161,9 @@ const ShopsList = () => {
                         columns={[
                             {
                                 accessor: 'id',
+                                title: 'ID',
                                 sortable: true,
-                                render: (row, index) => {
-                                    const offset = (page - 1) * pageSize;
-                                    return offset + index + 1;
-                                },
+                                render: ({ id }) => <strong className="text-info">#{id}</strong>,
                             },
                             {
                                 accessor: 'shop_name',
