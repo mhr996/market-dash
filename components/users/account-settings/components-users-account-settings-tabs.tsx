@@ -3,7 +3,7 @@ import CountrySelect from '@/components/country-select/country-select';
 import IconDollarSignCircle from '@/components/icon/icon-dollar-sign-circle';
 import IconFacebook from '@/components/icon/icon-facebook';
 import IconGithub from '@/components/icon/icon-github';
-import IconHome from '@/components/icon/icon-home'; 
+import IconHome from '@/components/icon/icon-home';
 import IconInfoCircle from '@/components/icon/icon-info-circle';
 import IconLinkedin from '@/components/icon/icon-linkedin';
 import IconPhone from '@/components/icon/icon-phone';
@@ -219,7 +219,7 @@ const ComponentsUsersAccountSettingsTabs = () => {
     const [tabs, setTabs] = useState<string>('home');
     const toggleTabs = (name: string) => {
         setTabs(name);
-          setAlertMessage(null);
+        setAlertMessage(null);
     };
 
     const [user, setUser] = useState<any>(null);
@@ -230,7 +230,6 @@ const ComponentsUsersAccountSettingsTabs = () => {
                 data: { user },
             } = await supabase.auth.getUser();
             setUser(user);
-          
         };
         getUser();
     }, []);
@@ -275,8 +274,10 @@ const ComponentsUsersAccountSettingsTabs = () => {
                         <div className="flex flex-col sm:flex-row">
                             <div className="mb-5 w-full sm:w-2/12 ltr:sm:mr-4 rtl:sm:ml-4">
                                 <ImageUpload
+                                    bucket="avatars"
                                     userId={user?.id}
                                     url={profileData.avatar_url}
+                                    placeholderImage="/assets/images/user-placeholder.webp"
                                     onUploadComplete={handleAvatarUpload}
                                     onError={(error) => {
                                         setAlertMessage({

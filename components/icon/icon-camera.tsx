@@ -6,7 +6,7 @@ interface IconCameraProps {
 
 const IconCamera: FC<IconCameraProps> = ({ className }) => {
     return (
-        <svg width="25" height="25" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
+        <svg width="30" height="30" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className={className}>
             <circle cx="12" cy="13" r="3" stroke="currentColor" strokeWidth="1.5" />
             <path
                 opacity="0.5"

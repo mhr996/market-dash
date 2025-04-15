@@ -27,7 +27,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({ isOpen, title, message, onC
         <Transition appear show={isOpen} as={Fragment}>
             <Dialog as="div" className="relative z-50" onClose={onCancel}>
                 <TransitionChild as={Fragment} enter="ease-out duration-300" enterFrom="opacity-0" enterTo="opacity-100" leave="ease-in duration-200" leaveFrom="opacity-100" leaveTo="opacity-0">
-                    <div className="fixed inset-0 bg-black bg-opacity-50" />
+                    <div className="fixed inset-0 bg-black bg-opacity-70" />
                 </TransitionChild>
                 <div className="fixed inset-0 flex items-center justify-center px-4">
                     <TransitionChild
@@ -39,7 +39,7 @@ const ConfirmModal: React.FC<ConfirmModalProps> = ({ isOpen, title, message, onC
                         leaveFrom="opacity-100 scale-100"
                         leaveTo="opacity-0 scale-95"
                     >
-                        <DialogPanel className={`bg-white dark:bg-black rounded-lg overflow-hidden ${sizeClasses[size]} p-6`}>
+                        <DialogPanel className={`bg-white dark:bg-black rounded-lg overflow-hidden shadow-md ${sizeClasses[size]} p-6`}>
                             <div className="flex items-center justify-between">
                                 <h3 className="text-lg font-bold text-black dark:text-gray-400">{title}</h3>
                                 <button onClick={onCancel} className="text-gray-500 dark:text-gray-400 hover:text-gray-700 dark:hover:text-gray-200">

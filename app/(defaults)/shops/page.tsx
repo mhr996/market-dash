@@ -11,36 +11,40 @@ import supabase from '@/lib/supabase';
 import { Alert } from '@/components/elements/alerts/elements-alerts-default';
 import ConfirmModal from '@/components/modals/confirm-modal';
 
-const UsersList = () => {
-    const [items, setItems] = useState<
-        Array<{
-            id: number;
-            full_name: string;
-            email: string;
-            avatar_url: string | null;
-            registration_date?: number;
-            status?: string;
-            uid?: string;
-        }>
-    >([]);
+// Updated shop type reflecting the join with profiles.
+interface Shop {
+    id: number;
+    shop_name: string;
+    shop_desc: string;
+    logo_url: string | null;
+    owner: string;
+    active: boolean;
+    created_at?: string;
+    profiles?: {
+        full_name: string;
+    };
+}
+
+const ShopsList = () => {
+    const [items, setItems] = useState<Shop[]>([]);
     const [loading, setLoading] = useState(true);
 
     const [page, setPage] = useState(1);
     const PAGE_SIZES = [10, 20, 30, 50, 100];
     const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
-    const [initialRecords, setInitialRecords] = useState(sortBy(items, 'firstName'));
-    const [records, setRecords] = useState(initialRecords);
+    const [initialRecords, setInitialRecords] = useState<Shop[]>([]);
+    const [records, setRecords] = useState<Shop[]>([]);
     const [selectedRecords, setSelectedRecords] = useState<any>([]);
 
     const [search, setSearch] = useState('');
     const [sortStatus, setSortStatus] = useState<DataTableSortStatus>({
-        columnAccessor: 'firstName',
+        columnAccessor: 'shop_name',
         direction: 'asc',
     });
 
     // New state for confirm modal and alert.
     const [showConfirmModal, setShowConfirmModal] = useState(false);
-    const [userToDelete, setUserToDelete] = useState<any>(null);
+    const [shopToDelete, setShopToDelete] = useState<Shop | null>(null);
     const [alert, setAlert] = useState<{ visible: boolean; message: string; type: 'success' | 'danger' }>({
         visible: false,
         message: '',
@@ -48,18 +52,20 @@ const UsersList = () => {
     });
 
     useEffect(() => {
-        const fetchUsers = async () => {
+        const fetchShops = async () => {
             try {
-                const { data, error } = await supabase.from('profiles').select('*');
+                // Join the profiles table to fetch owner's full name.
+                const { data, error } = await supabase.from('shops').select('*, profiles(full_name)');
                 if (error) throw error;
-                setItems(data);
+                setItems(data as Shop[]);
+                console.log('Fetched shops:', data);
             } catch (error) {
-                console.error('Error:', error);
+                console.error('Error fetching shops:', error);
             } finally {
                 setLoading(false);
             }
         };
-        fetchUsers();
+        fetchShops();
     }, []);
 
     useEffect(() => {
@@ -73,29 +79,29 @@ const UsersList = () => {
     }, [page, pageSize, initialRecords]);
 
     useEffect(() => {
-        setInitialRecords(() => {
-            return items.filter((item) => {
+        setInitialRecords(
+            items.filter((item) => {
+                const searchTerm = search.toLowerCase();
                 return (
-                    item.full_name?.toLowerCase().includes(search.toLowerCase()) ||
-                    item.email?.toLowerCase().includes(search.toLowerCase()) ||
-                    (item.registration_date?.toString() || '').includes(search.toLowerCase())
+                    item.shop_name.toLowerCase().includes(searchTerm) ||
+                    // Also search owner name if available.
+                    (item.profiles?.full_name.toLowerCase().includes(searchTerm) ?? false)
                 );
-            });
-        });
+            }),
+        );
     }, [items, search]);
 
     useEffect(() => {
-        const data2 = sortBy(initialRecords, sortStatus.columnAccessor);
-        setRecords(sortStatus.direction === 'desc' ? data2.reverse() : data2);
+        const sorted = sortBy(initialRecords, sortStatus.columnAccessor as keyof Shop);
+        setRecords(sortStatus.direction === 'desc' ? sorted.reverse() : sorted);
         setPage(1);
-    }, [sortStatus]);
+    }, [sortStatus, initialRecords]);
 
-    // Modified deletion function. It sets the user to delete and shows the confirm modal.
     const deleteRow = (id: number | null = null) => {
         if (id) {
-            const user = items.find((user) => user.id === id);
-            if (user) {
-                setUserToDelete(user);
+            const shop = items.find((s) => s.id === id);
+            if (shop) {
+                setShopToDelete(shop);
                 setShowConfirmModal(true);
             }
         }
@@ -103,44 +109,20 @@ const UsersList = () => {
 
     // Confirm deletion callback.
     const confirmDeletion = async () => {
-        if (!userToDelete || !userToDelete.id) return;
-
-        setAlert({ visible: true, message: 'Deleting an Admin is not possible', type: 'danger' });
-        setShowConfirmModal(false);
-        setUserToDelete(null);
-
-        // try {
-        //     // Delete from profiles table
-        //     const { error: profileError } = await supabase.from('profiles').delete().eq('id', userToDelete.id);
-        //     if (profileError) throw profileError;
-
-        //     // Delete account from supabase (admin API)
-        //     const { error: authError } = await supabase.auth.admin.deleteUser(userToDelete.id);
-        //     if (authError) throw authError;
-
-        //     // Remove the user from state arrays.
-        //     const updatedItems = items.filter((user) => user.id !== userToDelete.id);
-        //     setItems(updatedItems);
-        //     setInitialRecords(
-        //         updatedItems.filter((item) => {
-        //             return (
-        //                 item.full_name?.toLowerCase().includes(search.toLowerCase()) ||
-        //                 item.email?.toLowerCase().includes(search.toLowerCase()) ||
-        //                 (item.registration_date?.toLowerCase() || '').includes(search.toLowerCase())
-        //             );
-        //         }),
-        //     );
-        //     setSelectedRecords([]);
-        //     setSearch('');
-        //     // Optionally, a refresh of pagination can be done here.
-        //     setAlert({ visible: true, message: 'User deleted successfully.', type: 'success' });
-        // } catch (error) {
-        //     console.error('Deletion error:', error);
-        //     setAlert({ visible: true, message: 'Error deleting user.', type: 'danger' });
-        // } finally {
-        //     setShowConfirmModal(false);
-        //     setUserToDelete(null);
-        // }
+        if (!shopToDelete || !shopToDelete.id) return;
+        try {
+            const { error } = await supabase.from('shops').delete().eq('id', shopToDelete.id);
+            if (error) throw error;
+            const updatedItems = items.filter((s) => s.id !== shopToDelete.id);
+            setItems(updatedItems);
+            setAlert({ visible: true, message: 'Shop deleted successfully.', type: 'success' });
+        } catch (error) {
+            console.error('Deletion error:', error);
+            setAlert({ visible: true, message: 'Error deleting shop.', type: 'danger' });
+        } finally {
+            setShowConfirmModal(false);
+            setShopToDelete(null);
+        }
     };
 
     return (
@@ -163,7 +145,7 @@ const UsersList = () => {
                             <IconTrashLines />
                             Delete
                         </button>
-                        <Link href="/users/add" className="btn btn-primary gap-2">
+                        <Link href="/shops/add" className="btn btn-primary gap-2">
                             <IconPlus />
                             Add New
                         </Link>
@@ -187,30 +169,35 @@ const UsersList = () => {
                                 },
                             },
                             {
-                                accessor: 'full_name',
+                                accessor: 'shop_name',
+                                title: 'Shop Name',
                                 sortable: true,
-                                render: ({ full_name, avatar_url }) => (
+                                render: ({ shop_name, logo_url }) => (
                                     <div className="flex items-center font-semibold">
                                         <div className="w-max rounded-full ltr:mr-2 rtl:ml-2 flex items-center justify-center">
-                                            <img className="h-8 w-8 rounded-full object-cover" src={avatar_url || `/assets/images/user-placeholder.webp`} alt="" />
+                                            <img className="h-8 w-8 rounded-full object-cover" src={logo_url || `/assets/images/user-placeholder.webp`} alt="" />
                                         </div>
-                                        <div>{full_name}</div>
+                                        <div>{shop_name}</div>
                                     </div>
                                 ),
                             },
                             {
-                                accessor: 'email',
+                                accessor: 'owner',
+                                title: 'Owner',
                                 sortable: true,
+                                render: ({ owner, profiles }) => <span>{profiles ? profiles.full_name : owner}</span>,
                             },
                             {
-                                accessor: 'registration_date',
+                                accessor: 'created_at',
+                                title: 'Registration Date',
                                 sortable: true,
-                                render: ({ registration_date }) => <span>{registration_date ? new Date(registration_date).toLocaleDateString("TR") : ''}</span>,
+                                render: ({ created_at }) => (created_at ? <span>{new Date(created_at).toLocaleDateString('TR')}</span> : ''),
                             },
                             {
                                 accessor: 'status',
+                                title: 'Status',
                                 sortable: true,
-                                render: ({ status }) => <span className={`badge badge-outline-${status === 'Active' ? 'success' : 'danger'} `}>{status}</span>,
+                                render: ({ active }) => <span className={`badge badge-outline-${active ? 'success' : 'danger'}`}>{active ? 'Active' : 'Inactive'}</span>,
                             },
                             {
                                 accessor: 'action',
@@ -219,15 +206,10 @@ const UsersList = () => {
                                 textAlignment: 'center',
                                 render: ({ id }) => (
                                     <div className="mx-auto flex w-max items-center gap-4">
-                                        <div
-                                            onClick={() => {
-                                                setAlert({ visible: true, message: "You can't edit an Admin User", type: 'danger' });
-                                            }}
-                                            className="flex hover:text-info"
-                                        >
+                                        <Link href={`/shops/edit/${id}`} className="flex hover:text-info">
                                             <IconEdit className="h-4.5 w-4.5" />
-                                        </div>
-                                        <Link href={`/users/preview/${id}`} className="flex hover:text-primary">
+                                        </Link>
+                                        <Link href={`/shops/preview/${id}`} className="flex hover:text-primary">
                                             <IconEye />
                                         </Link>
                                         <button type="button" className="flex hover:text-danger" onClick={() => deleteRow(id)}>
@@ -248,7 +230,7 @@ const UsersList = () => {
                         onSortStatusChange={setSortStatus}
                         selectedRecords={selectedRecords}
                         onSelectedRecordsChange={setSelectedRecords}
-                        paginationText={({ from, to, totalRecords }) => `Showing  ${from} to ${to} of ${totalRecords} entries`}
+                        paginationText={({ from, to, totalRecords }) => `Showing ${from} to ${to} of ${totalRecords} entries`}
                         minHeight={300}
                     />
 
@@ -260,10 +242,10 @@ const UsersList = () => {
             <ConfirmModal
                 isOpen={showConfirmModal}
                 title="Confirm Deletion"
-                message="Are you sure you want to delete this user?"
+                message="Are you sure you want to delete this shop?"
                 onCancel={() => {
                     setShowConfirmModal(false);
-                    setUserToDelete(null);
+                    setShopToDelete(null);
                 }}
                 onConfirm={confirmDeletion}
                 confirmLabel="Delete"
@@ -274,4 +256,4 @@ const UsersList = () => {
     );
 };
 
-export default UsersList;
+export default ShopsList;

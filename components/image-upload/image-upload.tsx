@@ -5,11 +5,13 @@ import IconUpload from '@/components/icon/icon-camera';
 interface ImageUploadProps {
     userId: string;
     url: string | null;
+    bucket: string;
+    placeholderImage?: string;
     onUploadComplete: (url: string) => void;
     onError?: (error: string) => void;
 }
 
-const ImageUpload: React.FC<ImageUploadProps> = ({ userId, url, onUploadComplete, onError }) => {
+const ImageUpload: React.FC<ImageUploadProps> = ({ userId, url, bucket, placeholderImage = '/assets/images/user-placeholder.webp', onUploadComplete, onError }) => {
     const [uploading, setUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -31,17 +33,16 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ userId, url, onUploadComplete
 
             // Generate unique filename using provided userId instead of session
             const fileName = `${userId}/${Date.now()}.${fileExt}`;
-          
 
-            // Delete old avatar if exists
-            const { data: oldFiles } = await supabase.storage.from('avatars').list(userId);
+            // Delete old file if exists
+            const { data: oldFiles } = await supabase.storage.from(bucket).list(userId);
 
             if (oldFiles?.length) {
-                await Promise.all(oldFiles.map((file) => supabase.storage.from('avatars').remove([`${userId}/${file.name}`])));
+                await Promise.all(oldFiles.map((file) => supabase.storage.from(bucket).remove([`${userId}/${file.name}`])));
             }
 
-            // Upload new avatar
-            const { error: uploadError } = await supabase.storage.from('avatars').upload(fileName, file, {
+            // Upload new file
+            const { error: uploadError } = await supabase.storage.from(bucket).upload(fileName, file, {
                 cacheControl: '3600',
                 upsert: true,
             });
@@ -51,7 +52,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ userId, url, onUploadComplete
             // Get public URL
             const {
                 data: { publicUrl },
-            } = supabase.storage.from('avatars').getPublicUrl(fileName);
+            } = supabase.storage.from(bucket).getPublicUrl(fileName);
 
             onUploadComplete(publicUrl);
         } catch (error) {
@@ -65,7 +66,7 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ userId, url, onUploadComplete
 
     return (
         <div className="relative group cursor-pointer">
-            <img src={url || '/assets/images/user-placeholder.webp'} alt="Profile" className="mx-auto h-20 w-20 rounded-full object-cover md:h-32 md:w-32" />
+            <img src={url || placeholderImage} alt="Profile" className="mx-auto h-20 w-20 rounded-full object-cover md:h-32 md:w-32" />
 
             {/* Overlay */}
             <div
