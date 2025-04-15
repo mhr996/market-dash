@@ -11,7 +11,7 @@ interface ImageUploadProps {
     onError?: (error: string) => void;
 }
 
-const ImageUpload: React.FC<ImageUploadProps> = ({ userId, url, bucket, placeholderImage = '/assets/images/user-placeholder.webp', onUploadComplete, onError }) => {
+const ImageUpload: React.FC<ImageUploadProps> = ({ userId, url, bucket, placeholderImage = '/assets/images/img-placeholder-fallback.webp', onUploadComplete, onError }) => {
     const [uploading, setUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 

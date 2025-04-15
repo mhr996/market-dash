@@ -101,7 +101,7 @@ const AddOrderPage = () => {
                                 bucket="orders"
                                 userId="temp"
                                 url={form.image}
-                                placeholderImage="/assets/images/product-placeholder.jpg"
+                              
                                 onUploadComplete={handleImageUpload}
                                 onError={(error) => {
                                     setAlert({
