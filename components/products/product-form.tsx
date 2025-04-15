@@ -169,7 +169,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
             return;
         }
 
-        if (!formData.price.trim()) {
+        if (!formData.price) {
             setAlert({ type: 'danger', message: 'Price is required' });
             return;
         }
