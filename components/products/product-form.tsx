@@ -162,6 +162,28 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
+
+        // Validate required fields
+        if (!formData.title.trim()) {
+            setAlert({ type: 'danger', message: 'Title is required' });
+            return;
+        }
+
+        if (!formData.price.trim()) {
+            setAlert({ type: 'danger', message: 'Price is required' });
+            return;
+        }
+
+        if (!formData.shop) {
+            setAlert({ type: 'danger', message: 'You must select a shop' });
+            return;
+        }
+
+        if (!previewUrls.length && !selectedFiles.length) {
+            setAlert({ type: 'danger', message: 'At least one product image is required' });
+            return;
+        }
+
         setLoading(true);
         try {
             // Upload images first
@@ -194,16 +216,72 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
             }
 
             const productData = {
-                ...formData,
-                price: parseFloat(formData.price).toFixed(2),
+                title: formData.title,
+                desc: formData.desc,
+                price: parseFloat(formData.price),
+                shop: formData.shop,
                 category: formData.category ? parseInt(formData.category) : null,
                 images: imageUrls,
             };
 
             if (productId) {
-                // Update existing product
-                const { error } = await supabase.from('products').update(productData).eq('id', productId);
-                if (error) throw error;
+                try {
+                    // First try with a direct update
+                    const { error } = await supabase.from('products').update(productData).eq('id', productId);
+
+                    if (error) throw error;
+
+                    // Wait a moment to ensure the update is processed
+                    await new Promise((resolve) => setTimeout(resolve, 500));
+
+                    // Check if the update was successful by fetching the product separately
+                    const { data: updatedProduct, error: fetchError } = await supabase.from('products').select('*').eq('id', productId).single();
+
+                    if (fetchError) throw fetchError;
+
+                    // Check if the data was actually updated
+                    if (updatedProduct.title !== productData.title || updatedProduct.desc !== productData.desc || updatedProduct.price !== productData.price) {
+                        console.log('Data mismatch detected, trying upsert instead');
+
+                        // If the data doesn't match, try an upsert operation instead
+                        const { error: upsertError } = await supabase.from('products').upsert({
+                            id: parseInt(productId),
+                            ...productData,
+                        });
+
+                        if (upsertError) throw upsertError;
+
+                        // Verify the upsert worked
+                        const { data: upsertedProduct, error: upsertFetchError } = await supabase.from('products').select('*').eq('id', productId).single();
+
+                        if (upsertFetchError) throw upsertFetchError;
+
+                        console.log('Upserted product data:', upsertedProduct);
+
+                        // Update form with upserted data
+                        setFormData({
+                            title: upsertedProduct.title,
+                            desc: upsertedProduct.desc,
+                            price: upsertedProduct.price.toString(),
+                            shop: upsertedProduct.shop,
+                            category: upsertedProduct.category?.toString() || '',
+                        });
+                        setPreviewUrls(upsertedProduct.images || []);
+                    } else {
+                        // Update the form with the fetched data
+                        setFormData({
+                            title: updatedProduct.title,
+                            desc: updatedProduct.desc,
+                            price: updatedProduct.price.toString(),
+                            shop: updatedProduct.shop,
+                            category: updatedProduct.category?.toString() || '',
+                        });
+                        setPreviewUrls(updatedProduct.images || []);
+                    }
+                } catch (error) {
+                    console.error('Error updating product:', error);
+                    throw error;
+                }
             } else {
                 // Create new product
                 const { error } = await supabase.from('products').insert([productData]);
@@ -211,12 +289,29 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
             }
 
             setAlert({ type: 'success', message: `Product ${productId ? 'updated' : 'created'} successfully` });
-            router.replace('/products');
+            // Reset form if creating new product
+            if (!productId) {
+                setFormData({
+                    title: '',
+                    desc: '',
+                    price: '',
+                    shop: '',
+                    category: '',
+                });
+                setSelectedFiles([]);
+                setPreviewUrls([]);
+
+                // Redirect to products page after creating a new product
+                setTimeout(() => {
+                    router.push('/products');
+                }, 1500); // Short delay to allow user to see success message
+            }
         } catch (error) {
             console.error('Error saving product:', error);
-            setAlert({ type: 'danger', message: 'Error saving product' });
+            setAlert({ type: 'danger', message: error instanceof Error ? error.message : 'Error saving product' });
         } finally {
             setLoading(false);
+            window.scrollTo({ top: 0, behavior: 'smooth' });
         }
     };
 
@@ -255,14 +350,13 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                         </div>
 
                         <div>
-                            <label htmlFor="desc">Description</label>
+                            <label htmlFor="desc">Description (Optional)</label>
                             <textarea
                                 id="desc"
                                 name="desc"
                                 className="form-textarea min-h-[130px]"
                                 value={formData.desc}
                                 onChange={(e) => setFormData((prev) => ({ ...prev, desc: e.target.value }))}
-                                required
                             />
                         </div>
                     </div>
@@ -312,7 +406,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
 
                         {/* Category Selection */}
                         <div ref={categoryRef} className="relative">
-                            <label htmlFor="category">Category</label>
+                            <label htmlFor="category">Category (Optional)</label>
                             <div className="flex gap-2">
                                 <div className="relative flex-1">
                                     <div
@@ -416,7 +510,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                                     >
                                         <IconUpload className="mb-2 h-6 w-6" />
                                         <p className="text-sm text-gray-600 dark:text-gray-400">Click to upload</p>
-                                        <p className="text-xs text-gray-500 dark:text-gray-500">PNG, JPG, GIF up to 2MB</p>
+                                        <p className="text-[10px] text-gray-500 dark:text-gray-500">PNG, JPG, GIF up to 2MB</p>
                                     </div>
                                 )}
 

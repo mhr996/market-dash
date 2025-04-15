@@ -192,11 +192,7 @@ const ProductsList = () => {
                                 render: ({ title, images }) => {
                                     let imageList = [];
 
-                                    try {
-                                        imageList = JSON.parse(images || '[]');
-                                    } catch (e) {
-                                        imageList = [];
-                                    }
+                                    imageList = typeof images === 'string' ? JSON.parse(images || '[]') : images;
 
                                     return (
                                         <div className="flex items-center font-semibold">
@@ -223,6 +219,7 @@ const ProductsList = () => {
                                 accessor: 'categories.title',
                                 title: 'Category',
                                 sortable: true,
+                                render: ({ categories }) => <span>{categories?.title || 'N/A'}</span>,
                             },
                             {
                                 accessor: 'created_at',

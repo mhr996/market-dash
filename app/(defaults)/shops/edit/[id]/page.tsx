@@ -94,26 +94,67 @@ const EditShop = () => {
                 throw new Error('Shop name and description are required');
             }
 
-            // Create update payload with only the fields we want to update
+            // Create update payload with all fields we want to update
             const updatePayload = {
                 shop_name: form.shop_name,
                 shop_desc: form.shop_desc,
                 active: form.active,
             };
 
-            const { error } = await supabase.from('shops').update(updatePayload).eq('id', id).select();
+            console.log('Submitting shop data:', {
+                id,
+                form,
+                updatePayload,
+            });
 
-            if (error) throw error;
+            try {
+                // First try with a direct update
+                const { error } = await supabase.from('shops').update(updatePayload).eq('id', id);
+
+                if (error) throw error;
+
+                // Wait a moment to ensure the update is processed
+                await new Promise((resolve) => setTimeout(resolve, 500));
+
+                // Check if the update was successful by fetching the shop separately
+                const { data: updatedShop, error: fetchError } = await supabase.from('shops').select('*, profiles(full_name)').eq('id', id).single();
+
+                if (fetchError) throw fetchError;
+
+                console.log('Updated shop data:', updatedShop);
+
+                // Check if the data was actually updated
+                if (updatedShop.shop_name !== updatePayload.shop_name || updatedShop.shop_desc !== updatePayload.shop_desc || updatedShop.active !== updatePayload.active) {
+                    console.log('Data mismatch detected, trying upsert instead');
+
+                    // If the data doesn't match, try an upsert operation instead
+                    const { error: upsertError } = await supabase.from('shops').upsert({
+                        id: parseInt(id.toString()),
+                        ...updatePayload,
+                        // Preserve other fields that might be needed
+                        owner: form.owner,
+                        created_at: form.created_at,
+                    });
+
+                    if (upsertError) throw upsertError;
+
+                    // Verify the upsert worked
+                    const { data: upsertedShop, error: upsertFetchError } = await supabase.from('shops').select('*, profiles(full_name)').eq('id', id).single();
+
+                    if (upsertFetchError) throw upsertFetchError;
+
+                    console.log('Upserted shop data:', upsertedShop);
+                    setForm(upsertedShop);
+                } else {
+                    // Update was successful, update the form with the fetched data
+                    setForm(updatedShop);
+                }
+            } catch (error) {
+                console.error('Error updating shop:', error);
+                throw error;
+            }
 
             setAlert({ visible: true, message: 'Shop updated successfully!', type: 'success' });
-
-            // Refresh data after successful update
-            await fetchShopData();
-
-            // Redirect after successful update
-            setTimeout(() => {
-                router.push('/shops');
-            }, 1500);
         } catch (error) {
             console.error(error);
             setAlert({

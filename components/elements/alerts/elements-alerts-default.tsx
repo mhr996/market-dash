@@ -1,6 +1,6 @@
 import IconX from '@/components/icon/icon-x';
 import PanelCodeHighlight from '@/components/panel-code-highlight';
-import React, { useEffect } from 'react';
+import React, { useEffect, useState } from 'react';
 
 interface AlertProps {
     type: 'primary' | 'secondary' | 'success' | 'warning' | 'danger' | 'info';
@@ -10,6 +10,9 @@ interface AlertProps {
 }
 
 const Alert: React.FC<AlertProps> = ({ type, message, title, onClose }) => {
+    const [isVisible, setIsVisible] = useState(true);
+    const [isLeaving, setIsLeaving] = useState(false);
+
     const alertClasses = {
         primary: 'bg-primary-light text-primary dark:bg-primary-dark-light',
         secondary: 'bg-secondary-light text-secondary dark:bg-secondary-dark-light',
@@ -22,20 +25,37 @@ const Alert: React.FC<AlertProps> = ({ type, message, title, onClose }) => {
     useEffect(() => {
         if (onClose) {
             const timer = setTimeout(() => {
-                onClose();
-            }, 4000);
+                setIsLeaving(true);
+                // Wait for animation to complete before calling onClose
+                setTimeout(() => {
+                    setIsVisible(false);
+                    onClose();
+                }, 300);
+            }, 5000);
             return () => clearTimeout(timer);
         }
     }, [onClose]);
 
+    if (!isVisible) return null;
+
     return (
-        <div className={`flex items-center rounded p-3.5 mb-4 animate-fade-in ${alertClasses[type]}`}>
+        <div className={`flex items-center rounded p-3.5 mb-4 transition-all duration-300 ${isLeaving ? 'opacity-0 -translate-y-2' : 'opacity-100 translate-y-0'} transform ${alertClasses[type]}`}>
             <span className="ltr:pr-2 rtl:pl-2">
                 {title && <strong className="ltr:mr-1 rtl:ml-1">{title}!</strong>}
                 {message}
             </span>
             {onClose && (
-                <button type="button" className="hover:opacity-80 ltr:ml-auto rtl:mr-auto" onClick={onClose}>
+                <button
+                    type="button"
+                    className="hover:opacity-80 ltr:ml-auto rtl:mr-auto"
+                    onClick={() => {
+                        setIsLeaving(true);
+                        setTimeout(() => {
+                            setIsVisible(false);
+                            onClose();
+                        }, 300);
+                    }}
+                >
                     <IconX className="h-5 w-5" />
                 </button>
             )}
