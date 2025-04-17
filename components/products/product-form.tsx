@@ -164,11 +164,11 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
         e.preventDefault();
 
         // Validate required fields
-        if (!formData.title.trim()) {
+        if (!formData.title?.trim()) {
             setAlert({ type: 'danger', message: 'Title is required' });
             return;
         }
-
+ 
         if (!formData.price) {
             setAlert({ type: 'danger', message: 'Price is required' });
             return;
