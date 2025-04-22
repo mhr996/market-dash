@@ -22,6 +22,9 @@ interface Product {
         title: string;
         desc: string;
     };
+    sale_price?: number | null;
+    discount_type?: 'percentage' | 'fixed' | null;
+    discount_value?: number | null;
 }
 
 interface ProductDetailsPageProps {
@@ -141,7 +144,28 @@ const ProductDetailsPage = ({ params }: ProductDetailsPageProps) => {
 
                         <div>
                             <h3 className="text-lg font-semibold">Price</h3>
-                            <p className="mt-2 text-2xl font-bold text-primary">${parseFloat(product.price).toFixed(2)}</p>
+                            {product.sale_price ? (
+                                <div className="mt-2">
+                                    <div className="flex items-center gap-3">
+                                        <span className="text-2xl line-through text-gray-500">${parseFloat(product.price).toFixed(2)}</span>
+                                        <span className="text-3xl font-bold text-success">${product.sale_price.toFixed(2)}</span>
+                                    </div>
+                                    <div className="mt-1">
+                                        {product.discount_type === 'percentage' && product.discount_value && (
+                                            <span className="text-sm bg-success/20 text-success px-2 py-1 rounded-full">
+                                                {product.discount_value}% OFF
+                                            </span>
+                                        )}
+                                        {product.discount_type === 'fixed' && product.discount_value && (
+                                            <span className="text-sm bg-success/20 text-success px-2 py-1 rounded-full">
+                                                ${product.discount_value.toFixed(2)} OFF
+                                            </span>
+                                        )}
+                                    </div>
+                                </div>
+                            ) : (
+                                <p className="mt-2 text-2xl font-bold text-primary">${parseFloat(product.price).toFixed(2)}</p>
+                            )}
                         </div>
 
                         <div>

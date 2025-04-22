@@ -31,6 +31,9 @@ interface Product {
         shop_name: string;
     };
     categories?: Category;
+    sale_price?: number | null;
+    discount_type?: 'percentage' | 'fixed' | null;
+    discount_value?: number | null;
 }
 
 const ProductsList = () => {
@@ -208,7 +211,23 @@ const ProductsList = () => {
                                 accessor: 'price',
                                 title: 'Price',
                                 sortable: true,
-                                render: ({ price }) => <span>${parseFloat(price).toFixed(2)}</span>,
+                                render: ({ price, sale_price, discount_type, discount_value }) => (
+                                    <div>
+                                        {sale_price ? (
+                                            <div className="flex flex-col">
+                                                <span className="line-through text-gray-500">${parseFloat(price).toFixed(2)}</span>
+                                                <span className="text-success font-bold">${sale_price.toFixed(2)}</span>
+                                                {discount_type === 'percentage' && discount_value && (
+                                                    <span className="text-xs bg-success/20 text-success px-1.5 py-0.5 rounded-full w-fit mt-1">
+                                                        {discount_value}% OFF
+                                                    </span>
+                                                )}
+                                            </div>
+                                        ) : (
+                                            <span>${parseFloat(price).toFixed(2)}</span>
+                                        )}
+                                    </div>
+                                ),
                             },
                             {
                                 accessor: 'shops.shop_name',

@@ -36,6 +36,12 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
     const [alert, setAlert] = useState<{ type: 'success' | 'danger'; message: string } | null>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
+    // Sale price states
+    const [hasSalePrice, setHasSalePrice] = useState(false);
+    const [discountType, setDiscountType] = useState<'percentage' | 'fixed'>('percentage');
+    const [discountValue, setDiscountValue] = useState('');
+    const [finalPrice, setFinalPrice] = useState<number | null>(null);
+
     // Dropdown states
     const [isShopDropdownOpen, setIsShopDropdownOpen] = useState(false);
     const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
@@ -100,6 +106,21 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                             category: product.category?.toString() || '',
                         });
                         setPreviewUrls(product.images || []);
+
+                        // Set sale price state if available
+                        if (product.sale_price) {
+                            setHasSalePrice(true);
+                            setFinalPrice(product.sale_price);
+
+                            // Determine discount type and value
+                            if (product.discount_type === 'percentage') {
+                                setDiscountType('percentage');
+                                setDiscountValue(product.discount_value?.toString() || '');
+                            } else {
+                                setDiscountType('fixed');
+                                setDiscountValue(product.discount_value?.toString() || '');
+                            }
+                        }
                     }
                 }
             } catch (error) {
@@ -110,6 +131,31 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
 
         fetchData();
     }, [productId]);
+
+    // Calculate discount price whenever price or discount changes
+    useEffect(() => {
+        if (hasSalePrice && formData.price && discountValue) {
+            const basePrice = parseFloat(formData.price);
+            if (discountType === 'percentage') {
+                const percentage = parseFloat(discountValue);
+                if (percentage >= 0 && percentage <= 100) {
+                    const discountAmount = basePrice * (percentage / 100);
+                    setFinalPrice(parseFloat((basePrice - discountAmount).toFixed(2)));
+                } else {
+                    setFinalPrice(null);
+                }
+            } else {
+                const fixedDiscount = parseFloat(discountValue);
+                if (fixedDiscount >= 0 && fixedDiscount < basePrice) {
+                    setFinalPrice(parseFloat((basePrice - fixedDiscount).toFixed(2)));
+                } else {
+                    setFinalPrice(null);
+                }
+            }
+        } else {
+            setFinalPrice(null);
+        }
+    }, [hasSalePrice, formData.price, discountType, discountValue]);
 
     const handleFileSelect = () => {
         fileInputRef.current?.click();
@@ -168,7 +214,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
             setAlert({ type: 'danger', message: 'Title is required' });
             return;
         }
- 
+
         if (!formData.price) {
             setAlert({ type: 'danger', message: 'Price is required' });
             return;
@@ -182,6 +228,24 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
         if (!previewUrls.length && !selectedFiles.length) {
             setAlert({ type: 'danger', message: 'At least one product image is required' });
             return;
+        }
+
+        // Validate sale price if enabled
+        if (hasSalePrice) {
+            if (!discountValue || parseFloat(discountValue) <= 0) {
+                setAlert({ type: 'danger', message: 'Please enter a valid discount value' });
+                return;
+            }
+
+            if (discountType === 'percentage' && parseFloat(discountValue) > 100) {
+                setAlert({ type: 'danger', message: 'Percentage discount cannot exceed 100%' });
+                return;
+            }
+
+            if (discountType === 'fixed' && parseFloat(discountValue) >= parseFloat(formData.price)) {
+                setAlert({ type: 'danger', message: 'Fixed discount cannot be equal to or greater than the product price' });
+                return;
+            }
         }
 
         setLoading(true);
@@ -222,6 +286,9 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                 shop: formData.shop,
                 category: formData.category ? parseInt(formData.category) : null,
                 images: imageUrls,
+                sale_price: hasSalePrice && finalPrice ? finalPrice : null,
+                discount_type: hasSalePrice ? discountType : null,
+                discount_value: hasSalePrice && discountValue ? parseFloat(discountValue) : null,
             };
 
             if (productId) {
@@ -267,6 +334,18 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                             category: upsertedProduct.category?.toString() || '',
                         });
                         setPreviewUrls(upsertedProduct.images || []);
+
+                        // Update sale price data
+                        if (upsertedProduct.sale_price) {
+                            setHasSalePrice(true);
+                            setFinalPrice(upsertedProduct.sale_price);
+                            setDiscountType(upsertedProduct.discount_type);
+                            setDiscountValue(upsertedProduct.discount_value?.toString() || '');
+                        } else {
+                            setHasSalePrice(false);
+                            setFinalPrice(null);
+                            setDiscountValue('');
+                        }
                     } else {
                         // Update the form with the fetched data
                         setFormData({
@@ -277,6 +356,18 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                             category: updatedProduct.category?.toString() || '',
                         });
                         setPreviewUrls(updatedProduct.images || []);
+
+                        // Update sale price data
+                        if (updatedProduct.sale_price) {
+                            setHasSalePrice(true);
+                            setFinalPrice(updatedProduct.sale_price);
+                            setDiscountType(updatedProduct.discount_type);
+                            setDiscountValue(updatedProduct.discount_value?.toString() || '');
+                        } else {
+                            setHasSalePrice(false);
+                            setFinalPrice(null);
+                            setDiscountValue('');
+                        }
                     }
                 } catch (error) {
                     console.error('Error updating product:', error);
@@ -300,6 +391,9 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                 });
                 setSelectedFiles([]);
                 setPreviewUrls([]);
+                setHasSalePrice(false);
+                setDiscountValue('');
+                setFinalPrice(null);
 
                 // Redirect to products page after creating a new product
                 setTimeout(() => {
@@ -347,6 +441,81 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                                 onChange={(e) => setFormData((prev) => ({ ...prev, price: e.target.value }))}
                                 required
                             />
+                        </div>
+
+                        {/* Sale Price Toggle and Options */}
+                        <div className="space-y-4 border-2 border-dashed border-gray-200 p-4 rounded-lg dark:border-gray-700">
+                            <div className="flex items-center justify-between">
+                                <label htmlFor="hasSalePrice" className="font-medium flex items-center cursor-pointer">
+                                    <input
+                                        id="hasSalePrice"
+                                        type="checkbox"
+                                        className="form-checkbox mr-2"
+                                        checked={hasSalePrice}
+                                        onChange={(e) => {
+                                            setHasSalePrice(e.target.checked);
+                                            if (!e.target.checked) {
+                                                setDiscountValue('');
+                                                setFinalPrice(null);
+                                            }
+                                        }}
+                                    />
+                                    Add Sale Price
+                                </label>
+                            </div>
+
+                            <AnimateHeight duration={300} height={hasSalePrice ? 'auto' : 0}>
+                                {hasSalePrice && (
+                                    <div className="space-y-4 mt-2">
+                                        <div>
+                                            <label className="block mb-2">Discount Type</label>
+                                            <div className="flex gap-4">
+                                                <label className="inline-flex items-center cursor-pointer">
+                                                    <input
+                                                        type="radio"
+                                                        className="form-radio"
+                                                        name="discountType"
+                                                        checked={discountType === 'percentage'}
+                                                        onChange={() => setDiscountType('percentage')}
+                                                    />
+                                                    <span className="ml-2">Percentage (%)</span>
+                                                </label>
+                                                <label className="inline-flex items-center cursor-pointer">
+                                                    <input type="radio" className="form-radio" name="discountType" checked={discountType === 'fixed'} onChange={() => setDiscountType('fixed')} />
+                                                    <span className="ml-2">Fixed Amount</span>
+                                                </label>
+                                            </div>
+                                        </div>
+
+                                        <div>
+                                            <label htmlFor="discountValue">{discountType === 'percentage' ? 'Percentage Discount (%)' : 'Fixed Discount Amount'}</label>
+                                            <input
+                                                id="discountValue"
+                                                type="number"
+                                                name="discountValue"
+                                                step="0.01"
+                                                className="form-input"
+                                                value={discountValue}
+                                                onChange={(e) => setDiscountValue(e.target.value)}
+                                                min="0"
+                                                max={discountType === 'percentage' ? '100' : formData.price || '999999'}
+                                                required={hasSalePrice}
+                                            />
+                                        </div>
+
+                                        {finalPrice !== null && formData.price && (
+                                            <div className="flex items-center gap-4 text-lg">
+                                                <div className="font-medium">Final Price:</div>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="text-danger line-through">{parseFloat(formData.price).toFixed(2)}</span>
+                                                    <span className="font-bold text-success">{finalPrice.toFixed(2)}</span>
+                                                    {discountType === 'percentage' && <span className="bg-success text-white px-2 py-0.5 text-xs rounded-full">{discountValue}% OFF</span>}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+                            </AnimateHeight>
                         </div>
 
                         <div>
