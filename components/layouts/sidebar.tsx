@@ -178,14 +178,14 @@ const Sidebar = () => {
                                 <span>{t('settings')}</span>
                             </h2>
 
-                            <li className="nav-item">
+                            {/* <li className="nav-item">
                                 <Link href="/settings" className="group">
                                     <div className="flex items-center">
                                         <IconSettings fill className="shrink-0 group-hover:!text-primary" />
                                         <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">{t('general_settings')}</span>
                                     </div>
                                 </Link>
-                            </li>
+                            </li> */}
                             <li className="nav-item">
                                 <Link href="/account-settings" className="group">
                                     <div className="flex items-center">
