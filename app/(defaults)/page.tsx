@@ -4,7 +4,13 @@ import { useSelector } from 'react-redux';
 import { IRootState } from '@/store';
 import supabase from '@/lib/supabase';
 import Link from 'next/link';
-import ReactApexChart from 'react-apexcharts';
+import dynamic from 'next/dynamic';
+
+// Dynamically import ReactApexChart with SSR disabled
+const ReactApexChart = dynamic(() => import('react-apexcharts'), { 
+    ssr: false,
+    loading: () => <div className="h-[200px] flex items-center justify-center">Loading chart...</div>
+});
 
 // Icons
 import IconTrendingUp from '@/components/icon/icon-trending-up';
@@ -395,7 +401,9 @@ const HomePage = () => {
                             <div className="relative">
                                 <h4 className="text-lg font-semibold dark:text-white-light mb-4">Revenue Trend</h4>
                                 <div className="h-[200px] mb-3">
-                                    {isMounted && <ReactApexChart series={performanceChartData.series} options={performanceChartData.options} type="area" height={200} />}
+                                    {isMounted && typeof window !== 'undefined' && (
+                                        <ReactApexChart series={performanceChartData.series} options={performanceChartData.options} type="area" height={200} />
+                                    )}
                                 </div>
                                 <div className="absolute bottom-0 left-0 right-0 text-center text-xs text-gray-500 dark:text-gray-400">Performance over last 6 months</div>
                             </div>
