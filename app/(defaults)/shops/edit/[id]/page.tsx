@@ -101,11 +101,6 @@ const EditShop = () => {
                 active: form.active,
             };
 
-            console.log('Submitting shop data:', {
-                id,
-                form,
-                updatePayload,
-            });
 
             try {
                 // First try with a direct update

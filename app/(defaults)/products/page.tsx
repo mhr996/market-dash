@@ -218,9 +218,7 @@ const ProductsList = () => {
                                                 <span className="line-through text-gray-500">${parseFloat(price).toFixed(2)}</span>
                                                 <span className="text-success font-bold">${sale_price.toFixed(2)}</span>
                                                 {discount_type === 'percentage' && discount_value && (
-                                                    <span className="text-xs bg-success/20 text-success px-1.5 py-0.5 rounded-full w-fit mt-1">
-                                                        {discount_value}% OFF
-                                                    </span>
+                                                    <span className="text-xs bg-success/20 text-success px-1.5 py-0.5 rounded-full w-fit mt-1">{discount_value}% OFF</span>
                                                 )}
                                             </div>
                                         ) : (

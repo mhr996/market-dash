@@ -152,14 +152,10 @@ const ProductDetailsPage = ({ params }: ProductDetailsPageProps) => {
                                     </div>
                                     <div className="mt-1">
                                         {product.discount_type === 'percentage' && product.discount_value && (
-                                            <span className="text-sm bg-success/20 text-success px-2 py-1 rounded-full">
-                                                {product.discount_value}% OFF
-                                            </span>
+                                            <span className="text-sm bg-success/20 text-success px-2 py-1 rounded-full">{product.discount_value}% OFF</span>
                                         )}
                                         {product.discount_type === 'fixed' && product.discount_value && (
-                                            <span className="text-sm bg-success/20 text-success px-2 py-1 rounded-full">
-                                                ${product.discount_value.toFixed(2)} OFF
-                                            </span>
+                                            <span className="text-sm bg-success/20 text-success px-2 py-1 rounded-full">${product.discount_value.toFixed(2)} OFF</span>
                                         )}
                                     </div>
                                 </div>
