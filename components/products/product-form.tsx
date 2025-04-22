@@ -277,7 +277,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                 if (typeof url === 'string' && url.startsWith('http')) {
                     imageUrls.push(url);
                 }
-            }
+            } //
 
             const productData = {
                 title: formData.title,
