@@ -8,7 +8,6 @@ import { Alert } from '@/components/elements/alerts/elements-alerts-default';
 const AddUserPage = () => {
     const router = useRouter();
     const [form, setForm] = useState({
-        id: 'kdujfaldnaid234234',
         full_name: '',
         email: '',
         profession: '',
@@ -38,18 +37,64 @@ const AddUserPage = () => {
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
         setLoading(true);
-        // Basic validation: full name and email are required.
+        // Basic validation: full name and email are required
         if (!form.full_name || !form.email) {
             setAlert({ visible: true, message: 'Full name and email are required.', type: 'danger' });
             setLoading(false);
             return;
         }
+
         try {
-            const { error } = await supabase.from('profiles').insert([form]);
-            if (error) throw error;
-            setAlert({ visible: true, message: 'User added successfully!', type: 'success' });
-            // Redirect back to the users list page after successful insertion.
-            router.push('/users');
+            // Get the user's session for authentication
+            const { data: sessionData } = await supabase.auth.getSession();
+            const token = sessionData?.session?.access_token;
+
+            if (!token) {
+                throw new Error('Not authenticated');
+            }
+
+            // Call our secure API endpoint to invite the user
+            const response = await fetch('/api/users/invite', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json',
+                    Authorization: `Bearer ${token}`,
+                },
+                body: JSON.stringify({
+                    email: form.email,
+                    userData: {
+                        display_name: form.full_name,
+                    },
+                    profileData: {
+                        full_name: form.full_name,
+                        profession: form.profession,
+                        country: form.country,
+                        address: form.address,
+                        location: form.location,
+                        phone: form.phone,
+                        website: form.website,
+                        avatar_url: form.avatar_url,
+                        status: form.status,
+                    },
+                }),
+            });
+
+            const result = await response.json();
+
+            if (!response.ok) {
+                throw new Error(result.error || 'Failed to invite user');
+            }
+
+            setAlert({
+                visible: true,
+                message: 'User added successfully! An invitation email has been sent to the user.',
+                type: 'success',
+            });
+
+            // Redirect back to the users list page after successful insertion
+            setTimeout(() => {
+                router.push('/users');
+            }, 2000);
         } catch (error: any) {
             console.error(error);
             setAlert({ visible: true, message: error.message || 'Error adding user', type: 'danger' });
@@ -94,12 +139,13 @@ const AddUserPage = () => {
             {/* Form Container */}
             <div className="rounded-md border border-[#ebedf2] bg-white p-4 dark:border-[#191e3a] dark:bg-black">
                 <h6 className="mb-5 text-lg font-bold">Add New User</h6>
-                <form
-                    onSubmit={(e) => {
-                        e.preventDefault();
-                    }}
-                    className="grid grid-cols-1 gap-5 sm:grid-cols-2"
-                >
+                <div className="mb-5 p-3 border-l-2 border-primary bg-primary/10 dark:bg-primary/20">
+                    <p className="text-sm">
+                        <span className="font-bold">Note:</span> This will create a new user account and send the user an invitation email to set up their password. Only admins should use this page to
+                        add users.
+                    </p>
+                </div>
+                <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                     <div>
                         <label htmlFor="full_name" className="block text-sm font-bold text-gray-700 dark:text-white">
                             Full Name *
@@ -150,8 +196,8 @@ const AddUserPage = () => {
                     </div>
 
                     <div className="sm:col-span-2">
-                        <button type="submit" disabled={loading} className="btn btn-primary ">
-                            {loading ? 'Submitting...' : 'Add User'}
+                        <button type="submit" disabled={loading} className="btn btn-primary">
+                            {loading ? 'Sending Invitation...' : 'Add User & Send Invitation'}
                         </button>
                     </div>
                 </form>

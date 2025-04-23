@@ -34,7 +34,7 @@ function App({ children }: PropsWithChildren) {
             initTheme();
 
             const publicPages = ['/login', '/register', '/reset-password', '/update-password'];
-            if (publicPages.includes(pathname)) {
+            if (pathname && publicPages.includes(pathname)) {
                 setIsLoading(false);
                 return;
             }
