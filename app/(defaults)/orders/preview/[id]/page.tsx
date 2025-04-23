@@ -13,7 +13,10 @@ interface Order {
 }
 
 const PreviewOrder = () => {
-    const { id } = useParams();
+    // Fix: Type assertion to access id from params
+    const params = useParams();
+    const id = params?.id as string;
+
     const [order, setOrder] = useState<Order | null>(null);
     const [loading, setLoading] = useState(true);
 
