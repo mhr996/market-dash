@@ -20,7 +20,10 @@ interface Shop {
 }
 
 const EditShop = () => {
-    const { id } = useParams();
+    // Fix: Type assertion to access id from params
+    const params = useParams();
+    const id = params?.id as string;
+    
     const router = useRouter();
     const [loading, setLoading] = useState(true);
     const [form, setForm] = useState<Shop>({

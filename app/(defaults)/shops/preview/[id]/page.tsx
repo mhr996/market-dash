@@ -21,7 +21,10 @@ interface Shop {
 }
 
 const ShopPreview = () => {
-    const { id } = useParams();
+    // Fix: Type assertion to access id from params
+    const params = useParams();
+    const id = params?.id as string;
+    
     const router = useRouter();
     const [shop, setShop] = useState<Shop | null>(null);
     const [loading, setLoading] = useState(true);
