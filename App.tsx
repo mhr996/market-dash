@@ -33,7 +33,7 @@ function App({ children }: PropsWithChildren) {
         const checkAuth = async () => {
             initTheme();
 
-            const publicPages = ['/login', '/register'];
+            const publicPages = ['/login', '/register', '/reset-password', '/update-password'];
             if (publicPages.includes(pathname)) {
                 setIsLoading(false);
                 return;

@@ -4,6 +4,7 @@ import IconMail from '@/components/icon/icon-mail';
 import { useRouter } from 'next/navigation';
 import React, { useState } from 'react';
 import { signIn } from '@/lib/auth';
+import Link from 'next/link';
 
 interface FormErrors {
     email?: string;
@@ -100,11 +101,14 @@ const ComponentsAuthLoginForm = () => {
                 </div>
                 {errors.password && <span className="text-red-500 text-sm mt-1">{errors.password}</span>}
             </div>
-            <div>
+            <div className="flex justify-between">
                 <label className="flex cursor-pointer items-center">
                     <input type="checkbox" className="form-checkbox bg-white dark:bg-black" />
                     <span className="text-white-dark">Remember me</span>
                 </label>
+                <Link href="/reset-password" className="text-primary hover:underline">
+                    Forgot Password?
+                </Link>
             </div>
             <button type="submit" className="btn btn-gradient !mt-6 w-full border-0 uppercase shadow-[0_10px_20px_-10px_rgba(67,97,238,0.44)]" disabled={isSubmitting}>
                 {isSubmitting ? 'Signing In...' : 'Sign In'}
