@@ -4,13 +4,14 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import supabase from '@/lib/supabase';
 import { Alert } from '@/components/elements/alerts/elements-alerts-default';
+import CountrySelect from '@/components/country-select/country-select';
 
 const AddUserPage = () => {
     const router = useRouter();
     const [form, setForm] = useState({
         full_name: '',
         email: '',
-        profession: '',
+        username: '',
         country: '',
         address: '',
         location: '',
@@ -67,7 +68,7 @@ const AddUserPage = () => {
                     },
                     profileData: {
                         full_name: form.full_name,
-                        profession: form.profession,
+                        username: form.username,
                         country: form.country,
                         address: form.address,
                         location: form.location,
@@ -139,12 +140,7 @@ const AddUserPage = () => {
             {/* Form Container */}
             <div className="rounded-md border border-[#ebedf2] bg-white p-4 dark:border-[#191e3a] dark:bg-black">
                 <h6 className="mb-5 text-lg font-bold">Add New User</h6>
-                <div className="mb-5 p-3 border-l-2 border-primary bg-primary/10 dark:bg-primary/20">
-                    <p className="text-sm">
-                        <span className="font-bold">Note:</span> This will create a new user account and send the user an invitation email to set up their password. Only admins should use this page to
-                        add users.
-                    </p>
-                </div>
+              
                 <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                     <div>
                         <label htmlFor="full_name" className="block text-sm font-bold text-gray-700 dark:text-white">
@@ -159,16 +155,27 @@ const AddUserPage = () => {
                         <input type="email" id="email" name="email" value={form.email} onChange={handleInputChange} className="form-input" placeholder="Enter email" required />
                     </div>
                     <div>
-                        <label htmlFor="profession" className="block text-sm font-bold text-gray-700 dark:text-white">
-                            Profession
+                        <label htmlFor="username" className="block text-sm font-bold text-gray-700 dark:text-white">
+                            Username
                         </label>
-                        <input type="text" id="profession" name="profession" value={form.profession} onChange={handleInputChange} className="form-input" placeholder="Enter profession" />
+                        <input type="text" id="username" name="username" value={form.username} onChange={handleInputChange} className="form-input" placeholder="Enter username" />
                     </div>
                     <div>
                         <label htmlFor="country" className="block text-sm font-bold text-gray-700 dark:text-white">
                             Country
                         </label>
-                        <input type="text" id="country" name="country" value={form.country} onChange={handleInputChange} className="form-input" placeholder="Enter country" />
+                        <CountrySelect
+                            id="country"
+                            name="country"
+                            defaultValue={form.country}
+                            className="form-select text-white-dark"
+                            onChange={(e) => {
+                                setForm((prev) => ({
+                                    ...prev,
+                                    country: e.target.value,
+                                }));
+                            }}
+                        />
                     </div>
                     <div>
                         <label htmlFor="address" className="block text-sm font-bold text-gray-700 dark:text-white">

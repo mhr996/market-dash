@@ -34,6 +34,9 @@ interface Product {
     sale_price?: number | null;
     discount_type?: 'percentage' | 'fixed' | null;
     discount_value?: number | null;
+    discount_start?: string | null;
+    discount_end?: string | null;
+    active: boolean;
 }
 
 const ProductsList = () => {
@@ -148,6 +151,18 @@ const ProductsList = () => {
         }
     };
 
+    const toggleProductStatus = async (id: string, status: boolean) => {
+        try {
+            const { error } = await supabase.from('products').update({ active: status }).eq('id', id);
+            if (error) throw error;
+
+            const updatedItems = items.map((item) => (item.id === id ? { ...item, active: status } : item));
+            setItems(updatedItems);
+        } catch (error) {
+            console.error('Error updating product status:', error);
+        }
+    };
+
     return (
         <div className="panel border-white-light px-0 dark:border-[#1b2e4b]">
             {alert.visible && (
@@ -211,7 +226,7 @@ const ProductsList = () => {
                                 accessor: 'price',
                                 title: 'Price',
                                 sortable: true,
-                                render: ({ price, sale_price, discount_type, discount_value }) => (
+                                render: ({ price, sale_price, discount_type, discount_value, discount_start, discount_end }) => (
                                     <div>
                                         {sale_price ? (
                                             <div className="flex flex-col">
@@ -219,6 +234,11 @@ const ProductsList = () => {
                                                 <span className="text-success font-bold">${sale_price.toFixed(2)}</span>
                                                 {discount_type === 'percentage' && discount_value && (
                                                     <span className="text-xs bg-success/20 text-success px-1.5 py-0.5 rounded-full w-fit mt-1">{discount_value}% OFF</span>
+                                                )}
+                                                {discount_start && discount_end && (
+                                                    <span className="text-xs text-gray-500 mt-1">
+                                                        {new Date() < new Date(discount_start) ? 'Starts soon' : new Date() > new Date(discount_end) ? 'Expired' : 'Limited time'}
+                                                    </span>
                                                 )}
                                             </div>
                                         ) : (
@@ -243,6 +263,24 @@ const ProductsList = () => {
                                 title: 'Created Date',
                                 sortable: true,
                                 render: ({ created_at }) => <span>{new Date(created_at).toLocaleDateString()}</span>,
+                            },
+                            {
+                                accessor: 'active',
+                                title: 'Status',
+                                sortable: true,
+                                textAlignment: 'center',
+                                render: ({ id, active }) => (
+                                    <div className="flex items-center justify-start w-full">
+                                        <span
+                                            className={`cursor-pointer inline-block w-[60px] text-center px-1 py-1 text-xs rounded-full ${
+                                                active ? 'bg-success/20 text-success hover:bg-success/30' : 'bg-danger/20 text-danger hover:bg-danger/30'
+                                            } transition-all duration-300`}
+                                            onClick={() => toggleProductStatus(id, !active)}
+                                        >
+                                            {active ? 'Active' : 'Inactive'}
+                                        </span>
+                                    </div>
+                                ),
                             },
                             {
                                 accessor: 'action',

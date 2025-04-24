@@ -1,6 +1,6 @@
 const themeConfig = {
     locale: 'en', // en, da, de, el, es, fr, hu, it, ja, pl, pt, ru, sv, tr, zh
-    theme: 'light', // light, dark, system
+    theme: 'dark', // light, dark, system
     menu: 'vertical', // vertical, collapsible-vertical, horizontal
     layout: 'full', // full, boxed-layout
     rtlClass: 'ltr', // rtl, ltr

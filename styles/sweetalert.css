@@ -17,6 +17,10 @@ body.swal2-toast-shown .swal2-container.toast {
     color: #888ea8;
 }
 
+input[type="time"]::-webkit-calendar-picker-indicator{
+  filter: invert(48%) sepia(13%) saturate(3207%) hue-rotate(130deg) brightness(95%) contrast(80%);
+}
+
 .swal2-popup .swal2-title {
     display: block;
     margin: 0px !important;

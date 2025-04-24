@@ -35,7 +35,7 @@ table tr .mantine-Checkbox-root {
     @apply text-center;
 } */
 .datatables .mantine-gzzjso,
-.datatables .mantine-lrzwoq{
+.datatables .mantine-lrzwoq {
     @apply border-t-0 !p-0 !pt-5 !bg-transparent;
 }
 .datatables.pagination-padding .mantine-gzzjso {
@@ -119,4 +119,19 @@ table tr .mantine-Checkbox-root {
 }
 .mantine-ScrollArea-viewport > div:first-child > div {
     @apply bg-none;
+}
+
+/* Fix for pagination buttons in dark mode */
+.dark .mantine-Pagination-control {
+    @apply bg-[#1b2e4b] text-white-dark border-[#191e3a];
+}
+
+.dark .mantine-Pagination-control[data-active] {
+    @apply !bg-primary !text-white;
+}
+
+/* Fix for records per page dropdown button in dark mode */
+.dark .mantine-y4ntz3,
+.dark .mantine-UnstyledButton-root.mantine-Button-root.mantine-y4ntz3 {
+    @apply bg-[#1b2e4b] text-white-dark border-[#191e3a];
 }

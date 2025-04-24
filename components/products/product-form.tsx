@@ -6,9 +6,12 @@ import { useRouter } from 'next/navigation';
 import IconX from '@/components/icon/icon-x';
 import IconCaretDown from '@/components/icon/icon-caret-down';
 import IconUpload from '@/components/icon/icon-camera';
+import IconCalendar from '@/components/icon/icon-calendar';
 import AnimateHeight from 'react-animate-height';
 import { useSelector } from 'react-redux';
 import { IRootState } from '@/store';
+import Flatpickr from 'react-flatpickr';
+import 'flatpickr/dist/flatpickr.css';
 
 interface Shop {
     id: string;
@@ -41,6 +44,8 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
     const [discountType, setDiscountType] = useState<'percentage' | 'fixed'>('percentage');
     const [discountValue, setDiscountValue] = useState('');
     const [finalPrice, setFinalPrice] = useState<number | null>(null);
+    const [discountStart, setDiscountStart] = useState<Date | null>(null);
+    const [discountEnd, setDiscountEnd] = useState<Date | null>(null);
 
     // Dropdown states
     const [isShopDropdownOpen, setIsShopDropdownOpen] = useState(false);
@@ -56,6 +61,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
         price: '',
         shop: '',
         category: '',
+        active: true, // Default to active
     });
 
     // New category form state
@@ -104,6 +110,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                             price: product.price,
                             shop: product.shop,
                             category: product.category?.toString() || '',
+                            active: product.active !== undefined ? product.active : true,
                         });
                         setPreviewUrls(product.images || []);
 
@@ -119,6 +126,15 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                             } else {
                                 setDiscountType('fixed');
                                 setDiscountValue(product.discount_value?.toString() || '');
+                            }
+
+                            // Set discount time period if available
+                            if (product.discount_start) {
+                                setDiscountStart(new Date(product.discount_start));
+                            }
+
+                            if (product.discount_end) {
+                                setDiscountEnd(new Date(product.discount_end));
                             }
                         }
                     }
@@ -289,6 +305,9 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                 sale_price: hasSalePrice && finalPrice ? finalPrice : null,
                 discount_type: hasSalePrice ? discountType : null,
                 discount_value: hasSalePrice && discountValue ? parseFloat(discountValue) : null,
+                discount_start: hasSalePrice && discountStart ? discountStart.toISOString() : null,
+                discount_end: hasSalePrice && discountEnd ? discountEnd.toISOString() : null,
+                active: formData.active,
             };
 
             if (productId) {
@@ -332,6 +351,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                             price: upsertedProduct.price.toString(),
                             shop: upsertedProduct.shop,
                             category: upsertedProduct.category?.toString() || '',
+                            active: upsertedProduct.active,
                         });
                         setPreviewUrls(upsertedProduct.images || []);
 
@@ -347,16 +367,16 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                             setDiscountValue('');
                         }
                     } else {
-                        // Update the form with the fetched data
                         setFormData({
                             title: updatedProduct.title,
                             desc: updatedProduct.desc,
                             price: updatedProduct.price.toString(),
                             shop: updatedProduct.shop,
                             category: updatedProduct.category?.toString() || '',
+                            active: updatedProduct.active,
                         });
                         setPreviewUrls(updatedProduct.images || []);
-
+        
                         // Update sale price data
                         if (updatedProduct.sale_price) {
                             setHasSalePrice(true);
@@ -388,6 +408,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                     price: '',
                     shop: '',
                     category: '',
+                    active: true,
                 });
                 setSelectedFiles([]);
                 setPreviewUrls([]);
@@ -513,6 +534,55 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                                                 </div>
                                             </div>
                                         )}
+
+                                        <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
+                                            <div>
+                                                <label htmlFor="discountStart">Discount Start Date/Time</label>
+                                                <div className="relative">
+                                                    <Flatpickr
+                                                        options={{
+                                                            enableTime: true,
+                                                            dateFormat: 'Y-m-d H:i',
+                                                            minDate: 'today',
+                                                            position: isRtl ? 'auto right' : 'auto left',
+                                                            static: true,
+                                                            disableMobile: true,
+                                                            time_24hr: true,
+                                                        }}
+                                                        placeholder="Select start date/time"
+                                                        className="form-input text-sm pr-10"
+                                                        value={discountStart || ''}
+                                                        onChange={([date]) => setDiscountStart(date)}
+                                                    />
+                                                    <div className="absolute right-[11px] top-1/2 -translate-y-1/2">
+                                                        <IconCalendar className="text-neutral-300 dark:text-neutral-600" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label htmlFor="discountEnd">Discount End Date/Time</label>
+                                                <div className="relative">
+                                                    <Flatpickr
+                                                        options={{
+                                                            enableTime: true,
+                                                            dateFormat: 'Y-m-d H:i',
+                                                            minDate: discountStart || 'today',
+                                                            position: isRtl ? 'auto right' : 'auto left',
+                                                            static: true,
+                                                            disableMobile: true,
+                                                            time_24hr: true,
+                                                        }}
+                                                        placeholder="Select end date/time"
+                                                        className="form-input text-sm pr-10"
+                                                        value={discountEnd || ''}
+                                                        onChange={([date]) => setDiscountEnd(date)}
+                                                    />
+                                                    <div className="absolute right-[11px] top-1/2 -translate-y-1/2">
+                                                        <IconCalendar className="text-neutral-300 dark:text-neutral-600" />
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        </div>
                                     </div>
                                 )}
                             </AnimateHeight>
@@ -527,6 +597,14 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                                 value={formData.desc}
                                 onChange={(e) => setFormData((prev) => ({ ...prev, desc: e.target.value }))}
                             />
+                        </div>
+
+                        <div>
+                            <label className="mb-2 block text-sm font-semibold">Product Status</label>
+                            <label className="inline-flex cursor-pointer items-center">
+                                <input type="checkbox" className="form-checkbox" checked={formData.active} onChange={(e) => setFormData((prev) => ({ ...prev, active: e.target.checked }))} />
+                                <span className="relative text-white-dark checked:bg-none ml-2">{formData.active ? 'Active' : 'Inactive'}</span>
+                            </label>
                         </div>
                     </div>
 

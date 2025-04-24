@@ -25,6 +25,8 @@ interface Product {
     sale_price?: number | null;
     discount_type?: 'percentage' | 'fixed' | null;
     discount_value?: number | null;
+    discount_start?: string | null;
+    discount_end?: string | null;
 }
 
 interface ProductDetailsPageProps {
@@ -156,6 +158,25 @@ const ProductDetailsPage = ({ params }: ProductDetailsPageProps) => {
                                         )}
                                         {product.discount_type === 'fixed' && product.discount_value && (
                                             <span className="text-sm bg-success/20 text-success px-2 py-1 rounded-full">${product.discount_value.toFixed(2)} OFF</span>
+                                        )}
+
+                                        {(product.discount_start || product.discount_end) && (
+                                            <div className="mt-2 text-sm">
+                                                <div className="flex flex-col gap-1">
+                                                    {product.discount_start && (
+                                                        <div className="flex items-center">
+                                                            <span className="font-medium mr-2">Start:</span>
+                                                            <span>{new Date(product.discount_start).toLocaleString()}</span>
+                                                        </div>
+                                                    )}
+                                                    {product.discount_end && (
+                                                        <div className="flex items-center">
+                                                            <span className="font-medium mr-2">End:</span>
+                                                            <span>{new Date(product.discount_end).toLocaleString()}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
                                         )}
                                     </div>
                                 </div>
