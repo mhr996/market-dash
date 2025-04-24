@@ -376,7 +376,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                             active: updatedProduct.active,
                         });
                         setPreviewUrls(updatedProduct.images || []);
-        
+
                         // Update sale price data
                         if (updatedProduct.sale_price) {
                             setHasSalePrice(true);
@@ -548,8 +548,8 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                                                             static: true,
                                                             disableMobile: true,
                                                             time_24hr: true,
+                                                            placeholder: 'Select start date/time',
                                                         }}
-                                                        placeholder="Select start date/time"
                                                         className="form-input text-sm pr-10"
                                                         value={discountStart || ''}
                                                         onChange={([date]) => setDiscountStart(date)}
@@ -571,8 +571,8 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                                                             static: true,
                                                             disableMobile: true,
                                                             time_24hr: true,
+                                                            placeholder: 'Select end date/time',
                                                         }}
-                                                        placeholder="Select end date/time"
                                                         className="form-input text-sm pr-10"
                                                         value={discountEnd || ''}
                                                         onChange={([date]) => setDiscountEnd(date)}
