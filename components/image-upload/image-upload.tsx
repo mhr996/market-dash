@@ -9,9 +9,10 @@ interface ImageUploadProps {
     placeholderImage?: string;
     onUploadComplete: (url: string) => void;
     onError?: (error: string) => void;
+    buttonLabel?: string;
 }
 
-const ImageUpload: React.FC<ImageUploadProps> = ({ userId, url, bucket, placeholderImage = '/assets/images/img-placeholder-fallback.webp', onUploadComplete, onError }) => {
+const ImageUpload: React.FC<ImageUploadProps> = ({ userId, url, bucket, placeholderImage = '/assets/images/img-placeholder-fallback.webp', onUploadComplete, onError, buttonLabel }) => {
     const [uploading, setUploading] = useState(false);
     const fileInputRef = useRef<HTMLInputElement>(null);
 
@@ -66,20 +67,28 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ userId, url, bucket, placehol
 
     return (
         <div className="relative group cursor-pointer">
-            <img src={url || placeholderImage} alt="Profile" className="mx-auto h-20 w-20 rounded-full object-cover md:h-32 md:w-32" />
+            {!buttonLabel ? (
+                <>
+                    <img src={url || placeholderImage} alt="Profile" className="mx-auto h-20 w-20 rounded-full object-cover md:h-32 md:w-32" />
 
-            {/* Overlay */}
-            <div
-                className="absolute inset-0 flex items-center justify-center rounded-full bg-black bg-opacity-50 opacity-0 transition-opacity group-hover:opacity-100"
-                onClick={() => fileInputRef.current?.click()}
-            >
-                <IconUpload className="h-6 w-6 text-white" />
-            </div>
+                    {/* Overlay */}
+                    <div
+                        className="absolute inset-0 flex items-center justify-center rounded-full bg-black bg-opacity-50 opacity-0 transition-opacity group-hover:opacity-100"
+                        onClick={() => fileInputRef.current?.click()}
+                    >
+                        <IconUpload className="h-6 w-6 text-white" />
+                    </div>
+                </>
+            ) : (
+                <button type="button" className="btn btn-primary" onClick={() => fileInputRef.current?.click()} disabled={uploading}>
+                    {uploading ? 'Uploading...' : buttonLabel}
+                </button>
+            )}
 
             {/* Hidden file input */}
             <input type="file" ref={fileInputRef} onChange={uploadAvatar} accept="image/*" className="hidden" disabled={uploading} />
 
-            {uploading && (
+            {uploading && buttonLabel === undefined && (
                 <div className="absolute inset-0 flex items-center justify-center rounded-full bg-black bg-opacity-50">
                     <div className="h-6 w-6 animate-spin rounded-full border-2 border-white border-t-transparent"></div>
                 </div>
