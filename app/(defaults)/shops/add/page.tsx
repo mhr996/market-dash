@@ -356,10 +356,10 @@ const AddShopPage = () => {
                     <div className="relative h-52 w-full">
                         <img src={form.cover_image_url || '/assets/images/img-placeholder-fallback.webp'} alt="Shop Cover" className="h-full w-full object-cover" />
                         <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center">
-                            <div className="text-center">
+                            <div className="text-center flex flex-col items-center justify-center">
                                 <h2 className="text-xl font-bold text-white mb-4">Shop Cover Image</h2>
                                 <ImageUpload
-                                    bucket="shops-covers"
+                                    bucket="shops-logos/covers"
                                     userId="new"
                                     url={form.cover_image_url}
                                     placeholderImage="/assets/images/img-placeholder-fallback.webp"

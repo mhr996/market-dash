@@ -159,7 +159,7 @@ const ShopPreview = () => {
                     <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black to-transparent p-6">
                         <div className="flex items-center">
                             <div className="h-24 w-24 rounded-lg border-4 border-white overflow-hidden bg-white mr-4">
-                                <img src={shop.logo_url || '/assets/images/shop-placeholder.webp'} alt={shop.shop_name} className="h-full w-full object-cover" />
+                                <img src={shop.logo_url || '/assets/images/shop-placeholder.jpg'} alt={shop.shop_name} className="h-full w-full object-cover" />
                             </div>
                             <div>
                                 <h1 className="text-2xl font-bold text-white">{shop.shop_name}</h1>

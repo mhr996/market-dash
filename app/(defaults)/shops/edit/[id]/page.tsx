@@ -434,7 +434,7 @@ const EditShop = () => {
                                     bucket="shops"
                                     userId={id.toString()}
                                     url={form.logo_url}
-                                    placeholderImage="/assets/images/shop-placeholder.webp"
+                                    placeholderImage="/assets/images/shop-placeholder.jpg"
                                     onUploadComplete={handleLogoUpload}
                                     onError={(error) => {
                                         setAlert({
@@ -460,7 +460,7 @@ const EditShop = () => {
                                 </div>
                                 <div className="sm:col-span-2">
                                     <label htmlFor="shop_desc" className="mb-2 block text-sm font-semibold text-gray-700 dark:text-white">
-                                        Description <span className="text-red-500">*</span>
+                                        Description
                                     </label>
                                     <textarea id="shop_desc" name="shop_desc" className="form-textarea min-h-[100px]" value={form.shop_desc} onChange={handleInputChange} required />
                                 </div>
