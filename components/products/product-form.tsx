@@ -548,11 +548,11 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                                                             static: true,
                                                             disableMobile: true,
                                                             time_24hr: true,
-                                                            placeholder: 'Select start date/time',
                                                         }}
                                                         className="form-input text-sm pr-10"
                                                         value={discountStart || ''}
                                                         onChange={([date]) => setDiscountStart(date)}
+                                                        placeholder="Select start date/time"
                                                     />
                                                     <div className="absolute right-[11px] top-1/2 -translate-y-1/2">
                                                         <IconCalendar className="text-neutral-300 dark:text-neutral-600" />
@@ -571,11 +571,11 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                                                             static: true,
                                                             disableMobile: true,
                                                             time_24hr: true,
-                                                            placeholder: 'Select end date/time',
                                                         }}
                                                         className="form-input text-sm pr-10"
                                                         value={discountEnd || ''}
                                                         onChange={([date]) => setDiscountEnd(date)}
+                                                        placeholder="Select end date/time"
                                                     />
                                                     <div className="absolute right-[11px] top-1/2 -translate-y-1/2">
                                                         <IconCalendar className="text-neutral-300 dark:text-neutral-600" />
