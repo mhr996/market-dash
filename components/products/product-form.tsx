@@ -25,7 +25,7 @@ interface Category {
 }
 
 interface ProductFormProps {
-    productId?: string; // If provided, we're editing an existing product
+    productId?: string;
 }
 
 const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {

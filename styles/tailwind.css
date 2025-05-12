@@ -33,8 +33,6 @@
 /* file upload with preview */
 @import './file-upload-preview.css';
 
-/* dragndrop*/
-@import './dragndrop.css';
 
 /* form element*/
 @import './form-elements.css';
@@ -111,7 +109,7 @@ hover:text-primary hover:before:!bg-primary ltr:before:mr-2 rtl:before:ml-2 dark
 
     .sidebar .nav-item a div:first-child svg,
     .sidebar .nav-item button div:first-child svg {
-        @apply h-5 w-5 text-black/50 dark:text-white/50;
+        @apply h-5 w-5 text-[#0056e5ba] dark:text-white/50;
     }
 
     .main-container .main-content {
