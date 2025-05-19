@@ -16,6 +16,13 @@ import IconCaretDown from '@/components/icon/icon-caret-down';
 import IconUpload from '@/components/icon/icon-camera';
 import AnimateHeight from 'react-animate-height';
 import Tabs from '@/components/tabs';
+import 'leaflet/dist/leaflet.css';
+import dynamic from 'next/dynamic';
+
+// Import the map component dynamically with no SSR
+const MapSelector = dynamic(() => import('@/components/map/map-selector'), {
+    ssr: false, // This will prevent the component from being rendered on the server
+});
 
 interface WorkHours {
     day: string;
@@ -38,12 +45,16 @@ interface Shop {
     shop_desc: string;
     logo_url: string | null;
     cover_image_url: string | null;
-    active: boolean;
+    public: boolean;
+    status: string;
+    statusDropdownOpen?: boolean;
     address?: string;
     work_hours?: WorkHours[];
     phone_numbers?: string[];
     category_id?: number | null;
     gallery?: string[];
+    latitude?: number | null;
+    longitude?: number | null;
     profiles?: {
         full_name: string;
         email?: string;
@@ -63,6 +74,7 @@ const EditShop = () => {
     const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
     const [searchCategoryTerm, setSearchCategoryTerm] = useState('');
     const categoryRef = useRef<HTMLDivElement>(null);
+    const statusRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
@@ -73,7 +85,8 @@ const EditShop = () => {
         logo_url: null,
         cover_image_url: null,
         owner: '',
-        active: true,
+        public: true,
+        status: 'Approved',
         created_at: '',
         address: '',
         phone_numbers: [''],
@@ -97,11 +110,13 @@ const EditShop = () => {
         { day: 'Saturday', open: false, startTime: '10:00', endTime: '16:00' },
         { day: 'Sunday', open: false, startTime: '10:00', endTime: '16:00' },
     ];
-
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (categoryRef.current && !categoryRef.current.contains(event.target as Node)) {
                 setIsCategoryDropdownOpen(false);
+            }
+            if (statusRef.current && !statusRef.current.contains(event.target as Node)) {
+                setForm((prev) => ({ ...prev, statusDropdownOpen: false }));
             }
         };
 
@@ -152,7 +167,7 @@ const EditShop = () => {
         }
     }, [id]);
 
-    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement>) => {
+    const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value, type } = e.target;
         setForm((prev) => ({
             ...prev,
@@ -305,12 +320,15 @@ const EditShop = () => {
             const updatePayload = {
                 shop_name: form.shop_name,
                 shop_desc: form.shop_desc,
-                active: form.active,
+                public: form.public,
+                status: form.status,
                 address: form.address,
                 work_hours: form.work_hours || defaultWorkHours,
                 phone_numbers: form.phone_numbers?.filter((phone) => phone.trim() !== '') || [],
                 category_id: form.category_id,
                 gallery: galleryUrls,
+                latitude: form.latitude,
+                longitude: form.longitude,
             };
 
             // Update the shop data in Supabase
@@ -385,7 +403,7 @@ const EditShop = () => {
                 {/* Cover Image */}
                 <div className="panel mb-5 overflow-hidden">
                     <div className="relative h-52 w-full">
-                        <img src={form.cover_image_url || '/assets/images/shop-cover-placeholder.jpg'} alt="Shop Cover" className="h-full w-full object-cover" />
+                        <img src={form.cover_image_url || '/assets/images/img-placeholder-fallback.webp'} alt="Shop Cover" className="h-full w-full object-cover" />
                         <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center">
                             <div className="text-center">
                                 <h2 className="text-xl font-bold text-white mb-4">Shop Cover Image</h2>
@@ -393,7 +411,7 @@ const EditShop = () => {
                                     bucket="shops-covers"
                                     userId={id.toString()}
                                     url={form.cover_image_url}
-                                    placeholderImage="/assets/images/shop-cover-placeholder.jpg"
+                                    placeholderImage="/assets/images/img-placeholder-fallback.webp"
                                     onUploadComplete={handleCoverImageUpload}
                                     onError={(error) => {
                                         setAlert({
@@ -462,14 +480,46 @@ const EditShop = () => {
                                     <label htmlFor="shop_desc" className="mb-2 block text-sm font-semibold text-gray-700 dark:text-white">
                                         Description
                                     </label>
-                                    <textarea id="shop_desc" name="shop_desc" className="form-textarea min-h-[100px]" value={form.shop_desc} onChange={handleInputChange} required />
+                                    <textarea id="shop_desc" name="shop_desc" className="form-textarea min-h-[100px]" value={form.shop_desc} onChange={handleInputChange} />
                                 </div>
                                 <div>
-                                    <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-white">Status</label>
+                                    <label className="block text-sm font-bold text-gray-700 dark:text-white ">Visibility</label>
                                     <label className="inline-flex cursor-pointer items-center">
-                                        <input type="checkbox" name="active" className="form-checkbox" checked={form.active} onChange={handleInputChange} />
-                                        <span className="relative text-white-dark checked:bg-none ml-2">{form.active ? 'Active' : 'Inactive'}</span>
+                                        <input type="checkbox" name="public" className="form-checkbox" checked={form.public} onChange={handleInputChange} />
+                                        <span className="relative text-white-dark checked:bg-none ml-2">{form.public ? 'Public' : 'Private'}</span>
                                     </label>
+                                </div>{' '}
+                                <div className="relative" ref={statusRef}>
+                                    <label className="block text-sm font-bold text-gray-700 dark:text-white">Status</label>
+                                    <div
+                                        className="cursor-pointer rounded border border-[#e0e6ed] bg-white p-2.5 text-dark dark:border-[#191e3a] dark:bg-black dark:text-white-dark flex items-center justify-between"
+                                        onClick={() => {
+                                            setForm((prev) => ({ ...prev, statusDropdownOpen: !prev.statusDropdownOpen }));
+                                        }}
+                                    >
+                                        <span>{form.status}</span>
+                                        <IconCaretDown className={`h-4 w-4 transition-transform duration-300 ${form.statusDropdownOpen ? 'rotate-180' : ''}`} />
+                                    </div>
+
+                                    {form.statusDropdownOpen && (
+                                        <div className="absolute z-10 mt-1 w-full rounded-md border border-[#e0e6ed] bg-white shadow-lg dark:border-[#191e3a] dark:bg-black">
+                                            <div className="max-h-64 overflow-y-auto">
+                                                {['Approved', 'Pending', 'Rejected', 'Banned'].map((status) => (
+                                                    <div
+                                                        key={status}
+                                                        className={`cursor-pointer px-4 py-2 hover:bg-gray-100 dark:text-white-dark dark:hover:bg-[#191e3a] ${
+                                                            form.status === status ? 'bg-primary/10 dark:bg-primary/10' : ''
+                                                        }`}
+                                                        onClick={() => {
+                                                            setForm((prev) => ({ ...prev, status: status, statusDropdownOpen: false }));
+                                                        }}
+                                                    >
+                                                        {status}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                                 <div ref={categoryRef} className="relative">
                                     <label htmlFor="category_id" className="mb-2 block text-sm font-semibold text-gray-700 dark:text-white">
@@ -543,6 +593,34 @@ const EditShop = () => {
                                         rows={2}
                                     />
                                 </div>
+                            </div>
+
+                            <div className="sm:col-span-2">
+                                <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-white">Shop Location</label>{' '}
+                                <div className="h-[400px] mb-4">
+                                    {' '}
+                                    <MapSelector
+                                        initialPosition={form.latitude && form.longitude ? [form.latitude, form.longitude] : null}
+                                        onChange={(lat, lng) => {
+                                            setForm((prev) => ({
+                                                ...prev,
+                                                latitude: lat,
+                                                longitude: lng,
+                                            }));
+                                        }}
+                                        height="400px"
+                                        useCurrentLocationByDefault={false}
+                                    />
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">Click on the map to select your shop's location.</p>
+                                {form.latitude && form.longitude && (
+                                    <p className="text-sm mt-10">
+                                        Selected coordinates:{' '}
+                                        <span className="font-semibold">
+                                            {form.latitude.toFixed(6)}, {form.longitude.toFixed(6)}
+                                        </span>
+                                    </p>
+                                )}
                             </div>
 
                             <div className="sm:col-span-2">

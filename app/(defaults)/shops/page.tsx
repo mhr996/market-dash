@@ -20,6 +20,8 @@ interface Shop {
     owner: string;
     active: boolean;
     created_at?: string;
+    public: boolean;
+    status: string;
     profiles?: {
         full_name: string;
     };
@@ -194,7 +196,19 @@ const ShopsList = () => {
                                 accessor: 'status',
                                 title: 'Status',
                                 sortable: true,
-                                render: ({ active }) => <span className={`badge badge-outline-${active ? 'success' : 'danger'}`}>{active ? 'Active' : 'Inactive'}</span>,
+                                render: ({ status }) => {
+                                    let statusClass = 'warning';
+                                    if (status === 'Approved') statusClass = 'success';
+                                    else if (status === 'Rejected') statusClass = 'danger';
+
+                                    return <span className={`badge badge-outline-${statusClass}`}>{status || 'Pending'}</span>;
+                                },
+                            },
+                            {
+                                accessor: 'visibility',
+                                title: 'Visibility',
+                                sortable: true,
+                                render: ({ public: isPublic }) => <span className={`badge badge-outline-${isPublic ? 'success' : 'danger'}`}>{isPublic ? 'Public' : 'Private'}</span>,
                             },
                             {
                                 accessor: 'action',

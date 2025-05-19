@@ -1,7 +1,8 @@
 'use client';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, Suspense } from 'react';
 import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
+import dynamic from 'next/dynamic';
 import supabase from '@/lib/supabase';
 import { Alert } from '@/components/elements/alerts/elements-alerts-default';
 import IconEdit from '@/components/icon/icon-edit';
@@ -12,6 +13,12 @@ import IconCalendar from '@/components/icon/icon-calendar';
 import IconUser from '@/components/icon/icon-user';
 import IconMail from '@/components/icon/icon-mail';
 import IconX from '@/components/icon/icon-x';
+import 'leaflet/dist/leaflet.css';
+
+// Import the map component dynamically with no SSR
+const InteractiveMap = dynamic(() => import('@/components/map/interactive-map'), {
+    ssr: false, // This will prevent the component from being rendered on the server
+});
 
 interface WorkHours {
     day: string;
@@ -33,13 +40,16 @@ interface Shop {
     logo_url: string | null;
     cover_image_url: string | null;
     owner: string;
-    active: boolean;
+    status: string; // Shop status (Pending, Approved, etc.)
+    public: boolean; // Controls if shop is public or private
     created_at?: string;
     address?: string;
     work_hours?: WorkHours[];
     phone_numbers?: string[];
     category_id?: number | null;
     gallery?: string[] | null;
+    latitude?: number | null; // Geographical location data
+    longitude?: number | null; // Geographical location data
     profiles?: {
         id: string;
         full_name: string;
@@ -60,6 +70,7 @@ const ShopPreview = () => {
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'owner' | 'details'>('owner');
     const [categories, setCategories] = useState<Category[]>([]);
+    const [unauthorized, setUnauthorized] = useState(false);
     const [alert, setAlert] = useState<{ visible: boolean; message: string; type: 'success' | 'danger' }>({
         visible: false,
         message: '',
@@ -69,10 +80,29 @@ const ShopPreview = () => {
     useEffect(() => {
         const fetchShop = async () => {
             try {
+                // Get current user
+                const { data: userData, error: userError } = await supabase.auth.getUser();
+                if (userError) throw userError;
+
+                // Get user's role from profiles table
+                const { data: profileData, error: profileError } = await supabase.from('profiles').select('role').eq('id', userData?.user?.id).single();
+
+                if (profileError) throw profileError;
+
+                const isAdmin = profileData?.role === 1;
+
                 // Updated query to fetch category details as well
                 const { data, error } = await supabase.from('shops').select('*, profiles(id, full_name, avatar_url, email, phone), categories(*)').eq('id', id).single();
 
                 if (error) throw error;
+
+                // Check if user has permission to view this shop
+                if (!isAdmin && data.owner !== userData?.user?.id) {
+                    setUnauthorized(true);
+                    setLoading(false);
+                    return;
+                }
+
                 setShop(data);
 
                 // Also fetch all categories for reference
@@ -109,6 +139,39 @@ const ShopPreview = () => {
 
     if (loading) {
         return <div className="flex items-center justify-center h-screen">Loading...</div>;
+    }
+
+    if (unauthorized) {
+        return (
+            <div className="container mx-auto p-6">
+                <div className="panel">
+                    <div className="flex flex-col items-center justify-center p-6">
+                        <div className="text-danger mb-4">
+                            <svg
+                                xmlns="http://www.w3.org/2000/svg"
+                                width="40"
+                                height="40"
+                                viewBox="0 0 24 24"
+                                fill="none"
+                                stroke="currentColor"
+                                strokeWidth="2"
+                                strokeLinecap="round"
+                                strokeLinejoin="round"
+                            >
+                                <circle cx="12" cy="12" r="10"></circle>
+                                <line x1="12" y1="8" x2="12" y2="12"></line>
+                                <line x1="12" y1="16" x2="12.01" y2="16"></line>
+                            </svg>
+                        </div>
+                        <h2 className="text-xl font-bold mb-2">Unauthorized Access</h2>
+                        <p className="text-gray-500 mb-4">You do not have permission to view this shop.</p>
+                        <button onClick={() => router.push('/shops')} className="btn btn-primary">
+                            Return to Shops
+                        </button>
+                    </div>
+                </div>
+            </div>
+        );
     }
 
     if (!shop) {
@@ -155,7 +218,7 @@ const ShopPreview = () => {
             {/* Shop Header with Cover Image */}
             <div className="mb-6 rounded-md overflow-hidden">
                 <div className="relative h-64 w-full">
-                    <img src={shop.cover_image_url || '/assets/images/shop-cover-placeholder.jpg'} alt={`${shop.shop_name} Cover`} className="h-full w-full object-cover" />
+                    <img src={shop.cover_image_url || '/assets/images/img-placeholder-fallback.webp'} alt={`${shop.shop_name} Cover`} className="h-full w-full object-cover" />
                     <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black to-transparent p-6">
                         <div className="flex items-center">
                             <div className="h-24 w-24 rounded-lg border-4 border-white overflow-hidden bg-white mr-4">
@@ -163,7 +226,12 @@ const ShopPreview = () => {
                             </div>
                             <div>
                                 <h1 className="text-2xl font-bold text-white">{shop.shop_name}</h1>
-                                <span className={`badge mt-1 badge-outline-${shop.active ? 'success' : 'danger'}`}>{shop.active ? 'Active' : 'Inactive'}</span>
+                                <div className="flex gap-2 mt-1">
+                                    <span className={`badge badge-outline-${shop.public ? 'success' : 'danger'}`}>{shop.public ? 'Public' : 'Private'}</span>
+                                    <span className={`badge badge-outline-${shop.status === 'Pending' ? 'warning' : shop.status === 'Approved' ? 'success' : 'danger'}`}>
+                                        {shop.status || 'Pending'}
+                                    </span>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -255,8 +323,8 @@ const ShopPreview = () => {
                                         <span className="badge bg-primary text-white">{shop.categories?.title || 'Uncategorized'}</span>
                                     </div>
                                     <div>
-                                        <h6 className="text-sm font-semibold mb-2">Status</h6>
-                                        <span className={`badge ${shop.active ? 'bg-success' : 'bg-danger'} text-white`}>{shop.active ? 'Active' : 'Inactive'}</span>
+                                        <h6 className="text-sm font-semibold mb-2">Visibility</h6>
+                                        <span className={`badge ${shop.public ? 'bg-success' : 'bg-danger'} text-white`}>{shop.public ? 'Public' : 'Private'}</span>
                                     </div>
                                     {shop.address && (
                                         <div className="sm:col-span-2">
@@ -303,6 +371,7 @@ const ShopPreview = () => {
                                 </div>
 
                                 <div className="grid grid-cols-1 gap-5">
+                                    {' '}
                                     {/* Address */}
                                     <div>
                                         <h6 className="text-sm font-semibold mb-3">Address</h6>
@@ -313,7 +382,18 @@ const ShopPreview = () => {
                                             <p className="text-gray-500 dark:text-gray-400">{shop.address || 'No address provided'}</p>
                                         </div>
                                     </div>
-
+                                    {/* Map Location */}
+                                    {shop.latitude && shop.longitude && (
+                                        <div>
+                                            <h6 className="text-sm font-semibold mb-3">Shop Location</h6>
+                                            <div className="h-[400px] rounded-md overflow-hidden">
+                                                <InteractiveMap position={[shop.latitude, shop.longitude]} height="400px" shopName={shop.shop_name} shopAddress={shop.address} />
+                                            </div>
+                                            <p className="text-xs text-gray-500 mt-2">
+                                                Coordinates: {shop.latitude.toFixed(6)}, {shop.longitude.toFixed(6)}
+                                            </p>
+                                        </div>
+                                    )}
                                     {/* Contact Numbers */}
                                     <div>
                                         <h6 className="text-sm font-semibold mb-3">Contact Numbers</h6>
@@ -335,7 +415,6 @@ const ShopPreview = () => {
                                             )}
                                         </div>
                                     </div>
-
                                     {/* Category */}
                                     <div>
                                         <h6 className="text-sm font-semibold mb-3">Category</h6>
@@ -344,7 +423,6 @@ const ShopPreview = () => {
                                             {shop.categories?.desc && <p className="ml-3 text-gray-500 dark:text-gray-400">{shop.categories.desc}</p>}
                                         </div>
                                     </div>
-
                                     {/* Working Hours */}
                                     <div>
                                         <h6 className="text-sm font-semibold mb-3">Working Hours</h6>
@@ -366,7 +444,6 @@ const ShopPreview = () => {
                                             </div>
                                         </div>
                                     </div>
-
                                     {/* Gallery */}
                                     {gallery && gallery.length > 0 && (
                                         <div>
@@ -395,14 +472,32 @@ const ShopPreview = () => {
                                     {/* Products Count */}
                                     <div>
                                         <div className="flex items-center mb-3">
-                                            <div className="h-9 w-9 rounded-md bg-warning-light dark:bg-warning text-warning dark:text-warning-light flex items-center justify-center">
+                                            <div className="h-9 w-9 rounded-md bg-info-light dark:bg-info text-info dark:text-info-light flex items-center justify-center">
                                                 <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
                                                     <path
-                                                        d="M3.79424 12.0291C4.33141 9.34329 4.59999 8.00036 5.48746 7.13543C5.65149 6.97557 5.82894 6.8301 6.01786 6.70061C7.04004 6 8.40956 6 11.1486 6H12.8515C15.5906 6 16.9601 6 17.9823 6.70061C18.1712 6.8301 18.3486 6.97557 18.5127 7.13543C19.4001 8.00036 19.6687 9.34329 20.2059 12.0291C20.9771 15.8851 21.3627 17.8131 20.475 19.1793C20.3143 19.4267 20.1267 19.6561 19.9142 19.8649C18.5819 21.1793 16.5577 21.1793 12.5093 21.1793H11.4908C7.44242 21.1793 5.41823 21.1793 4.08591 19.8649C3.87337 19.6561 3.68584 19.4267 3.52516 19.1793C2.63741 17.8131 3.02303 15.8851 3.79424 12.0291Z"
+                                                        d="M6.17071 16.7071C5.41775 16.7071 4.80103 16.0904 4.80103 15.3374C4.80103 14.5845 5.41775 13.9678 6.17071 13.9678C6.92366 13.9678 7.54038 14.5845 7.54038 15.3374C7.54038 16.0904 6.92366 16.7071 6.17071 16.7071Z"
                                                         stroke="currentColor"
                                                         strokeWidth="1.5"
                                                     />
-                                                    <path opacity="0.5" d="M9 6V5C9 3.34315 10.3431 2 12 2C13.6569 2 15 3.34315 15 5V6" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                                                    <path
+                                                        d="M6.17071 10.0322C5.41775 10.0322 4.80103 9.41543 4.80103 8.66248C4.80103 7.90953 5.41775 7.29281 6.17071 7.29281C6.92366 7.29281 7.54038 7.90953 7.54038 8.66248C7.54038 9.41543 6.92366 10.0322 6.17071 10.0322Z"
+                                                        stroke="currentColor"
+                                                        strokeWidth="1.5"
+                                                    />
+                                                    <path opacity="0.5" d="M9 5H20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                                                    <path opacity="0.5" d="M9 9H20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                                                    <path opacity="0.5" d="M9 15H20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                                                    <path opacity="0.5" d="M9 19H20" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" />
+                                                    <path
+                                                        d="M6.17071 19.4465C5.41775 19.4465 4.80103 18.8297 4.80103 18.0768C4.80103 17.3238 5.41775 16.7071 6.17071 16.7071C6.92366 16.7071 7.54038 17.3238 7.54038 18.0768C7.54038 18.8297 6.92366 19.4465 6.17071 19.4465Z"
+                                                        stroke="currentColor"
+                                                        strokeWidth="1.5"
+                                                    />
+                                                    <path
+                                                        d="M6.17071 6.70712C5.41775 6.70712 4.80103 6.0904 4.80103 5.33745C4.80103 4.5845 5.41775 3.96777 6.17071 3.96777C6.92366 3.96777 7.54038 4.5845 7.54038 5.33745C7.54038 6.0904 6.92366 6.70712 6.17071 6.70712Z"
+                                                        stroke="currentColor"
+                                                        strokeWidth="1.5"
+                                                    />
                                                 </svg>
                                             </div>
                                             <h6 className="text-sm font-semibold ltr:ml-3 rtl:mr-3">Products</h6>
@@ -416,8 +511,8 @@ const ShopPreview = () => {
                                     {/* Orders Count */}
                                     <div>
                                         <div className="flex items-center mb-3">
-                                            <div className="h-9 w-9 rounded-md bg-danger-light dark:bg-danger text-danger dark:text-danger-light flex items-center justify-center">
-                                                <svg width="24" height="24" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-5 w-5">
+                                            <div className="h-9 w-9 rounded-md bg-warning-light dark:bg-warning text-warning dark:text-warning-light flex items-center justify-center">
+                                                <svg width="20" height="20" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg" className="h-5 w-5">
                                                     <path
                                                         d="M2 3L2.26491 3.0883C3.58495 3.52832 4.24497 3.74832 4.62248 4.2721C5 4.79587 5 5.49159 5 6.88304V9.5C5 12.3284 5 13.7426 5.87868 14.6213C6.75736 15.5 8.17157 15.5 11 15.5H19"
                                                         stroke="currentColor"
@@ -470,7 +565,7 @@ const ShopPreview = () => {
                                             <h6 className="text-sm font-semibold ltr:ml-3 rtl:mr-3">Revenue</h6>
                                         </div>
                                         <div className="flex items-center justify-between">
-                                            <p className="text-3xl font-bold dark:text-white-light">$3,745</p>
+                                            <p className="text-3xl font-bold dark:text-white-light">$2,450</p>
                                             <span className="badge bg-success/20 text-success dark:bg-success dark:text-white-light">+2.5%</span>
                                         </div>
                                     </div>

@@ -15,6 +15,13 @@ import IconCaretDown from '@/components/icon/icon-caret-down';
 import IconUpload from '@/components/icon/icon-camera';
 import AnimateHeight from 'react-animate-height';
 import Tabs from '@/components/tabs';
+import dynamic from 'next/dynamic';
+import 'leaflet/dist/leaflet.css';
+
+// Import the map component dynamically with no SSR
+const MapSelector = dynamic(() => import('@/components/map/map-selector'), {
+    ssr: false, // This will prevent the component from being rendered on the server
+});
 
 interface Profile {
     id: string;
@@ -43,12 +50,16 @@ const AddShopPage = () => {
         logo_url: '',
         cover_image_url: '',
         owner: '',
-        active: true,
+        public: true, // Renamed from active to public - controls shop visibility
+        status: 'Approved',
+        statusDropdownOpen: false, // Track if status dropdown is open
         address: '',
         work_hours: null as WorkHours[] | null,
         phone_numbers: [''],
         category_id: null as number | null,
         gallery: [] as string[],
+        latitude: null as number | null, // Shop location coordinates
+        longitude: null as number | null, // Shop location coordinates
     });
 
     const [alert, setAlert] = useState<{ visible: boolean; message: string; type: 'success' | 'danger' }>({
@@ -64,6 +75,7 @@ const AddShopPage = () => {
     const [showDropdown, setShowDropdown] = useState(false);
     const dropdownRef = useRef<HTMLDivElement>(null);
     const categoryRef = useRef<HTMLDivElement>(null);
+    const statusRef = useRef<HTMLDivElement>(null);
     const fileInputRef = useRef<HTMLInputElement>(null);
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
     const [activeTab, setActiveTab] = useState(0);
@@ -126,9 +138,7 @@ const AddShopPage = () => {
     useEffect(() => {
         const filtered = users.filter((user) => user.full_name.toLowerCase().includes(searchTerm.toLowerCase()));
         setFilteredUsers(filtered);
-    }, [searchTerm, users]);
-
-    // Handle click outside for user dropdown
+    }, [searchTerm, users]); // Handle click outside for user dropdown
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -136,6 +146,9 @@ const AddShopPage = () => {
             }
             if (categoryRef.current && !categoryRef.current.contains(event.target as Node)) {
                 setIsCategoryDropdownOpen(false);
+            }
+            if (statusRef.current && !statusRef.current.contains(event.target as Node)) {
+                setForm((prev) => ({ ...prev, statusDropdownOpen: false }));
             }
         };
 
@@ -162,6 +175,14 @@ const AddShopPage = () => {
         setForm((prev) => ({
             ...prev,
             cover_image_url: url,
+        }));
+    };
+
+    const handleLocationChange = (lat: number, lng: number) => {
+        setForm((prev) => ({
+            ...prev,
+            latitude: lat,
+            longitude: lng,
         }));
     };
 
@@ -264,7 +285,8 @@ const AddShopPage = () => {
                 logo_url: form.logo_url,
                 cover_image_url: form.cover_image_url,
                 owner: form.owner,
-                active: form.active,
+                public: form.public,
+                status: form.status,
                 address: form.address,
                 work_hours: form.work_hours,
                 phone_numbers: form.phone_numbers.filter((phone) => phone.trim() !== ''),
@@ -427,7 +449,6 @@ const AddShopPage = () => {
                                         required
                                     />
                                 </div>
-
                                 <div>
                                     <label htmlFor="shop_desc" className="block text-sm font-bold text-gray-700 dark:text-white">
                                         Shop Description
@@ -442,7 +463,6 @@ const AddShopPage = () => {
                                         rows={4}
                                     />
                                 </div>
-
                                 <div className="relative" ref={dropdownRef}>
                                     <label htmlFor="owner" className="block text-sm font-bold text-gray-700 dark:text-white">
                                         Shop Owner <span className="text-red-500">*</span>
@@ -486,7 +506,6 @@ const AddShopPage = () => {
                                         )}
                                     </div>
                                 </div>
-
                                 <div ref={categoryRef} className="relative">
                                     <label htmlFor="category_id" className="block text-sm font-bold text-gray-700 dark:text-white">
                                         Category
@@ -529,14 +548,45 @@ const AddShopPage = () => {
                                             </div>
                                         </div>
                                     )}
-                                </div>
-
+                                </div>{' '}
                                 <div>
-                                    <label className="block text-sm font-bold text-gray-700 dark:text-white">Status</label>
+                                    <label className="block text-sm font-bold text-gray-700 dark:text-white ">Visibility</label>
                                     <label className="inline-flex cursor-pointer items-center">
-                                        <input type="checkbox" name="active" className="form-checkbox" checked={form.active} onChange={handleInputChange} />
-                                        <span className="relative text-white-dark checked:bg-none ml-2">{form.active ? 'Active' : 'Inactive'}</span>
+                                        <input type="checkbox" name="public" className="form-checkbox" checked={form.public} onChange={handleInputChange} />
+                                        <span className="relative text-white-dark checked:bg-none ml-2">{form.public ? 'Public' : 'Private'}</span>
                                     </label>
+                                </div>{' '}
+                                <div className="relative" ref={statusRef}>
+                                    <label className="block text-sm font-bold text-gray-700 dark:text-white">Status</label>
+                                    <div
+                                        className="cursor-pointer rounded border border-[#e0e6ed] bg-white p-2.5 text-dark dark:border-[#191e3a] dark:bg-black dark:text-white-dark flex items-center justify-between"
+                                        onClick={() => {
+                                            setForm((prev) => ({ ...prev, statusDropdownOpen: !prev.statusDropdownOpen }));
+                                        }}
+                                    >
+                                        <span>{form.status}</span>
+                                        <IconCaretDown className={`h-4 w-4 transition-transform duration-300 ${form.statusDropdownOpen ? 'rotate-180' : ''}`} />
+                                    </div>
+
+                                    {form.statusDropdownOpen && (
+                                        <div className="absolute z-10 mt-1 w-full rounded-md border border-[#e0e6ed] bg-white shadow-lg dark:border-[#191e3a] dark:bg-black">
+                                            <div className="max-h-64 overflow-y-auto">
+                                                {['Approved', 'Pending', 'Rejected', 'Banned'].map((status) => (
+                                                    <div
+                                                        key={status}
+                                                        className={`cursor-pointer px-4 py-2 hover:bg-gray-100 dark:text-white-dark dark:hover:bg-[#191e3a] ${
+                                                            form.status === status ? 'bg-primary/10 dark:bg-primary/10' : ''
+                                                        }`}
+                                                        onClick={() => {
+                                                            setForm((prev) => ({ ...prev, status: status, statusDropdownOpen: false }));
+                                                        }}
+                                                    >
+                                                        {status}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
                                 </div>
                             </div>
                         </div>
@@ -567,6 +617,27 @@ const AddShopPage = () => {
                                         rows={2}
                                     />
                                 </div>
+                            </div>
+
+                            <div className="sm:col-span-2">
+                                <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-white">Shop Location</label>{' '}
+                                <div className="h-[400px] mb-4">
+                                    <MapSelector
+                                        initialPosition={form.latitude && form.longitude ? [form.latitude, form.longitude] : null}
+                                        onChange={handleLocationChange}
+                                        height="400px"
+                                        useCurrentLocationByDefault={true}
+                                    />
+                                </div>
+                                <p className="text-xs text-gray-500 mt-1">Click on the map to select your shop's location.</p>
+                                {form.latitude && form.longitude && (
+                                    <p className="text-sm mt-10">
+                                        Selected coordinates:{' '}
+                                        <span className="font-semibold">
+                                            {form.latitude.toFixed(6)}, {form.longitude.toFixed(6)}
+                                        </span>
+                                    </p>
+                                )}
                             </div>
 
                             <div className="sm:col-span-2">
