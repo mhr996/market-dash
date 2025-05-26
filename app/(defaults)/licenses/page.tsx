@@ -10,6 +10,7 @@ import React, { useEffect, useState } from 'react';
 import supabase from '@/lib/supabase';
 import { Alert } from '@/components/elements/alerts/elements-alerts-default';
 import ConfirmModal from '@/components/modals/confirm-modal';
+import { getTranslation } from '@/i18n';
 
 // License interface
 interface License {
@@ -25,6 +26,7 @@ interface License {
 const LicensesList = () => {
     const [items, setItems] = useState<License[]>([]);
     const [loading, setLoading] = useState(true);
+    const { t } = getTranslation();
 
     const [page, setPage] = useState(1);
     const PAGE_SIZES = [10, 20, 30, 50, 100];
@@ -87,7 +89,6 @@ const LicensesList = () => {
         setRecords(sortStatus.direction === 'desc' ? sorted.reverse() : sorted);
         setPage(1);
     }, [sortStatus, initialRecords]);
-
     const deleteRow = (id: number | null = null) => {
         if (id) {
             const license = items.find((c) => c.id === id);
@@ -105,10 +106,10 @@ const LicensesList = () => {
             const { error } = await supabase.from('licenses').delete().eq('id', licenseToDelete.id);
             if (error) throw error;
             setItems((prevItems) => prevItems.filter((item) => item.id !== licenseToDelete.id));
-            setAlert({ visible: true, message: 'License deleted successfully!', type: 'success' });
+            setAlert({ visible: true, message: t('license_deleted_successfully'), type: 'success' });
         } catch (error: any) {
             console.error('Error deleting license:', error);
-            setAlert({ visible: true, message: error.message || 'Error deleting license', type: 'danger' });
+            setAlert({ visible: true, message: error.message || t('error_deleting_license'), type: 'danger' });
         } finally {
             setShowConfirmModal(false);
             setLicenseToDelete(null);
@@ -125,24 +126,24 @@ const LicensesList = () => {
 
     return (
         <div className="panel border-white-light px-0 dark:border-[#1b2e4b]">
+            {' '}
             {/* Alert */}
             {alert.visible && (
                 <div className="mb-4 ml-4 max-w-96">
                     <Alert
                         type={alert.type}
-                        title={alert.type === 'success' ? 'Success' : 'Error'}
+                        title={alert.type === 'success' ? t('success') : t('error')}
                         message={alert.message}
                         onClose={() => setAlert({ visible: false, message: '', type: 'success' })}
                     />
                 </div>
             )}
-
             {/* Confirm Modal */}
             {showConfirmModal && licenseToDelete && (
                 <ConfirmModal
                     isOpen={showConfirmModal}
-                    title="Delete License"
-                    message={`Are you sure you want to delete the license "${licenseToDelete.title}"? This action cannot be undone.`}
+                    title={t('delete_license')}
+                    message={`${t('confirm_delete_license')} "${licenseToDelete.title}"`}
                     onConfirm={confirmDeletion}
                     onCancel={() => {
                         setShowConfirmModal(false);
@@ -150,71 +151,72 @@ const LicensesList = () => {
                     }}
                 />
             )}
-
             <div className="invoice-table">
                 <div className="mb-4.5 flex flex-col gap-5 px-5 md:flex-row md:items-center">
+                    {' '}
                     <div className="flex items-center gap-2">
                         <button type="button" className="btn btn-danger gap-2" onClick={() => deleteRow(selectedRecords[0]?.id)}>
                             <IconTrashLines />
-                            Delete
+                            {t('delete')}
                         </button>
                         <Link href="/licenses/add" className="btn btn-primary gap-2">
                             <IconPlus />
-                            Add New
+                            {t('add_new')}
                         </Link>
                     </div>
                     <div className="ltr:ml-auto rtl:mr-auto">
-                        <input type="text" className="form-input w-auto" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} />
+                        <input type="text" className="form-input w-auto" placeholder={t('search')} value={search} onChange={(e) => setSearch(e.target.value)} />
                     </div>
                 </div>
                 <div className="datatables pagination-padding relative">
+                    {' '}
                     <DataTable
                         className={`${loading ? 'filter blur-sm pointer-events-none' : 'table-hover whitespace-nowrap'}`}
                         records={records}
                         columns={[
                             {
                                 accessor: 'id',
-                                title: 'ID',
+                                title: t('id'),
                                 sortable: true,
                                 render: ({ id }) => <strong className="text-info">#{id}</strong>,
                             },
                             {
                                 accessor: 'title',
-                                title: 'Title',
+                                title: t('title'),
                                 sortable: true,
                             },
                             {
                                 accessor: 'desc',
-                                title: 'Description',
+                                title: t('description'),
                                 sortable: true,
                             },
                             {
                                 accessor: 'price',
-                                title: 'Price',
+                                title: t('price'),
                                 sortable: true,
                                 render: ({ price }) => formatCurrency(price),
                             },
                             {
                                 accessor: 'shops',
-                                title: 'Shops',
+                                title: t('shops'),
                                 sortable: true,
                                 render: ({ shops }) => <span className="badge badge-outline-info">{shops}</span>,
                             },
                             {
                                 accessor: 'products',
-                                title: 'Products',
+                                title: t('products'),
                                 sortable: true,
                                 render: ({ products }) => <span className="badge badge-outline-primary">{products}</span>,
                             },
                             {
                                 accessor: 'created_at',
-                                title: 'Created Date',
+                                title: t('created_date'),
                                 sortable: true,
                                 render: ({ created_at }) => (created_at ? <span>{new Date(created_at).toLocaleDateString()}</span> : ''),
                             },
                             {
                                 accessor: 'action',
-                                title: 'Actions',
+                                title: t('actions'),
                                 sortable: false,
                                 textAlignment: 'center',
                                 render: ({ id }) => (
@@ -245,7 +247,6 @@ const LicensesList = () => {
                         onSelectedRecordsChange={setSelectedRecords}
                         minHeight={300}
                     />
-
                     {loading && <div className="absolute inset-0 z-10 flex items-center justify-center bg-white dark:bg-black-dark-light bg-opacity-60 backdrop-blur-sm" />}
                 </div>
             </div>

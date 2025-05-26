@@ -8,6 +8,7 @@ import IconLinkedin from '@/components/icon/icon-linkedin';
 import IconTwitter from '@/components/icon/icon-twitter';
 import IconFacebook from '@/components/icon/icon-facebook';
 import IconGithub from '@/components/icon/icon-github';
+import { getTranslation } from '@/i18n';
 
 interface User {
     id: number;
@@ -36,6 +37,7 @@ const UserPreview = () => {
     const id = params?.id as string;
 
     const router = useRouter();
+    const { t } = getTranslation();
     const [user, setUser] = useState<User | null>(null);
     const [loading, setLoading] = useState(true);
     const [alert, setAlert] = useState<{ visible: boolean; message: string; type: 'success' | 'danger' }>({
@@ -62,103 +64,100 @@ const UserPreview = () => {
             fetchUser();
         }
     }, [id]);
-
     if (loading) {
-        return <div className="flex items-center justify-center h-screen">Loading...</div>;
+        return <div className="flex items-center justify-center h-screen">{t('loading')}</div>;
     }
 
     if (!user) {
-        return <div className="text-center p-6">User not found.</div>;
+        return <div className="text-center p-6">{t('user_not_found')}</div>;
     }
 
     return (
         <div className="container mx-auto p-6">
             <div className="flex items-center gap-5 mb-6">
+                {' '}
                 <div onClick={() => router.back()}>
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 mb-4 cursor-pointer text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 mb-4 cursor-pointer text-primary rtl:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                     </svg>
                 </div>
-
-                {/* Breadcrumb Navigation */}
+                {/* Breadcrumb Navigation */}{' '}
                 <ul className="flex space-x-2 rtl:space-x-reverse mb-4">
                     <li>
                         <Link href="/" className="text-primary hover:underline">
-                            Home
+                            {t('home')}
                         </Link>
                     </li>
                     <li className="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
                         <Link href="/users" className="text-primary hover:underline">
-                            Users
+                            {t('users')}
                         </Link>
                     </li>
                     <li className="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
-                        <span>User Preview</span>
+                        <span>{t('preview')}</span>
                     </li>
                 </ul>
-            </div>
-
+            </div>{' '}
             {alert.visible && (
                 <div className="mb-4">
-                    <Alert type={alert.type} title={alert.type === 'success' ? 'Success' : 'Error'} message={alert.message} onClose={() => setAlert({ ...alert, visible: false })} />
+                    <Alert type={alert.type} title={alert.type === 'success' ? t('success') : t('error')} message={alert.message} onClose={() => setAlert({ ...alert, visible: false })} />
                 </div>
-            )}
-
+            )}{' '}
             {/* General Information */}
             <div className="mb-6 rounded-md border border-[#ebedf2] bg-white p-4 dark:border-[#191e3a] dark:bg-black">
-                <h6 className="mb-5 text-lg font-bold">General Information</h6>
+                <h6 className="mb-5 text-lg font-bold">{t('general_information')}</h6>
                 <div className="flex flex-col sm:flex-row">
                     <div className="mb-5 w-full  sm:w-2/12 ltr:sm:mr-4 rtl:sm:ml-4">
                         <img src={user.avatar_url || '/assets/images/user-placeholder.webp'} alt={user.full_name} className="rounded-full object-cover w-full aspect-square" />
                     </div>
                     <div className="grid flex-1 grid-cols-1 gap-5 sm:grid-cols-2">
                         <div>
-                            <label className="block text-sm font-bold text-gray-700 dark:text-white">Full Name</label>
-                            <p className="mt-1 text-base text-gray-800 dark:text-gray-400">{user.full_name || 'N/A'}</p>
+                            {' '}
+                            <label className="block text-sm font-bold text-gray-700 dark:text-white">{t('full_name')}</label>
+                            <p className="mt-1 text-base text-gray-800 dark:text-gray-400">{user.full_name || t('not_available')}</p>
                         </div>
                         <div>
-                            <label className="block text-sm font-bold text-gray-700 dark:text-white">Profession</label>
-                            <p className="mt-1 text-base text-gray-800 dark:text-gray-400">{user.profession || 'N/A'}</p>
+                            <label className="block text-sm font-bold text-gray-700 dark:text-white">{t('profession')}</label>
+                            <p className="mt-1 text-base text-gray-800 dark:text-gray-400">{user.profession || t('not_available')}</p>
                         </div>
                         <div>
-                            <label className="block text-sm font-bold text-gray-700 dark:text-white">Country</label>
-                            <p className="mt-1 text-base text-gray-800 dark:text-gray-400">{user.country || 'N/A'}</p>
+                            <label className="block text-sm font-bold text-gray-700 dark:text-white">{t('country')}</label>
+                            <p className="mt-1 text-base text-gray-800 dark:text-gray-400">{user.country || t('not_available')}</p>
                         </div>
                         <div>
-                            <label className="block text-sm font-bold text-gray-700 dark:text-white">Address</label>
-                            <p className="mt-1 text-base text-gray-800 dark:text-gray-400">{user.address || 'N/A'}</p>
+                            <label className="block text-sm font-bold text-gray-700 dark:text-white">{t('address')}</label>
+                            <p className="mt-1 text-base text-gray-800 dark:text-gray-400">{user.address || t('not_available')}</p>
                         </div>
                         <div>
-                            <label className="block text-sm font-bold text-gray-700 dark:text-white">Location</label>
-                            <p className="mt-1 text-base text-gray-800 dark:text-gray-400">{user.location || 'N/A'}</p>
+                            <label className="block text-sm font-bold text-gray-700 dark:text-white">{t('location')}</label>
+                            <p className="mt-1 text-base text-gray-800 dark:text-gray-400">{user.location || t('not_available')}</p>
                         </div>
                         <div>
-                            <label className="block text-sm font-bold text-gray-700 dark:text-white">Phone</label>
-                            <p className="mt-1 text-base text-gray-800 dark:text-gray-400">{user.phone || 'N/A'}</p>
+                            <label className="block text-sm font-bold text-gray-700 dark:text-white">{t('phone')}</label>
+                            <p className="mt-1 text-base text-gray-800 dark:text-gray-400">{user.phone || t('not_available')}</p>
                         </div>
                         <div>
-                            <label className="block text-sm font-bold text-gray-700 dark:text-white">Email</label>
-                            <p className="mt-1 text-base text-gray-800 dark:text-gray-400">{user.email || 'N/A'}</p>
+                            <label className="block text-sm font-bold text-gray-700 dark:text-white">{t('email')}</label>
+                            <p className="mt-1 text-base text-gray-800 dark:text-gray-400">{user.email || t('not_available')}</p>
                         </div>
                         <div>
-                            <label className="block text-sm font-bold text-gray-700 dark:text-white">Website</label>
-                            <p className="mt-1 text-base text-gray-800 dark:text-gray-400">{user.website || 'N/A'}</p>
+                            <label className="block text-sm font-bold text-gray-700 dark:text-white">{t('website')}</label>
+                            <p className="mt-1 text-base text-gray-800 dark:text-gray-400">{user.website || t('not_available')}</p>
                         </div>
                         <div>
-                            <label className="block text-sm font-bold text-gray-700 dark:text-white">Registration Date</label>
-                            <p className="mt-1 text-base text-gray-800 dark:text-gray-400">{user.registration_date || 'N/A'}</p>
+                            <label className="block text-sm font-bold text-gray-700 dark:text-white">{t('registration_date')}</label>
+                            <p className="mt-1 text-base text-gray-800 dark:text-gray-400">{user.registration_date || t('not_available')}</p>
                         </div>
                         <div>
-                            <label className="block text-sm font-bold text-gray-700 dark:text-white">Status</label>
-                            <p className="mt-1 text-base text-gray-800 dark:text-gray-400">{user.status || 'N/A'}</p>
+                            <label className="block text-sm font-bold text-gray-700 dark:text-white">{t('status')}</label>
+                            <p className="mt-1 text-base text-gray-800 dark:text-gray-400">{user.status || t('not_available')}</p>
                         </div>
                     </div>
                 </div>
-            </div>
-
+            </div>{' '}
             {/* Social Information */}
             <div className="rounded-md border border-[#ebedf2] bg-white p-4 dark:border-[#191e3a] dark:bg-black">
-                <h6 className="mb-5 text-lg font-bold">Social</h6>
+                <h6 className="mb-5 text-lg font-bold">{t('social')}</h6>
                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                     <div className="flex items-center">
                         <div className="flex items-center justify-center rounded bg-[#eee] px-4 py-3 mr-3 dark:bg-[#1b2e4b]">

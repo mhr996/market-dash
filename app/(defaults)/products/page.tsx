@@ -10,6 +10,7 @@ import React, { useEffect, useState } from 'react';
 import supabase from '@/lib/supabase';
 import { Alert } from '@/components/elements/alerts/elements-alerts-default';
 import ConfirmModal from '@/components/modals/confirm-modal';
+import { getTranslation } from '@/i18n';
 
 interface Category {
     id: number;
@@ -40,6 +41,7 @@ interface Product {
 }
 
 const ProductsList = () => {
+    const { t } = getTranslation();
     const [items, setItems] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -141,10 +143,10 @@ const ProductsList = () => {
 
             const updatedItems = items.filter((p) => p.id !== productToDelete.id);
             setItems(updatedItems);
-            setAlert({ visible: true, message: 'Product deleted successfully.', type: 'success' });
+            setAlert({ visible: true, message: t('product_deleted'), type: 'success' });
         } catch (error) {
             console.error('Deletion error:', error);
-            setAlert({ visible: true, message: 'Error deleting product.', type: 'danger' });
+            setAlert({ visible: true, message: t('error_deleting_product'), type: 'danger' });
         } finally {
             setShowConfirmModal(false);
             setProductToDelete(null);
@@ -165,11 +167,12 @@ const ProductsList = () => {
 
     return (
         <div className="panel border-white-light px-0 dark:border-[#1b2e4b]">
+            {' '}
             {alert.visible && (
                 <div className="mb-4 ml-4 max-w-96">
                     <Alert
                         type={alert.type}
-                        title={alert.type === 'success' ? 'Success' : 'Error'}
+                        title={alert.type === 'success' ? t('success') : t('error')}
                         message={alert.message}
                         onClose={() => setAlert({ visible: false, message: '', type: 'success' })}
                     />
@@ -180,15 +183,15 @@ const ProductsList = () => {
                     <div className="flex items-center gap-2">
                         <button type="button" className="btn btn-danger gap-2">
                             <IconTrashLines />
-                            Delete
+                            {t('delete')}
                         </button>
                         <Link href="/products/add" className="btn btn-primary gap-2">
                             <IconPlus />
-                            Add New
+                            {t('add_new')}
                         </Link>
                     </div>
                     <div className="ltr:ml-auto rtl:mr-auto">
-                        <input type="text" className="form-input w-auto" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} />
+                        <input type="text" className="form-input w-auto" placeholder={t('search')} value={search} onChange={(e) => setSearch(e.target.value)} />
                     </div>
                 </div>
 
@@ -199,13 +202,13 @@ const ProductsList = () => {
                         columns={[
                             {
                                 accessor: 'id',
-                                title: 'ID',
+                                title: t('id'),
                                 sortable: true,
                                 render: ({ id }) => <strong className="text-info">#{id}</strong>,
                             },
                             {
                                 accessor: 'title',
-                                title: 'Product',
+                                title: t('products'),
                                 sortable: true,
                                 render: ({ title, images }) => {
                                     let imageList = [];
@@ -224,7 +227,7 @@ const ProductsList = () => {
                             },
                             {
                                 accessor: 'price',
-                                title: 'Price',
+                                title: t('price'),
                                 sortable: true,
                                 render: ({ price, sale_price, discount_type, discount_value, discount_start, discount_end }) => (
                                     <div>
@@ -237,7 +240,7 @@ const ProductsList = () => {
                                                 )}
                                                 {discount_start && discount_end && (
                                                     <span className="text-xs text-gray-500 mt-1">
-                                                        {new Date() < new Date(discount_start) ? 'Starts soon' : new Date() > new Date(discount_end) ? 'Expired' : 'Limited time'}
+                                                        {new Date() < new Date(discount_start) ? t('starts') : new Date() > new Date(discount_end) ? t('expired') : t('limited_time')}
                                                     </span>
                                                 )}
                                             </div>
@@ -249,24 +252,24 @@ const ProductsList = () => {
                             },
                             {
                                 accessor: 'shops.shop_name',
-                                title: 'Shop',
+                                title: t('shop'),
                                 sortable: true,
                             },
                             {
                                 accessor: 'categories.title',
-                                title: 'Category',
+                                title: t('category'),
                                 sortable: true,
                                 render: ({ categories }) => <span>{categories?.title || 'N/A'}</span>,
                             },
                             {
                                 accessor: 'created_at',
-                                title: 'Created Date',
+                                title: t('created_date'),
                                 sortable: true,
                                 render: ({ created_at }) => <span>{new Date(created_at).toLocaleDateString()}</span>,
                             },
                             {
                                 accessor: 'active',
-                                title: 'Status',
+                                title: t('status'),
                                 sortable: true,
                                 textAlignment: 'center',
                                 render: ({ id, active }) => (
@@ -277,14 +280,14 @@ const ProductsList = () => {
                                             } transition-all duration-300`}
                                             onClick={() => toggleProductStatus(id, !active)}
                                         >
-                                            {active ? 'Active' : 'Inactive'}
+                                            {active ? t('active') : t('inactive')}
                                         </span>
                                     </div>
                                 ),
                             },
                             {
                                 accessor: 'action',
-                                title: 'Actions',
+                                title: t('actions'),
                                 sortable: false,
                                 textAlignment: 'center',
                                 render: ({ id }) => (
@@ -313,25 +316,24 @@ const ProductsList = () => {
                         onSortStatusChange={setSortStatus}
                         selectedRecords={selectedRecords}
                         onSelectedRecordsChange={setSelectedRecords}
-                        paginationText={({ from, to, totalRecords }) => `Showing ${from} to ${to} of ${totalRecords} entries`}
+                        paginationText={({ from, to, totalRecords }) => `${t('showing')} ${from} ${t('to')} ${to} ${t('of')} ${totalRecords} ${t('entries')}`}
                         minHeight={300}
                     />
 
                     {loading && <div className="absolute inset-0 z-10 flex items-center justify-center bg-white dark:bg-black-dark-light bg-opacity-60 backdrop-blur-sm" />}
                 </div>
-            </div>
-
+            </div>{' '}
             <ConfirmModal
                 isOpen={showConfirmModal}
-                title="Confirm Deletion"
-                message="Are you sure you want to delete this product? This will also delete all associated images."
+                title={t('confirm_deletion')}
+                message={t('confirm_delete_product')}
                 onCancel={() => {
                     setShowConfirmModal(false);
                     setProductToDelete(null);
                 }}
                 onConfirm={confirmDeletion}
-                confirmLabel="Delete"
-                cancelLabel="Cancel"
+                confirmLabel={t('delete')}
+                cancelLabel={t('cancel')}
                 size="sm"
             />
         </div>

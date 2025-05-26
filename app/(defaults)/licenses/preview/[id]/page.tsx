@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import supabase from '@/lib/supabase';
 import IconEdit from '@/components/icon/icon-edit';
+import { getTranslation } from '@/i18n';
 
 interface License {
     id: number;
@@ -25,6 +26,7 @@ const LicenseDetailsPage = ({ params }: LicenseDetailsPageProps) => {
     const router = useRouter();
     const [license, setLicense] = useState<License | null>(null);
     const [loading, setLoading] = useState(true);
+    const { t } = getTranslation();
 
     useEffect(() => {
         const fetchLicense = async () => {
@@ -52,9 +54,9 @@ const LicenseDetailsPage = ({ params }: LicenseDetailsPageProps) => {
     if (!license) {
         return (
             <div className="flex flex-col items-center justify-center h-80">
-                <p className="text-xl font-bold mb-2">License Not Found</p>
+                <p className="text-xl font-bold mb-2">{t('license_not_found')}</p>
                 <Link href="/licenses" className="btn btn-primary mt-4">
-                    Back to Licenses
+                    {t('back_to_licenses')}
                 </Link>
             </div>
         );
@@ -72,14 +74,15 @@ const LicenseDetailsPage = ({ params }: LicenseDetailsPageProps) => {
         <div className="container mx-auto p-6">
             {/* Header with back button */}
             <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+                {' '}
                 <div onClick={() => router.back()} className="cursor-pointer">
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 mb-4 cursor-pointer text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 mb-4 cursor-pointer text-primary rtl:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                     </svg>
                 </div>
                 <Link href={`/licenses/edit/${license.id}`} className="btn btn-primary flex items-center gap-2">
                     <IconEdit className="h-5 w-5" />
-                    Edit License
+                    {t('edit_license')}
                 </Link>
             </div>
 
@@ -87,12 +90,12 @@ const LicenseDetailsPage = ({ params }: LicenseDetailsPageProps) => {
             <ul className="flex space-x-2 rtl:space-x-reverse mb-4">
                 <li>
                     <Link href="/" className="text-primary hover:underline">
-                        Home
+                        {t('home')}
                     </Link>
                 </li>
                 <li className="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
                     <Link href="/licenses" className="text-primary hover:underline">
-                        Licenses
+                        {t('licenses')}
                     </Link>
                 </li>
                 <li className="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
@@ -113,13 +116,13 @@ const LicenseDetailsPage = ({ params }: LicenseDetailsPageProps) => {
 
                         {/* Description */}
                         <div className="mb-6">
-                            <h6 className="text-base font-semibold text-gray-700 dark:text-white-light mb-2">Description</h6>
-                            <p className="text-gray-600 dark:text-gray-400">{license.desc || 'No description available.'}</p>
+                            <h6 className="text-base font-semibold text-gray-700 dark:text-white-light mb-2">{t('description')}</h6>
+                            <p className="text-gray-600 dark:text-gray-400">{license.desc || t('no_description_available')}</p>
                         </div>
 
                         {/* Features */}
                         <div>
-                            <h6 className="text-base font-semibold text-gray-700 dark:text-white-light mb-3">Features</h6>
+                            <h6 className="text-base font-semibold text-gray-700 dark:text-white-light mb-3">{t('features')}</h6>
                             <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
                                 <div className="flex items-center p-4 border border-gray-200 dark:border-gray-700 rounded-md bg-white-light/30 dark:bg-dark/40">
                                     <div className="flex h-11 w-11 min-w-[2.75rem] items-center justify-center rounded-md bg-primary-light dark:bg-primary text-primary dark:text-white-light">
@@ -133,7 +136,7 @@ const LicenseDetailsPage = ({ params }: LicenseDetailsPageProps) => {
                                         </svg>
                                     </div>
                                     <div className="ltr:ml-4 rtl:mr-4">
-                                        <p className="text-gray-400 text-sm">Allowed Shops</p>
+                                        <p className="text-gray-400 text-sm">{t('allowed_shops')}</p>
                                         <h5 className="text-xl font-semibold text-gray-800 dark:text-white-light">{license.shops}</h5>
                                     </div>
                                 </div>
@@ -146,7 +149,7 @@ const LicenseDetailsPage = ({ params }: LicenseDetailsPageProps) => {
                                         </svg>
                                     </div>
                                     <div className="ltr:ml-4 rtl:mr-4">
-                                        <p className="text-gray-400 text-sm">Allowed Products</p>
+                                        <p className="text-gray-400 text-sm">{t('allowed_products')}</p>
                                         <h5 className="text-xl font-semibold text-gray-800 dark:text-white-light">{license.products}</h5>
                                     </div>
                                 </div>
@@ -159,25 +162,25 @@ const LicenseDetailsPage = ({ params }: LicenseDetailsPageProps) => {
                 <div className="lg:col-span-4">
                     <div className="panel h-full">
                         <div className="mb-5">
-                            <h5 className="text-lg font-semibold text-gray-800 dark:text-white-light">License Summary</h5>
+                            <h5 className="text-lg font-semibold text-gray-800 dark:text-white-light">{t('license_summary')}</h5>
                         </div>
 
                         <div className="space-y-5">
                             <div>
-                                <h6 className="text-sm font-semibold text-gray-700 dark:text-white-light mb-2">ID</h6>
+                                <h6 className="text-sm font-semibold text-gray-700 dark:text-white-light mb-2">{t('id')}</h6>
                                 <p className="text-gray-600 dark:text-gray-400">#{license.id}</p>
                             </div>
 
                             <div>
-                                <h6 className="text-sm font-semibold text-gray-700 dark:text-white-light mb-2">Created Date</h6>
+                                <h6 className="text-sm font-semibold text-gray-700 dark:text-white-light mb-2">{t('created_date')}</h6>
                                 <p className="text-gray-600 dark:text-gray-400">{new Date(license.created_at).toLocaleDateString()}</p>
                             </div>
 
                             <div>
-                                <h6 className="text-sm font-semibold text-gray-700 dark:text-white-light mb-2">Price</h6>
+                                <h6 className="text-sm font-semibold text-gray-700 dark:text-white-light mb-2">{t('price')}</h6>
                                 <div className="flex items-center">
                                     <span className="text-xl font-bold text-primary">{formatCurrency(license.price)}</span>
-                                    <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">per license</span>
+                                    <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">{t('per_license')}</span>
                                 </div>
                             </div>
 
@@ -185,10 +188,10 @@ const LicenseDetailsPage = ({ params }: LicenseDetailsPageProps) => {
 
                             <div className="mt-4">
                                 <Link href={`/licenses/edit/${license.id}`} className="btn btn-primary w-full">
-                                    Edit License
+                                    {t('edit_license')}
                                 </Link>
                                 <Link href="/licenses" className="btn btn-outline-primary w-full mt-3">
-                                    Back to Licenses
+                                    {t('back_to_licenses')}
                                 </Link>
                             </div>
                         </div>

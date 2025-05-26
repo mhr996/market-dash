@@ -9,6 +9,7 @@ import React, { useEffect, useState } from 'react';
 import supabase from '@/lib/supabase';
 import { Alert } from '@/components/elements/alerts/elements-alerts-default';
 import ConfirmModal from '@/components/modals/confirm-modal';
+import { getTranslation } from '@/i18n';
 
 // Category interface
 interface Category {
@@ -21,6 +22,7 @@ interface Category {
 const CategoriesList = () => {
     const [items, setItems] = useState<Category[]>([]);
     const [loading, setLoading] = useState(true);
+    const { t } = getTranslation();
 
     const [page, setPage] = useState(1);
     const PAGE_SIZES = [10, 20, 30, 50, 100];
@@ -102,10 +104,10 @@ const CategoriesList = () => {
             if (error) throw error;
             const updatedItems = items.filter((c) => c.id !== categoryToDelete.id);
             setItems(updatedItems);
-            setAlert({ visible: true, message: 'Category deleted successfully.', type: 'success' });
+            setAlert({ visible: true, message: t('category_deleted_successfully'), type: 'success' });
         } catch (error) {
             console.error('Deletion error:', error);
-            setAlert({ visible: true, message: 'Error deleting category.', type: 'danger' });
+            setAlert({ visible: true, message: t('error_deleting_category'), type: 'danger' });
         } finally {
             setShowConfirmModal(false);
             setCategoryToDelete(null);
@@ -119,7 +121,7 @@ const CategoriesList = () => {
                 <div className="mb-4 ml-4 max-w-96">
                     <Alert
                         type={alert.type}
-                        title={alert.type === 'success' ? 'Success' : 'Error'}
+                        title={alert.type === 'success' ? t('success') : t('error')}
                         message={alert.message}
                         onClose={() => setAlert({ visible: false, message: '', type: 'success' })}
                     />
@@ -130,15 +132,15 @@ const CategoriesList = () => {
                     <div className="flex items-center gap-2">
                         <button type="button" className="btn btn-danger gap-2">
                             <IconTrashLines />
-                            Delete
+                            {t('delete')}
                         </button>
                         <Link href="/categories/add" className="btn btn-primary gap-2">
                             <IconPlus />
-                            Add New
+                            {t('add_new')}
                         </Link>
                     </div>
                     <div className="ltr:ml-auto rtl:mr-auto">
-                        <input type="text" className="form-input w-auto" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} />
+                        <input type="text" className="form-input w-auto" placeholder={t('search')} value={search} onChange={(e) => setSearch(e.target.value)} />
                     </div>
                 </div>
 
@@ -149,30 +151,30 @@ const CategoriesList = () => {
                         columns={[
                             {
                                 accessor: 'id',
-                                title: 'ID',
+                                title: t('id'),
                                 sortable: true,
                                 render: ({ id }) => <strong className="text-info">#{id}</strong>,
                             },
                             {
                                 accessor: 'title',
-                                title: 'Title',
+                                title: t('title'),
                                 sortable: true,
                             },
                             {
                                 accessor: 'desc',
-                                title: 'Description',
+                                title: t('description'),
                                 sortable: true,
                                 render: ({ desc }) => <span>{desc || 'N/A'}</span>,
                             },
                             {
                                 accessor: 'created_at',
-                                title: 'Created Date',
+                                title: t('created_date'),
                                 sortable: true,
                                 render: ({ created_at }) => (created_at ? <span>{new Date(created_at).toLocaleDateString()}</span> : ''),
                             },
                             {
                                 accessor: 'action',
-                                title: 'Actions',
+                                title: t('actions'),
                                 sortable: false,
                                 textAlignment: 'center',
                                 render: ({ id }) => (
@@ -198,7 +200,7 @@ const CategoriesList = () => {
                         onSortStatusChange={setSortStatus}
                         selectedRecords={selectedRecords}
                         onSelectedRecordsChange={setSelectedRecords}
-                        paginationText={({ from, to, totalRecords }) => `Showing ${from} to ${to} of ${totalRecords} entries`}
+                        paginationText={({ from, to, totalRecords }) => `${t('showing')} ${from} ${t('to')} ${to} ${t('of')} ${totalRecords} ${t('entries')}`}
                         minHeight={300}
                     />
 
@@ -209,15 +211,15 @@ const CategoriesList = () => {
             {/* Confirm Deletion Modal */}
             <ConfirmModal
                 isOpen={showConfirmModal}
-                title="Confirm Deletion"
-                message="Are you sure you want to delete this category?"
+                title={t('confirm_deletion')}
+                message={t('confirm_delete_category')}
                 onCancel={() => {
                     setShowConfirmModal(false);
                     setCategoryToDelete(null);
                 }}
                 onConfirm={confirmDeletion}
-                confirmLabel="Delete"
-                cancelLabel="Cancel"
+                confirmLabel={t('delete')}
+                cancelLabel={t('cancel')}
                 size="sm"
             />
         </div>

@@ -12,6 +12,7 @@ import { useSelector } from 'react-redux';
 import { IRootState } from '@/store';
 import Flatpickr from 'react-flatpickr';
 import 'flatpickr/dist/flatpickr.css';
+import { getTranslation } from '@/i18n';
 
 interface Shop {
     id: string;
@@ -30,6 +31,7 @@ interface ProductFormProps {
 
 const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
     const router = useRouter();
+    const { t } = getTranslation();
     const isRtl = useSelector((state: IRootState) => state.themeConfig.rtlClass) === 'rtl';
     const [loading, setLoading] = useState(false);
     const [shops, setShops] = useState<Shop[]>([]);
@@ -141,7 +143,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                 }
             } catch (error) {
                 console.error('Error fetching data:', error);
-                setAlert({ type: 'danger', message: 'Error loading data' });
+                setAlert({ type: 'danger', message: t('error_loading_data') });
             }
         };
 
@@ -227,22 +229,22 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
 
         // Validate required fields
         if (!formData.title?.trim()) {
-            setAlert({ type: 'danger', message: 'Title is required' });
+            setAlert({ type: 'danger', message: t('title_required') });
             return;
         }
 
         if (!formData.price) {
-            setAlert({ type: 'danger', message: 'Price is required' });
+            setAlert({ type: 'danger', message: t('price_required') });
             return;
         }
 
         if (!formData.shop) {
-            setAlert({ type: 'danger', message: 'You must select a shop' });
+            setAlert({ type: 'danger', message: t('shop_selection_required') });
             return;
         }
 
         if (!previewUrls.length && !selectedFiles.length) {
-            setAlert({ type: 'danger', message: 'At least one product image is required' });
+            setAlert({ type: 'danger', message: t('image_required') });
             return;
         }
 
@@ -399,7 +401,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                 if (error) throw error;
             }
 
-            setAlert({ type: 'success', message: `Product ${productId ? 'updated' : 'created'} successfully` });
+            setAlert({ type: 'success', message: productId ? t('product_updated_successfully') : t('product_created_successfully') });
             // Reset form if creating new product
             if (!productId) {
                 setFormData({
@@ -432,13 +434,13 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
 
     return (
         <div className="panel">
-            {alert && <Alert type={alert.type} title={alert.type === 'success' ? 'Success' : 'Error'} message={alert.message} onClose={() => setAlert(null)} />}
+            {alert && <Alert type={alert.type} title={alert.type === 'success' ? t('success') : t('error')} message={alert.message} onClose={() => setAlert(null)} />}
 
             <form onSubmit={handleSubmit} className="space-y-5">
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                     <div className="space-y-5">
                         <div>
-                            <label htmlFor="title">Title</label>
+                            <label htmlFor="title">{t('title')}</label>
                             <input
                                 id="title"
                                 type="text"
@@ -451,7 +453,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                         </div>
 
                         <div>
-                            <label htmlFor="price">Price</label>
+                            <label htmlFor="price">{t('price')}</label>
                             <input
                                 id="price"
                                 type="number"
@@ -481,7 +483,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                                             }
                                         }}
                                     />
-                                    Add Sale Price
+                                    {t('enable_sale_price')}
                                 </label>
                             </div>
 
@@ -489,7 +491,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                                 {hasSalePrice && (
                                     <div className="space-y-4 mt-2">
                                         <div>
-                                            <label className="block mb-2">Discount Type</label>
+                                            <label className="block mb-2">{t('discount_type')}</label>
                                             <div className="flex gap-4">
                                                 <label className="inline-flex items-center cursor-pointer">
                                                     <input
@@ -499,17 +501,17 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                                                         checked={discountType === 'percentage'}
                                                         onChange={() => setDiscountType('percentage')}
                                                     />
-                                                    <span className="ml-2">Percentage (%)</span>
+                                                    <span className="ml-2">{t('percentage')}</span>
                                                 </label>
                                                 <label className="inline-flex items-center cursor-pointer">
                                                     <input type="radio" className="form-radio" name="discountType" checked={discountType === 'fixed'} onChange={() => setDiscountType('fixed')} />
-                                                    <span className="ml-2">Fixed Amount</span>
+                                                    <span className="ml-2">{t('fixed')}</span>
                                                 </label>
                                             </div>
                                         </div>
 
                                         <div>
-                                            <label htmlFor="discountValue">{discountType === 'percentage' ? 'Percentage Discount (%)' : 'Fixed Discount Amount'}</label>
+                                            <label htmlFor="discountValue">{discountType === 'percentage' ? t('percentage_discount') : t('fixed_discount')}</label>
                                             <input
                                                 id="discountValue"
                                                 type="number"
@@ -526,18 +528,22 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
 
                                         {finalPrice !== null && formData.price && (
                                             <div className="flex items-center gap-4 text-lg">
-                                                <div className="font-medium">Final Price:</div>
+                                                <div className="font-medium">{t('final_price')}:</div>
                                                 <div className="flex items-center gap-2">
                                                     <span className="text-danger line-through">{parseFloat(formData.price).toFixed(2)}</span>
                                                     <span className="font-bold text-success">{finalPrice.toFixed(2)}</span>
-                                                    {discountType === 'percentage' && <span className="bg-success text-white px-2 py-0.5 text-xs rounded-full">{discountValue}% OFF</span>}
+                                                    {discountType === 'percentage' && (
+                                                        <span className="bg-success text-white px-2 py-0.5 text-xs rounded-full">
+                                                            {discountValue}% {t('off')}
+                                                        </span>
+                                                    )}
                                                 </div>
                                             </div>
                                         )}
 
                                         <div className="grid grid-cols-1 md:grid-cols-2 gap-4 mt-4">
                                             <div>
-                                                <label htmlFor="discountStart">Discount Start Date/Time</label>
+                                                <label htmlFor="discountStart">{t('discount_start_date')}</label>
                                                 <div className="relative">
                                                     <Flatpickr
                                                         options={{
@@ -559,7 +565,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                                                 </div>
                                             </div>
                                             <div>
-                                                <label htmlFor="discountEnd">Discount End Date/Time</label>
+                                                <label htmlFor="discountEnd">{t('discount_end_date')}</label>
                                                 <div className="relative">
                                                     <Flatpickr
                                                         options={{
@@ -587,7 +593,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                         </div>
 
                         <div>
-                            <label htmlFor="desc">Description (Optional)</label>
+                            <label htmlFor="desc">{t('description')}</label>
                             <textarea
                                 id="desc"
                                 name="desc"
@@ -598,10 +604,10 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                         </div>
 
                         <div>
-                            <label className="mb-2 block text-sm font-semibold">Product Status</label>
+                            <label className="mb-2 block text-sm font-semibold">{t('product_status')}</label>
                             <label className="inline-flex cursor-pointer items-center">
                                 <input type="checkbox" className="form-checkbox" checked={formData.active} onChange={(e) => setFormData((prev) => ({ ...prev, active: e.target.checked }))} />
-                                <span className="relative text-white-dark checked:bg-none ml-2">{formData.active ? 'Active' : 'Inactive'}</span>
+                                <span className="relative text-white-dark checked:bg-none ml-2">{formData.active ? t('active') : t('inactive')}</span>
                             </label>
                         </div>
                     </div>
@@ -609,13 +615,13 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                     <div className="space-y-5">
                         {/* Shop Dropdown */}
                         <div ref={shopRef} className="relative">
-                            <label htmlFor="shop">Shop</label>
+                            <label htmlFor="shop">{t('shop')}</label>
                             <div className="relative">
                                 <div
                                     className="cursor-pointer rounded border border-[#e0e6ed] bg-white p-2.5 text-dark dark:border-[#191e3a] dark:bg-black dark:text-white-dark flex items-center justify-between"
                                     onClick={() => setIsShopDropdownOpen(!isShopDropdownOpen)}
                                 >
-                                    <span>{formData.shop ? shops.find((s) => s.id === formData.shop)?.shop_name : 'Select a shop'}</span>
+                                    <span>{formData.shop ? shops.find((s) => s.id === formData.shop)?.shop_name : t('select_shop')}</span>
                                     <IconCaretDown className={`h-4 w-4 transition-transform duration-300 ${isShopDropdownOpen ? 'rotate-180' : ''}`} />
                                 </div>
 
@@ -625,7 +631,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                                             <input
                                                 type="text"
                                                 className="w-full rounded border border-[#e0e6ed] p-2 focus:border-primary focus:outline-none dark:border-[#191e3a] dark:bg-black dark:text-white-dark"
-                                                placeholder="Search..."
+                                                placeholder={t('search')}
                                                 value={searchTerm.shop}
                                                 onChange={(e) => setSearchTerm((prev) => ({ ...prev, shop: e.target.value }))}
                                             />
@@ -651,14 +657,14 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
 
                         {/* Category Selection */}
                         <div ref={categoryRef} className="relative">
-                            <label htmlFor="category">Category (Optional)</label>
+                            <label htmlFor="category">{t('category')}</label>
                             <div className="flex gap-2">
                                 <div className="relative flex-1">
                                     <div
                                         className="cursor-pointer rounded border border-[#e0e6ed] bg-white p-2.5 text-dark dark:border-[#191e3a] dark:bg-black dark:text-white-dark flex items-center justify-between"
                                         onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
                                     >
-                                        <span>{formData.category ? categories.find((c) => c.id.toString() === formData.category)?.title : 'Select a category'}</span>
+                                        <span>{formData.category ? categories.find((c) => c.id.toString() === formData.category)?.title : t('select_category')}</span>
                                         <IconCaretDown className={`h-4 w-4 transition-transform duration-300 ${isCategoryDropdownOpen ? 'rotate-180' : ''}`} />
                                     </div>
 
@@ -701,14 +707,14 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                             {showNewCategoryForm && (
                                 <div className="rounded-lg border border-[#e0e6ed] p-4 dark:border-[#1b2e4b]">
                                     <div className="mb-4 flex items-center justify-between">
-                                        <h3 className="text-lg font-semibold">Create New Category</h3>
+                                        <h3 className="text-lg font-semibold">{t('create_new_category')}</h3>
                                         <button type="button" className="hover:text-danger" onClick={() => setShowNewCategoryForm(false)}>
                                             <IconX className="h-5 w-5" />
                                         </button>
                                     </div>
                                     <div className="space-y-4">
                                         <div>
-                                            <label htmlFor="categoryTitle">Category Title</label>
+                                            <label htmlFor="categoryTitle">{t('category_title')}</label>
                                             <input
                                                 id="categoryTitle"
                                                 type="text"
@@ -720,12 +726,12 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                                             />
                                         </div>
                                         <div>
-                                            <label htmlFor="categoryDesc">Category Description</label>
+                                            <label htmlFor="categoryDesc">{t('category_description')}</label>
                                             <textarea
                                                 id="categoryDesc"
                                                 className="form-textarea"
                                                 name="desc"
-                                                placeholder="Optional"
+                                                placeholder={t('optional')}
                                                 value={newCategory.desc}
                                                 onChange={(e) => setNewCategory((prev) => ({ ...prev, desc: e.target.value }))}
                                             />
@@ -745,7 +751,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
 
                         {/* Image Upload */}
                         <div>
-                            <label className="mb-3 block">Product Images</label>
+                            <label className="mb-3 block">{t('product_images')}</label>
                             <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
                                 {/* Add New Image Button */}
                                 {previewUrls.length < 5 && (
@@ -754,8 +760,8 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                                         className="flex h-32 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 hover:border-primary hover:bg-gray-100 dark:border-[#1b2e4b] dark:bg-black dark:hover:border-primary dark:hover:bg-[#1b2e4b]"
                                     >
                                         <IconUpload className="mb-2 h-6 w-6" />
-                                        <p className="text-sm text-gray-600 dark:text-gray-400">Click to upload</p>
-                                        <p className="text-[10px] text-gray-500 dark:text-gray-500">PNG, JPG, GIF up to 2MB</p>
+                                        <p className="text-sm text-gray-600 dark:text-gray-400">{t('click_to_upload')}</p>
+                                        <p className="text-[10px] text-gray-500 dark:text-gray-500">{t('image_formats')}</p>
                                     </div>
                                 )}
 
@@ -781,10 +787,10 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
 
                 <div className="mt-8 flex justify-end gap-4">
                     <button type="button" className="btn btn-outline-danger" onClick={() => router.push('/products')} disabled={loading}>
-                        Cancel
+                        {t('cancel')}
                     </button>
                     <button type="submit" className="btn btn-primary" disabled={loading}>
-                        {loading ? 'Saving...' : productId ? 'Update Product' : 'Create Product'}
+                        {loading ? t('submitting') : productId ? t('update_product') : t('create_product')}
                     </button>
                 </div>
             </form>

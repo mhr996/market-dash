@@ -17,6 +17,7 @@ import AnimateHeight from 'react-animate-height';
 import Tabs from '@/components/tabs';
 import dynamic from 'next/dynamic';
 import 'leaflet/dist/leaflet.css';
+import { getTranslation } from '@/i18n';
 
 // Import the map component dynamically with no SSR
 const MapSelector = dynamic(() => import('@/components/map/map-selector'), {
@@ -44,6 +45,7 @@ interface WorkHours {
 
 const AddShopPage = () => {
     const router = useRouter();
+    const { t } = getTranslation();
     const [form, setForm] = useState({
         shop_name: '',
         shop_desc: '',
@@ -263,16 +265,14 @@ const AddShopPage = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setLoading(true);
-
-        // Basic validation: shop name and owner are required.
+        setLoading(true); // Basic validation: shop name and owner are required.
         if (!form.shop_name) {
-            setAlert({ visible: true, message: 'Shop name is required.', type: 'danger' });
+            setAlert({ visible: true, message: t('shop_name_required'), type: 'danger' });
             setLoading(false);
             return;
         }
         if (!form.owner) {
-            setAlert({ visible: true, message: 'Shop owner is required.', type: 'danger' });
+            setAlert({ visible: true, message: t('shop_owner_required'), type: 'danger' });
             setLoading(false);
             return;
         }
@@ -326,12 +326,12 @@ const AddShopPage = () => {
                 }
             }
 
-            setAlert({ visible: true, message: 'Shop added successfully!', type: 'success' });
+            setAlert({ visible: true, message: t('shop_added_successfully'), type: 'success' });
             // Redirect back to the shops list page after successful insertion
             router.push('/shops');
         } catch (error: any) {
             console.error(error);
-            setAlert({ visible: true, message: error.message || 'Error adding shop', type: 'danger' });
+            setAlert({ visible: true, message: error.message || t('error_adding_shop'), type: 'danger' });
             // Scroll to top to show error
             window.scrollTo({ top: 0, behavior: 'smooth' });
             setLoading(false);
@@ -341,26 +341,26 @@ const AddShopPage = () => {
     return (
         <div className="container mx-auto p-6">
             <div className="flex items-center gap-5 mb-6">
+                {' '}
                 <div onClick={() => router.back()}>
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 mb-4 cursor-pointer text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 mb-4 cursor-pointer text-primary rtl:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                     </svg>
-                </div>
-
+                </div>{' '}
                 {/* Breadcrumb Navigation */}
                 <ul className="flex space-x-2 rtl:space-x-reverse mb-4">
                     <li>
                         <Link href="/" className="text-primary hover:underline">
-                            Home
+                            {t('home')}
                         </Link>
                     </li>
                     <li className="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
                         <Link href="/shops" className="text-primary hover:underline">
-                            Shops
+                            {t('shops')}
                         </Link>
                     </li>
                     <li className="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
-                        <span>Add New Shop</span>
+                        <span>{t('add_new_shop')}</span>
                     </li>
                 </ul>
             </div>
@@ -378,8 +378,9 @@ const AddShopPage = () => {
                     <div className="relative h-52 w-full">
                         <img src={form.cover_image_url || '/assets/images/img-placeholder-fallback.webp'} alt="Shop Cover" className="h-full w-full object-cover" />
                         <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center">
+                            {' '}
                             <div className="text-center flex flex-col items-center justify-center">
-                                <h2 className="text-xl font-bold text-white mb-4">Shop Cover Image</h2>
+                                <h2 className="text-xl font-bold text-white mb-4">{t('shop_cover_image')}</h2>
                                 <ImageUpload
                                     bucket="shops-logos/covers"
                                     userId="new"
@@ -393,35 +394,33 @@ const AddShopPage = () => {
                                             message: error,
                                         });
                                     }}
-                                    buttonLabel="Select Cover"
+                                    buttonLabel={t('select_cover')}
                                 />
                             </div>
                         </div>
                     </div>
-                </div>
-
+                </div>{' '}
                 <div className="mb-6">
                     <Tabs
                         tabs={[
-                            { name: 'Basic Info', icon: 'store' },
-                            { name: 'Shop Details', icon: 'map-pin' },
-                            { name: 'Working Hours', icon: 'clock' },
-                            { name: 'Gallery', icon: 'image' },
+                            { name: t('basic_info'), icon: 'store' },
+                            { name: t('shop_details'), icon: 'map-pin' },
+                            { name: t('working_hours'), icon: 'clock' },
+                            { name: t('gallery'), icon: 'image' },
                         ]}
                         onTabClick={(tab) => setActiveTab(tab)}
                         activeTab={activeTab}
                     />
-                </div>
-
+                </div>{' '}
                 {activeTab === 0 && (
                     <div className="panel mb-5">
                         <div className="mb-5">
-                            <h5 className="text-lg font-semibold dark:text-white-light">Basic Information</h5>
+                            <h5 className="text-lg font-semibold dark:text-white-light">{t('basic_information')}</h5>
                         </div>
                         <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
                             {/* Logo Column */}
                             <div className="flex flex-col items-center">
-                                <label className="block text-sm font-bold text-gray-700 dark:text-white mb-3">Shop Logo</label>
+                                <label className="block text-sm font-bold text-gray-700 dark:text-white mb-3">{t('shop_logo')}</label>
                                 <ImageUpload
                                     bucket="shops-logos"
                                     userId="new"
@@ -431,12 +430,11 @@ const AddShopPage = () => {
                                     onError={(error) => setAlert({ visible: true, message: error, type: 'danger' })}
                                 />
                             </div>
-
-                            {/* Shop Info Column */}
+                            {/* Shop Info Column */}{' '}
                             <div className="space-y-5">
                                 <div>
                                     <label htmlFor="shop_name" className="block text-sm font-bold text-gray-700 dark:text-white">
-                                        Shop Name <span className="text-red-500">*</span>
+                                        {t('shop_name')} <span className="text-red-500">*</span>
                                     </label>
                                     <input
                                         type="text"
@@ -445,13 +443,13 @@ const AddShopPage = () => {
                                         value={form.shop_name}
                                         onChange={handleInputChange}
                                         className="form-input"
-                                        placeholder="Enter shop name"
+                                        placeholder={t('enter_shop_name')}
                                         required
                                     />
                                 </div>
                                 <div>
                                     <label htmlFor="shop_desc" className="block text-sm font-bold text-gray-700 dark:text-white">
-                                        Shop Description
+                                        {t('shop_description')}
                                     </label>
                                     <textarea
                                         id="shop_desc"
@@ -459,18 +457,18 @@ const AddShopPage = () => {
                                         value={form.shop_desc}
                                         onChange={handleInputChange}
                                         className="form-textarea"
-                                        placeholder="Enter shop description"
+                                        placeholder={t('enter_shop_description')}
                                         rows={4}
                                     />
                                 </div>
                                 <div className="relative" ref={dropdownRef}>
                                     <label htmlFor="owner" className="block text-sm font-bold text-gray-700 dark:text-white">
-                                        Shop Owner <span className="text-red-500">*</span>
-                                    </label>
+                                        {t('shop_owner')} <span className="text-red-500">*</span>
+                                    </label>{' '}
                                     <div className="relative">
                                         <input
                                             type="text"
-                                            placeholder="Search users..."
+                                            placeholder={t('search_users')}
                                             className="form-input pr-8"
                                             value={searchTerm}
                                             onChange={(e) => {
@@ -505,16 +503,16 @@ const AddShopPage = () => {
                                             </div>
                                         )}
                                     </div>
-                                </div>
+                                </div>{' '}
                                 <div ref={categoryRef} className="relative">
                                     <label htmlFor="category_id" className="block text-sm font-bold text-gray-700 dark:text-white">
-                                        Category
+                                        {t('category')}
                                     </label>
                                     <div
                                         className="cursor-pointer rounded border border-[#e0e6ed] bg-white p-2.5 text-dark dark:border-[#191e3a] dark:bg-black dark:text-white-dark flex items-center justify-between"
                                         onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
                                     >
-                                        <span>{form.category_id ? categories.find((c) => c.id === form.category_id)?.title || 'Select Category' : 'Select Category'}</span>
+                                        <span>{form.category_id ? categories.find((c) => c.id === form.category_id)?.title || t('select_category') : t('select_category')}</span>
                                         <IconCaretDown className={`h-4 w-4 transition-transform duration-300 ${isCategoryDropdownOpen ? 'rotate-180' : ''}`} />
                                     </div>
 
@@ -524,7 +522,7 @@ const AddShopPage = () => {
                                                 <input
                                                     type="text"
                                                     className="w-full rounded border border-[#e0e6ed] p-2 focus:border-primary focus:outline-none dark:border-[#191e3a] dark:bg-black dark:text-white-dark"
-                                                    placeholder="Search categories..."
+                                                    placeholder={t('search_categories')}
                                                     value={searchCategoryTerm}
                                                     onChange={(e) => setSearchCategoryTerm(e.target.value)}
                                                 />
@@ -544,33 +542,33 @@ const AddShopPage = () => {
                                                         {category.title}
                                                     </div>
                                                 ))}
-                                                {filteredCategories.length === 0 && <div className="px-4 py-2 text-gray-500 dark:text-gray-400">No categories found</div>}
+                                                {filteredCategories.length === 0 && <div className="px-4 py-2 text-gray-500 dark:text-gray-400">{t('no_categories_found')}</div>}
                                             </div>
                                         </div>
                                     )}
                                 </div>{' '}
                                 <div>
-                                    <label className="block text-sm font-bold text-gray-700 dark:text-white ">Visibility</label>
+                                    <label className="block text-sm font-bold text-gray-700 dark:text-white ">{t('visibility')}</label>
                                     <label className="inline-flex cursor-pointer items-center">
                                         <input type="checkbox" name="public" className="form-checkbox" checked={form.public} onChange={handleInputChange} />
-                                        <span className="relative text-white-dark checked:bg-none ml-2">{form.public ? 'Public' : 'Private'}</span>
+                                        <span className="relative text-white-dark checked:bg-none ml-2">{form.public ? t('public') : t('private')}</span>
                                     </label>
                                 </div>{' '}
                                 <div className="relative" ref={statusRef}>
-                                    <label className="block text-sm font-bold text-gray-700 dark:text-white">Status</label>
+                                    <label className="block text-sm font-bold text-gray-700 dark:text-white">{t('status')}</label>{' '}
                                     <div
                                         className="cursor-pointer rounded border border-[#e0e6ed] bg-white p-2.5 text-dark dark:border-[#191e3a] dark:bg-black dark:text-white-dark flex items-center justify-between"
                                         onClick={() => {
                                             setForm((prev) => ({ ...prev, statusDropdownOpen: !prev.statusDropdownOpen }));
                                         }}
                                     >
-                                        <span>{form.status}</span>
+                                        <span>{t(form.status.toLowerCase())}</span>
                                         <IconCaretDown className={`h-4 w-4 transition-transform duration-300 ${form.statusDropdownOpen ? 'rotate-180' : ''}`} />
                                     </div>
-
                                     {form.statusDropdownOpen && (
                                         <div className="absolute z-10 mt-1 w-full rounded-md border border-[#e0e6ed] bg-white shadow-lg dark:border-[#191e3a] dark:bg-black">
                                             <div className="max-h-64 overflow-y-auto">
+                                                {' '}
                                                 {['Approved', 'Pending', 'Rejected', 'Banned'].map((status) => (
                                                     <div
                                                         key={status}
@@ -581,7 +579,7 @@ const AddShopPage = () => {
                                                             setForm((prev) => ({ ...prev, status: status, statusDropdownOpen: false }));
                                                         }}
                                                     >
-                                                        {status}
+                                                        {t(status.toLowerCase())}
                                                     </div>
                                                 ))}
                                             </div>
@@ -591,17 +589,16 @@ const AddShopPage = () => {
                             </div>
                         </div>
                     </div>
-                )}
-
+                )}{' '}
                 {activeTab === 1 && (
                     <div className="panel mb-5">
                         <div className="mb-5">
-                            <h5 className="text-lg font-semibold dark:text-white-light">Shop Details</h5>
+                            <h5 className="text-lg font-semibold dark:text-white-light">{t('shop_details')}</h5>
                         </div>
                         <div className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                             <div className="sm:col-span-2">
                                 <label htmlFor="address" className="mb-2 block text-sm font-semibold text-gray-700 dark:text-white">
-                                    Address
+                                    {t('address')}
                                 </label>
                                 <div className="flex items-center">
                                     <span className="mt-1 ltr:mr-2 rtl:ml-2 text-primary">
@@ -613,14 +610,13 @@ const AddShopPage = () => {
                                         className="form-textarea flex-1"
                                         value={form.address}
                                         onChange={handleInputChange}
-                                        placeholder="Enter shop address"
+                                        placeholder={t('enter_shop_address')}
                                         rows={2}
                                     />
                                 </div>
                             </div>
-
                             <div className="sm:col-span-2">
-                                <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-white">Shop Location</label>{' '}
+                                <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-white">{t('shop_location')}</label>{' '}
                                 <div className="h-[400px] mb-4">
                                     <MapSelector
                                         initialPosition={form.latitude && form.longitude ? [form.latitude, form.longitude] : null}
@@ -629,26 +625,33 @@ const AddShopPage = () => {
                                         useCurrentLocationByDefault={true}
                                     />
                                 </div>
-                                <p className="text-xs text-gray-500 mt-1">Click on the map to select your shop's location.</p>
+                                <p className="text-xs text-gray-500 mt-1">{t('click_map_select_location')}</p>{' '}
                                 {form.latitude && form.longitude && (
                                     <p className="text-sm mt-10">
-                                        Selected coordinates:{' '}
+                                        {t('selected_coordinates')}:{' '}
                                         <span className="font-semibold">
                                             {form.latitude.toFixed(6)}, {form.longitude.toFixed(6)}
                                         </span>
                                     </p>
                                 )}
-                            </div>
-
+                            </div>{' '}
                             <div className="sm:col-span-2">
-                                <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-white">Phone Numbers (Up to 3)</label>
+                                <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-white">
+                                    {t('phone_numbers')} ({t('up_to_3')})
+                                </label>
                                 <div className="space-y-3">
                                     {form.phone_numbers.map((phone, index) => (
                                         <div key={index} className="flex items-center gap-2">
                                             <span className="mt-1 ltr:mr-2 rtl:ml-2 text-success">
                                                 <IconPhone className="h-5 w-5" />
                                             </span>
-                                            <input type="tel" className="form-input flex-1" placeholder="Enter phone number" value={phone} onChange={(e) => handlePhoneChange(index, e.target.value)} />
+                                            <input
+                                                type="tel"
+                                                className="form-input flex-1"
+                                                placeholder={t('enter_phone_number')}
+                                                value={phone}
+                                                onChange={(e) => handlePhoneChange(index, e.target.value)}
+                                            />
                                             {index > 0 && (
                                                 <button type="button" className="hover:text-danger" onClick={() => removePhoneNumber(index)}>
                                                     <IconX className="h-4 w-4" />
@@ -660,37 +663,37 @@ const AddShopPage = () => {
                                     {form.phone_numbers.length < 3 && (
                                         <button type="button" className="btn btn-outline-primary btn-sm mt-2" onClick={addPhoneNumber}>
                                             <IconPlus className="h-4 w-4 mr-2" />
-                                            Add Phone Number
+                                            {t('add_phone_number')}
                                         </button>
                                     )}
                                 </div>
                             </div>
                         </div>
                     </div>
-                )}
-
+                )}{' '}
                 {activeTab === 2 && (
                     <div className="panel mb-5">
                         <div className="mb-5">
-                            <h5 className="text-lg font-semibold dark:text-white-light">Working Hours</h5>
-                            <p className="text-gray-500 dark:text-gray-400 mt-1">Set your shop's working hours for each day of the week</p>
+                            <h5 className="text-lg font-semibold dark:text-white-light">{t('working_hours')}</h5>
+                            <p className="text-gray-500 dark:text-gray-400 mt-1">{t('set_working_hours')}</p>
                         </div>
                         <div className="grid grid-cols-1 gap-6">
                             {(form.work_hours || defaultWorkHours).map((day, index) => (
                                 <div key={day.day} className="border border-gray-200 dark:border-gray-700 rounded-md p-4">
                                     <div className="flex flex-wrap items-center justify-between gap-4">
                                         <div className="flex items-center">
-                                            <h6 className="text-lg font-semibold min-w-[100px]">{day.day}</h6>
+                                            <h6 className="text-lg font-semibold min-w-[100px]">{day.day}</h6>{' '}
                                             <label className="inline-flex cursor-pointer">
                                                 <input type="checkbox" className="form-checkbox" checked={day.open} onChange={(e) => handleWorkHoursChange(index, 'open', e.target.checked)} />
-                                                <span className="relative text-white-dark checked:bg-none ml-2">{day.open ? 'Open' : 'Closed'}</span>
+                                                <span className="relative text-white-dark checked:bg-none ml-2">{day.open ? t('open') : t('closed')}</span>
                                             </label>
                                         </div>
 
                                         <AnimateHeight duration={300} height={day.open ? 'auto' : 0}>
                                             <div className={`flex flex-wrap items-center gap-4 ${day.open ? 'mt-4 sm:mt-0' : ''}`}>
+                                                {' '}
                                                 <div className="flex items-center">
-                                                    <span className="mr-2">From:</span>
+                                                    <span className="mr-2">{t('from')}:</span>
                                                     <input
                                                         type="time"
                                                         className="form-input w-auto"
@@ -700,7 +703,7 @@ const AddShopPage = () => {
                                                     />
                                                 </div>
                                                 <div className="flex items-center">
-                                                    <span className="mr-2">To:</span>
+                                                    <span className="mr-2">{t('to')}:</span>
                                                     <input
                                                         type="time"
                                                         className="form-input w-auto"
@@ -716,13 +719,12 @@ const AddShopPage = () => {
                             ))}
                         </div>
                     </div>
-                )}
-
+                )}{' '}
                 {activeTab === 3 && (
                     <div className="panel mb-5">
                         <div className="mb-5">
-                            <h5 className="text-lg font-semibold dark:text-white-light">Shop Gallery</h5>
-                            <p className="text-gray-500 dark:text-gray-400 mt-1">Upload images for your shop gallery (will be saved after shop creation)</p>
+                            <h5 className="text-lg font-semibold dark:text-white-light">{t('shop_gallery')}</h5>
+                            <p className="text-gray-500 dark:text-gray-400 mt-1">{t('upload_gallery_images_info')}</p>
                         </div>
 
                         <div className="mb-5">
@@ -731,8 +733,8 @@ const AddShopPage = () => {
                                 className="flex h-32 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 hover:border-primary hover:bg-gray-100 dark:border-[#1b2e4b] dark:bg-black dark:hover:border-primary dark:hover:bg-[#1b2e4b]"
                             >
                                 <IconUpload className="mb-2 h-6 w-6" />
-                                <p className="text-sm text-gray-600 dark:text-gray-400">Click to upload</p>
-                                <p className="text-[10px] text-gray-500 dark:text-gray-500">JPG, PNG, GIF up to 2MB</p>
+                                <p className="text-sm text-gray-600 dark:text-gray-400">{t('click_to_upload')}</p>
+                                <p className="text-[10px] text-gray-500 dark:text-gray-500">{t('image_formats_and_size')}</p>
                             </div>
                             <input ref={fileInputRef} type="file" className="hidden" accept="image/*" multiple onChange={handleFileChange} />
                         </div>
@@ -741,7 +743,7 @@ const AddShopPage = () => {
                             {/* Selected files that will be uploaded */}
                             {selectedFiles.length > 0 && (
                                 <div>
-                                    <h6 className="font-semibold mb-3">Selected Images to Upload</h6>
+                                    <h6 className="font-semibold mb-3">{t('selected_images_to_upload')}</h6>
                                     <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
                                         {selectedFiles.map((file, index) => (
                                             <div key={index} className="group relative h-32">
@@ -760,15 +762,14 @@ const AddShopPage = () => {
                             )}
                         </div>
                     </div>
-                )}
-
+                )}{' '}
                 {/* Submit Button */}
                 <div className="flex justify-end gap-4">
                     <button type="button" className="btn btn-outline-danger" onClick={() => router.back()}>
-                        Cancel
+                        {t('cancel')}
                     </button>
                     <button type="submit" disabled={loading} className="btn btn-primary">
-                        {loading ? 'Submitting...' : 'Add Shop'}
+                        {loading ? t('submitting') : t('add_shop')}
                     </button>
                 </div>
             </form>

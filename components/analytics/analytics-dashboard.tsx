@@ -9,6 +9,7 @@ import Dropdown from '@/components/dropdown';
 import Link from 'next/link';
 import PerfectScrollbar from 'react-perfect-scrollbar';
 import AnimateHeight from 'react-animate-height';
+import { getTranslation } from '@/i18n';
 
 // Icons
 import IconTrendingUp from '@/components/icon/icon-trending-up';
@@ -93,6 +94,7 @@ const AnalyticsDashboard = () => {
     const isDark = useSelector((state: IRootState) => state.themeConfig.theme === 'dark' || state.themeConfig.isDarkMode);
     const isRtl = useSelector((state: IRootState) => state.themeConfig.rtlClass) === 'rtl';
     const [isMounted, setIsMounted] = useState(false);
+    const { t } = getTranslation();
 
     // State to hold all analytics data
     const [analytics, setAnalytics] = useState<AnalyticsState>({
@@ -847,16 +849,16 @@ const AnalyticsDashboard = () => {
     };
 
     return (
-        <div className='max-w-[1800px]'>
+        <div className="max-w-[1800px]">
             {/* Breadcrumbs */}
             <ul className="flex space-x-2 rtl:space-x-reverse">
                 <li>
                     <Link href="/" className="text-primary hover:underline">
-                        Home
+                        {t('home')}
                     </Link>
                 </li>
                 <li className="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
-                    <span>Analytics</span>
+                    <span>{t('analytics')}</span>
                 </li>
             </ul>
 
@@ -871,7 +873,7 @@ const AnalyticsDashboard = () => {
                             } border border-gray-200 dark:border-gray-800`}
                             onClick={() => handleTimeframeChange('week')}
                         >
-                            This Week
+                            {t('this_week')}
                         </button>
                         <button
                             type="button"
@@ -880,7 +882,7 @@ const AnalyticsDashboard = () => {
                             } border-t border-b border-gray-200 dark:border-gray-800`}
                             onClick={() => handleTimeframeChange('month')}
                         >
-                            This Month
+                            {t('this_month')}
                         </button>
                         <button
                             type="button"
@@ -889,7 +891,7 @@ const AnalyticsDashboard = () => {
                             } border border-gray-200 dark:border-gray-800`}
                             onClick={() => handleTimeframeChange('year')}
                         >
-                            This Year
+                            {t('this_year')}
                         </button>
                     </div>
                 </div>
@@ -903,8 +905,10 @@ const AnalyticsDashboard = () => {
                                 <IconStore className="h-7 w-7" />
                             </div>
                             <div className="ml-4">
-                                <h5 className="text-lg font-semibold dark:text-white-light">Shops</h5>
-                                <div className="text-[13px] font-normal text-white-dark">Total Shops</div>
+                                <h5 className="text-lg font-semibold dark:text-white-light">{t('shops')}</h5>
+                                <div className="text-[13px] font-normal text-white-dark">
+                                    {t('total')} {t('shops')}
+                                </div>
                             </div>
                             <div className={`badge ml-auto ${analytics.shopGrowth >= 0 ? 'bg-success/20 text-success' : 'bg-danger/20 text-danger'}`}>
                                 {analytics.shopGrowth >= 0 ? '+' : ''}
@@ -924,8 +928,10 @@ const AnalyticsDashboard = () => {
                                 <IconUsersGroup className="h-7 w-7" />
                             </div>
                             <div className="ml-4">
-                                <h5 className="text-lg font-semibold dark:text-white-light">Users</h5>
-                                <div className="text-[13px] font-normal text-white-dark">Total Users</div>
+                                <h5 className="text-lg font-semibold dark:text-white-light">{t('users')}</h5>
+                                <div className="text-[13px] font-normal text-white-dark">
+                                    {t('total')} {t('users')}
+                                </div>
                             </div>
                             <div className={`badge ml-auto ${analytics.userGrowth >= 0 ? 'bg-success/20 text-success' : 'bg-danger/20 text-danger'}`}>
                                 {analytics.userGrowth >= 0 ? '+' : ''}
@@ -945,8 +951,10 @@ const AnalyticsDashboard = () => {
                                 <IconBox className="h-7 w-7" />
                             </div>
                             <div className="ml-4">
-                                <h5 className="text-lg font-semibold dark:text-white-light">Products</h5>
-                                <div className="text-[13px] font-normal text-white-dark">Total Products</div>
+                                <h5 className="text-lg font-semibold dark:text-white-light">{t('products')}</h5>
+                                <div className="text-[13px] font-normal text-white-dark">
+                                    {t('total')} {t('products')}
+                                </div>
                             </div>
                             <div className={`badge ml-auto ${analytics.productGrowth >= 0 ? 'bg-success/20 text-success' : 'bg-danger/20 text-danger'}`}>
                                 {analytics.productGrowth >= 0 ? '+' : ''}
@@ -966,8 +974,10 @@ const AnalyticsDashboard = () => {
                                 <IconShoppingCart className="h-7 w-7" />
                             </div>
                             <div className="ml-4">
-                                <h5 className="text-lg font-semibold dark:text-white-light">Orders</h5>
-                                <div className="text-[13px] font-normal text-white-dark">Total Orders</div>
+                                <h5 className="text-lg font-semibold dark:text-white-light">{t('orders')}</h5>
+                                <div className="text-[13px] font-normal text-white-dark">
+                                    {t('total')} {t('orders')}
+                                </div>
                             </div>
                             <div className={`badge ml-auto ${analytics.orderGrowth >= 0 ? 'bg-success/20 text-success' : 'bg-danger/20 text-danger'}`}>
                                 {analytics.orderGrowth >= 0 ? '+' : ''}
@@ -986,7 +996,9 @@ const AnalyticsDashboard = () => {
                     {/* Revenue Overview */}
                     <div className="panel h-full xl:col-span-2">
                         <div className="mb-5 flex items-center justify-between">
-                            <h5 className="text-lg font-semibold dark:text-white-light">Revenue Overview</h5>
+                            <h5 className="text-lg font-semibold dark:text-white-light">
+                                {t('revenue')} {t('sales_overview')}
+                            </h5>
                             <div className="dropdown">
                                 <Dropdown
                                     offset={[0, 5]}
@@ -997,17 +1009,17 @@ const AnalyticsDashboard = () => {
                                     <ul>
                                         <li>
                                             <button type="button" onClick={() => handleTimeframeChange('week')}>
-                                                This Week
+                                                {t('this_week')}
                                             </button>
                                         </li>
                                         <li>
                                             <button type="button" onClick={() => handleTimeframeChange('month')}>
-                                                This Month
+                                                {t('this_month')}
                                             </button>
                                         </li>
                                         <li>
                                             <button type="button" onClick={() => handleTimeframeChange('year')}>
-                                                This Year
+                                                {t('this_year')}
                                             </button>
                                         </li>
                                     </ul>
@@ -1017,12 +1029,14 @@ const AnalyticsDashboard = () => {
 
                         <div className="mb-5 flex flex-col sm:flex-row">
                             <div className="mb-5 sm:mb-0 sm:w-1/3">
-                                <div className="mb-2 text-lg font-semibold dark:text-white-light">Total Revenue</div>
+                                <div className="mb-2 text-lg font-semibold dark:text-white-light">{t('total_revenue')}</div>
                                 <div className="text-3xl font-bold text-[#009688]">${analytics.revenue.total.toFixed(2)}</div>
                                 <div className={`mt-2 inline-flex items-center ${analytics.revenue.growth >= 0 ? 'text-success' : 'text-danger'}`}>
                                     {analytics.revenue.growth >= 0 ? <IconTrendingUp className="h-4 w-4 stroke-current mr-1" /> : <IconTrendingDown className="h-4 w-4 stroke-current mr-1" />}
                                     <span>{Math.abs(analytics.revenue.growth).toFixed(1)}%</span>
-                                    <span className="ml-1 text-white-dark text-xs">vs previous {analytics.timeframe}</span>
+                                    <span className="ml-1 text-white-dark text-xs">
+                                        {t('vs_previous')} {analytics.timeframe}
+                                    </span>
                                 </div>
                             </div>
                             <div className="sm:w-2/3">
@@ -1030,7 +1044,7 @@ const AnalyticsDashboard = () => {
                                     <ReactApexChart options={revenueChartData.options} series={revenueChartData.series} type="area" height={300} />
                                 ) : (
                                     <div className="flex h-72 items-center justify-center">
-                                        <div className="text-lg text-gray-500">No revenue data available</div>
+                                        <div className="text-lg text-gray-500">{t('no_revenue_data')}</div>
                                     </div>
                                 )}
                             </div>
@@ -1040,7 +1054,7 @@ const AnalyticsDashboard = () => {
                     {/* Order Status */}
                     <div className="panel h-full">
                         <div className="mb-5 flex items-center justify-between">
-                            <h5 className="text-lg font-semibold dark:text-white-light">Order Status</h5>
+                            <h5 className="text-lg font-semibold dark:text-white-light">{t('order_status')}</h5>
                             <div className="dropdown">
                                 <Dropdown
                                     offset={[0, 5]}
@@ -1051,17 +1065,17 @@ const AnalyticsDashboard = () => {
                                     <ul>
                                         <li>
                                             <button type="button" onClick={() => handleTimeframeChange('week')}>
-                                                This Week
+                                                {t('this_week')}
                                             </button>
                                         </li>
                                         <li>
                                             <button type="button" onClick={() => handleTimeframeChange('month')}>
-                                                This Month
+                                                {t('this_month')}
                                             </button>
                                         </li>
                                         <li>
                                             <button type="button" onClick={() => handleTimeframeChange('year')}>
-                                                This Year
+                                                {t('this_year')}
                                             </button>
                                         </li>
                                     </ul>
@@ -1074,7 +1088,7 @@ const AnalyticsDashboard = () => {
                                 <ReactApexChart options={orderStatusChartData.options} series={orderStatusChartData.series} type="donut" height={300} />
                             ) : (
                                 <div className="flex h-72 items-center justify-center">
-                                    <div className="text-lg text-gray-500">No order status data available</div>
+                                    <div className="text-lg text-gray-500">{t('no_order_status_data')}</div>
                                 </div>
                             )}
                         </div>
@@ -1086,7 +1100,7 @@ const AnalyticsDashboard = () => {
                     {/* Top Shops */}
                     <div className="panel h-full">
                         <div className="mb-5 flex items-center justify-between">
-                            <h5 className="text-lg font-semibold dark:text-white-light">Top Performing Shops</h5>
+                            <h5 className="text-lg font-semibold dark:text-white-light">{t('top_performing_shops')}</h5>
                             <button type="button" className="hover:text-primary" onClick={() => toggleSection('topShops')}>
                                 <IconCaretDown className={`h-4 w-4 transition-transform duration-300 ${expandedSection === 'topShops' ? 'rotate-180' : ''}`} />
                             </button>
@@ -1119,7 +1133,7 @@ const AnalyticsDashboard = () => {
                                         ))
                                     ) : (
                                         <div className="flex h-32 items-center justify-center">
-                                            <div className="text-lg text-gray-500">No shop data available</div>
+                                            <div className="text-lg text-gray-500">{t('no_shop_data')}</div>
                                         </div>
                                     )}
                                 </div>
@@ -1130,7 +1144,7 @@ const AnalyticsDashboard = () => {
                     {/* Growth Trends & Charts */}
                     <div className="panel h-full xl:col-span-2">
                         <div className="mb-5 flex items-center justify-between">
-                            <h5 className="text-lg font-semibold dark:text-white-light">Growth Trends</h5>
+                            <h5 className="text-lg font-semibold dark:text-white-light">{t('growth_trends')}</h5>
                             <div className="dropdown">
                                 <Dropdown
                                     offset={[0, 5]}
@@ -1141,12 +1155,12 @@ const AnalyticsDashboard = () => {
                                     <ul>
                                         <li>
                                             <button type="button" onClick={() => toggleSection('userOrderTrend')}>
-                                                User vs Order Trend
+                                                {t('user_vs_order_trend')}
                                             </button>
                                         </li>
                                         <li>
                                             <button type="button" onClick={() => toggleSection('shopProductTrend')}>
-                                                Shop vs Product Trend
+                                                {t('shop_vs_product_trend')}
                                             </button>
                                         </li>
                                     </ul>
@@ -1156,14 +1170,14 @@ const AnalyticsDashboard = () => {
 
                         <AnimateHeight duration={300} height={expandedSection !== 'shopProductTrend' ? 'auto' : 0}>
                             <div className="mb-5">
-                                <h6 className="mb-3 text-base font-medium dark:text-white-light">User vs Order Trends</h6>
+                                <h6 className="mb-3 text-base font-medium dark:text-white-light">{t('user_vs_order_trends')}</h6>
                                 {isMounted && <ReactApexChart options={timeTrendsData.options} series={timeTrendsData.series} type="line" height={300} />}
                             </div>
                         </AnimateHeight>
 
                         <AnimateHeight duration={300} height={expandedSection !== 'userOrderTrend' ? 'auto' : 0}>
                             <div className="mb-5">
-                                <h6 className="mb-3 text-base font-medium dark:text-white-light">Shop vs Product Distribution</h6>
+                                <h6 className="mb-3 text-base font-medium dark:text-white-light">{t('shop_vs_product_distribution')}</h6>
                                 {isMounted && <ReactApexChart options={shopProductComparisonData.options} series={shopProductComparisonData.series} type="bar" height={300} />}
                             </div>
                         </AnimateHeight>
@@ -1175,14 +1189,14 @@ const AnalyticsDashboard = () => {
                     {/* Recent Activity */}
                     <div className="panel h-full">
                         <div className="mb-5 flex items-center justify-between">
-                            <h5 className="text-lg font-semibold dark:text-white-light">Recent Activity</h5>
+                            <h5 className="text-lg font-semibold dark:text-white-light">{t('recent_activity')}</h5>
                         </div>
 
                         <PerfectScrollbar className="perfect-scrollbar relative h-[360px] ltr:-mr-3 ltr:pr-3 rtl:-ml-3 rtl:pl-3">
                             <div className="space-y-7">
                                 {analytics.loading ? (
                                     <div className="flex h-32 items-center justify-center">
-                                        <div className="text-lg text-gray-500">Loading activity data...</div>
+                                        <div className="text-lg text-gray-500">{t('loading_activity_data')}...</div>
                                     </div>
                                 ) : analytics.orders.length > 0 || analytics.users.length > 0 ? (
                                     <>
@@ -1199,7 +1213,7 @@ const AnalyticsDashboard = () => {
                                                     </div>
                                                     <div>
                                                         <h5 className="font-semibold dark:text-white-light">
-                                                            New order placed: <span className="text-success">${order.total_amount.toFixed(2)}</span>
+                                                            {t('new_order_placed')}: <span className="text-success">${order.total_amount.toFixed(2)}</span>
                                                         </h5>
                                                         <p className="text-xs text-white-dark">
                                                             {new Date(order.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
@@ -1226,7 +1240,7 @@ const AnalyticsDashboard = () => {
                                                     </div>
                                                     <div>
                                                         <h5 className="font-semibold dark:text-white-light">
-                                                            New user registered: <span className="text-primary">{user.email}</span>
+                                                            {t('new_user_registered')}: <span className="text-primary">{user.email}</span>
                                                         </h5>
                                                         <p className="text-xs text-white-dark">
                                                             {user.created_at && new Date(user.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
@@ -1253,7 +1267,7 @@ const AnalyticsDashboard = () => {
                                                     </div>
                                                     <div>
                                                         <h5 className="font-semibold dark:text-white-light">
-                                                            New product added: <span className="text-warning">{product.title}</span>
+                                                            {t('new_product_added')}: <span className="text-warning">{product.title}</span>
                                                         </h5>
                                                         <p className="text-xs text-white-dark">
                                                             {new Date(product.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}
@@ -1264,7 +1278,7 @@ const AnalyticsDashboard = () => {
                                     </>
                                 ) : (
                                     <div className="flex h-32 items-center justify-center">
-                                        <div className="text-lg text-gray-500">No recent activity</div>
+                                        <div className="text-lg text-gray-500">{t('no_recent_activity')}</div>
                                     </div>
                                 )}
                             </div>
@@ -1274,25 +1288,27 @@ const AnalyticsDashboard = () => {
                     {/* Sales Report */}
                     <div className="panel h-full">
                         <div className="mb-5 flex items-center justify-between">
-                            <h5 className="text-lg font-semibold dark:text-white-light">Revenue by Period</h5>
+                            <h5 className="text-lg font-semibold dark:text-white-light">{t('revenue_by_period')}</h5>
                         </div>
 
                         <div className="mb-10">
                             <div className="grid grid-cols-3 gap-6 text-center">
                                 <div>
                                     <div className="text-xl font-bold dark:text-white-light">${analytics.revenue.total.toFixed(2)}</div>
-                                    <div className="text-white-dark">{analytics.timeframe.charAt(0).toUpperCase() + analytics.timeframe.slice(1)} Revenue</div>
+                                    <div className="text-white-dark">
+                                        {t('this_period')} {t('revenue')}
+                                    </div>
                                 </div>
                                 <div>
                                     <div className="text-xl font-bold dark:text-white-light">${analytics.revenue.previousPeriod.toFixed(2)}</div>
-                                    <div className="text-white-dark">Previous {analytics.timeframe}</div>
+                                    <div className="text-white-dark">{t('previous_period')}</div>
                                 </div>
                                 <div>
                                     <div className={`text-xl font-bold ${analytics.revenue.growth >= 0 ? 'text-success' : 'text-danger'}`}>
                                         {analytics.revenue.growth >= 0 ? '+' : ''}
                                         {analytics.revenue.growth.toFixed(2)}%
                                     </div>
-                                    <div className="text-white-dark">Growth</div>
+                                    <div className="text-white-dark">{t('growth')}</div>
                                 </div>
                             </div>
                         </div>
@@ -1301,7 +1317,7 @@ const AnalyticsDashboard = () => {
                             <div className={`flex items-center justify-between border-b border-white-light py-2 dark:border-[#1b2e4b] ${analytics.timeframe === 'week' ? 'text-primary' : ''}`}>
                                 <div className="flex items-center">
                                     <div className={`h-2 w-2 rounded-full ${analytics.timeframe === 'week' ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-700'} mr-2`}></div>
-                                    <div className={`text-sm font-medium ${analytics.timeframe === 'week' ? 'text-primary' : 'text-gray-600 dark:text-gray-400'}`}>This Week</div>
+                                    <div className={`text-sm font-medium ${analytics.timeframe === 'week' ? 'text-primary' : 'text-gray-600 dark:text-gray-400'}`}>{t('this_week')}</div>
                                 </div>
                                 <div className="font-semibold">${analytics.timeframe === 'week' ? analytics.revenue.total.toFixed(2) : '0.00'}</div>
                             </div>
@@ -1309,7 +1325,7 @@ const AnalyticsDashboard = () => {
                             <div className={`flex items-center justify-between border-b border-white-light py-2 dark:border-[#1b2e4b] ${analytics.timeframe === 'month' ? 'text-primary' : ''}`}>
                                 <div className="flex items-center">
                                     <div className={`h-2 w-2 rounded-full ${analytics.timeframe === 'month' ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-700'} mr-2`}></div>
-                                    <div className={`text-sm font-medium ${analytics.timeframe === 'month' ? 'text-primary' : 'text-gray-600 dark:text-gray-400'}`}>This Month</div>
+                                    <div className={`text-sm font-medium ${analytics.timeframe === 'month' ? 'text-primary' : 'text-gray-600 dark:text-gray-400'}`}>{t('this_month')}</div>
                                 </div>
                                 <div className="font-semibold">${analytics.timeframe === 'month' ? analytics.revenue.total.toFixed(2) : '0.00'}</div>
                             </div>
@@ -1317,7 +1333,7 @@ const AnalyticsDashboard = () => {
                             <div className={`flex items-center justify-between border-b border-white-light py-2 dark:border-[#1b2e4b] ${analytics.timeframe === 'year' ? 'text-primary' : ''}`}>
                                 <div className="flex items-center">
                                     <div className={`h-2 w-2 rounded-full ${analytics.timeframe === 'year' ? 'bg-primary' : 'bg-gray-300 dark:bg-gray-700'} mr-2`}></div>
-                                    <div className={`text-sm font-medium ${analytics.timeframe === 'year' ? 'text-primary' : 'text-gray-600 dark:text-gray-400'}`}>This Year</div>
+                                    <div className={`text-sm font-medium ${analytics.timeframe === 'year' ? 'text-primary' : 'text-gray-600 dark:text-gray-400'}`}>{t('this_year')}</div>
                                 </div>
                                 <div className="font-semibold">${analytics.timeframe === 'year' ? analytics.revenue.total.toFixed(2) : '0.00'}</div>
                             </div>
@@ -1326,7 +1342,7 @@ const AnalyticsDashboard = () => {
                         <div className="mt-8 flex items-center justify-center">
                             <button type="button" className="btn btn-primary btn-lg" onClick={() => router.push('/orders')}>
                                 <IconCreditCard className="h-5 w-5 ltr:mr-2 rtl:ml-2" />
-                                View Order Details
+                                {t('view_order_details')}
                             </button>
                         </div>
                     </div>

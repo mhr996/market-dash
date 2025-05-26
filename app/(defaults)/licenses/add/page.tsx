@@ -4,9 +4,11 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import supabase from '@/lib/supabase';
 import { Alert } from '@/components/elements/alerts/elements-alerts-default';
+import { getTranslation } from '@/i18n';
 
 const AddLicensePage = () => {
     const router = useRouter();
+    const { t } = getTranslation();
     const [form, setForm] = useState({
         title: '',
         desc: '',
@@ -32,42 +34,39 @@ const AddLicensePage = () => {
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setLoading(true);
-
-        // Basic validation
+        setLoading(true); // Basic validation
         if (!form.title) {
-            setAlert({ visible: true, message: 'License title is required.', type: 'danger' });
+            setAlert({ visible: true, message: t('license_title_required'), type: 'danger' });
             setLoading(false);
             return;
         }
 
         if (form.price < 0) {
-            setAlert({ visible: true, message: 'Price cannot be negative.', type: 'danger' });
+            setAlert({ visible: true, message: t('price_cannot_be_negative'), type: 'danger' });
             setLoading(false);
             return;
         }
 
         if (form.shops < 0) {
-            setAlert({ visible: true, message: 'Shop count cannot be negative.', type: 'danger' });
+            setAlert({ visible: true, message: t('shop_count_cannot_be_negative'), type: 'danger' });
             setLoading(false);
             return;
         }
 
         if (form.products < 0) {
-            setAlert({ visible: true, message: 'Product count cannot be negative.', type: 'danger' });
+            setAlert({ visible: true, message: t('product_count_cannot_be_negative'), type: 'danger' });
             setLoading(false);
             return;
         }
-
         try {
             const { error } = await supabase.from('licenses').insert([form]);
             if (error) throw error;
-            setAlert({ visible: true, message: 'License added successfully!', type: 'success' });
+            setAlert({ visible: true, message: t('license_added_successfully'), type: 'success' });
             // Redirect back to the licenses list page after successful insertion
             router.push('/licenses');
         } catch (error: any) {
             console.error(error);
-            setAlert({ visible: true, message: error.message || 'Error adding license', type: 'danger' });
+            setAlert({ visible: true, message: error.message || t('error_adding_license'), type: 'danger' });
         } finally {
             setLoading(false);
         }
@@ -76,53 +75,51 @@ const AddLicensePage = () => {
     return (
         <div className="container mx-auto p-6">
             <div className="flex items-center gap-5 mb-6">
+                {' '}
                 <div onClick={() => router.back()}>
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 mb-4 cursor-pointer text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 mb-4 cursor-pointer text-primary rtl:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                     </svg>
-                </div>
-
+                </div>{' '}
                 {/* Breadcrumb Navigation */}
                 <ul className="flex space-x-2 rtl:space-x-reverse mb-4">
                     <li>
                         <Link href="/" className="text-primary hover:underline">
-                            Home
+                            {t('home')}
                         </Link>
                     </li>
                     <li className="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
                         <Link href="/licenses" className="text-primary hover:underline">
-                            Licenses
+                            {t('licenses')}
                         </Link>
                     </li>
                     <li className="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
-                        <span>Add New License</span>
+                        <span>{t('add_new_license')}</span>
                     </li>
                 </ul>
             </div>
-
             {alert.visible && (
                 <div className="mb-4">
-                    <Alert type={alert.type} title={alert.type === 'success' ? 'Success' : 'Error'} message={alert.message} onClose={() => setAlert({ ...alert, visible: false })} />
+                    <Alert type={alert.type} title={alert.type === 'success' ? t('success') : t('error')} message={alert.message} onClose={() => setAlert({ ...alert, visible: false })} />
                 </div>
-            )}
-
+            )}{' '}
             {/* Form Container */}
             <div className="rounded-md border border-[#ebedf2] bg-white p-6 dark:border-[#191e3a] dark:bg-black">
-                <h6 className="mb-5 text-lg font-bold">Add New License</h6>
+                <h6 className="mb-5 text-lg font-bold">{t('add_new_license')}</h6>
                 <form onSubmit={handleSubmit} className="space-y-5">
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         {/* Title Field */}
                         <div>
                             <label htmlFor="title" className="block text-sm font-bold text-gray-700 dark:text-white mb-2">
-                                License Title <span className="text-red-500">*</span>
+                                {t('license_title')} <span className="text-red-500">*</span>
                             </label>
-                            <input type="text" id="title" name="title" value={form.title} onChange={handleInputChange} className="form-input" placeholder="Enter license title" required />
+                            <input type="text" id="title" name="title" value={form.title} onChange={handleInputChange} className="form-input" placeholder={t('enter_license_title')} required />
                         </div>
 
                         {/* Price Field */}
                         <div>
                             <label htmlFor="price" className="block text-sm font-bold text-gray-700 dark:text-white mb-2">
-                                Price <span className="text-red-500">*</span>
+                                {t('price')} <span className="text-red-500">*</span>
                             </label>
                             <div className="flex">
                                 <span className="inline-flex items-center px-3 bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 border border-r-0 border-gray-300 dark:border-gray-600 rounded-l-md">
@@ -142,20 +139,18 @@ const AddLicensePage = () => {
                             </div>
                         </div>
                     </div>
-
                     {/* Description Field */}
                     <div>
                         <label htmlFor="desc" className="block text-sm font-bold text-gray-700 dark:text-white mb-2">
-                            Description
+                            {t('description')}
                         </label>
-                        <textarea id="desc" name="desc" value={form.desc} onChange={handleInputChange} className="form-textarea" placeholder="Enter license description" rows={4} />
-                    </div>
-
+                        <textarea id="desc" name="desc" value={form.desc} onChange={handleInputChange} className="form-textarea" placeholder={t('enter_license_description')} rows={4} />
+                    </div>{' '}
                     <div className="grid grid-cols-1 md:grid-cols-2 gap-5">
                         {/* Shops Count Field */}
                         <div>
                             <label htmlFor="shops" className="block text-sm font-bold text-gray-700 dark:text-white mb-2">
-                                Shops Allowed <span className="text-red-500">*</span>
+                                {t('shops_allowed')} <span className="text-red-500">*</span>
                             </label>
                             <input type="number" id="shops" name="shops" value={form.shops} onChange={handleInputChange} className="form-input" placeholder="0" required min="0" />
                         </div>
@@ -163,19 +158,18 @@ const AddLicensePage = () => {
                         {/* Products Count Field */}
                         <div>
                             <label htmlFor="products" className="block text-sm font-bold text-gray-700 dark:text-white mb-2">
-                                Products Allowed <span className="text-red-500">*</span>
+                                {t('products_allowed')} <span className="text-red-500">*</span>
                             </label>
                             <input type="number" id="products" name="products" value={form.products} onChange={handleInputChange} className="form-input" placeholder="0" required min="0" />
                         </div>
                     </div>
-
                     {/* Action Buttons */}
                     <div className="mt-8 flex items-center justify-end">
                         <button type="button" onClick={() => router.back()} className="btn btn-outline-danger ltr:mr-4 rtl:ml-4">
-                            Cancel
+                            {t('cancel')}
                         </button>
                         <button type="submit" className="btn btn-primary" disabled={loading}>
-                            {loading ? 'Creating...' : 'Create License'}
+                            {loading ? t('creating') : t('create_license')}
                         </button>
                     </div>
                 </form>

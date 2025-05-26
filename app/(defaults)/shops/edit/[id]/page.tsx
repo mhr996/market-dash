@@ -18,6 +18,7 @@ import AnimateHeight from 'react-animate-height';
 import Tabs from '@/components/tabs';
 import 'leaflet/dist/leaflet.css';
 import dynamic from 'next/dynamic';
+import { getTranslation } from '@/i18n';
 
 // Import the map component dynamically with no SSR
 const MapSelector = dynamic(() => import('@/components/map/map-selector'), {
@@ -67,6 +68,7 @@ const EditShop = () => {
     const id = params?.id as string;
 
     const router = useRouter();
+    const { t } = getTranslation();
     const [loading, setLoading] = useState(true);
     const [saving, setSaving] = useState(false);
     const [activeTab, setActiveTab] = useState(0);
@@ -367,46 +369,48 @@ const EditShop = () => {
     return (
         <div className="container mx-auto p-6">
             <div className="mb-6 flex items-center justify-between">
+                {' '}
                 <div className="flex items-center gap-5">
+                    {' '}
                     <button onClick={() => router.back()} className="hover:text-primary">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-primary rtl:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                         </svg>
                     </button>
-
                     <ul className="flex space-x-2 rtl:space-x-reverse items-center">
                         <li>
                             <Link href="/" className="text-primary hover:underline">
-                                Home
+                                {t('home')}
                             </Link>
                         </li>
                         <li className="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
                             <Link href="/shops" className="text-primary hover:underline">
-                                Shops
+                                {t('shops')}
                             </Link>
                         </li>
                         <li className="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
-                            <span className="text-black dark:text-white-dark">Edit {form.shop_name}</span>
+                            <span className="text-black dark:text-white-dark">
+                                {t('edit')} {form.shop_name}
+                            </span>
                         </li>
                     </ul>
                 </div>
-            </div>
-
+            </div>{' '}
             {alert.visible && (
                 <div className="mb-4">
-                    <Alert type={alert.type} title={alert.type === 'success' ? 'Success' : 'Error'} message={alert.message} onClose={() => setAlert({ ...alert, visible: false })} />
+                    <Alert type={alert.type} title={alert.type === 'success' ? t('success') : t('error')} message={alert.message} onClose={() => setAlert({ ...alert, visible: false })} />
                 </div>
             )}
-
             {/* Edit Form */}
             <form onSubmit={handleSubmit}>
                 {/* Cover Image */}
                 <div className="panel mb-5 overflow-hidden">
+                    {' '}
                     <div className="relative h-52 w-full">
-                        <img src={form.cover_image_url || '/assets/images/img-placeholder-fallback.webp'} alt="Shop Cover" className="h-full w-full object-cover" />
+                        <img src={form.cover_image_url || '/assets/images/img-placeholder-fallback.webp'} alt={t('shop_cover_image')} className="h-full w-full object-cover" />
                         <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center">
                             <div className="text-center">
-                                <h2 className="text-xl font-bold text-white mb-4">Shop Cover Image</h2>
+                                <h2 className="text-xl font-bold text-white mb-4">{t('shop_cover_image')}</h2>
                                 <ImageUpload
                                     bucket="shops-covers"
                                     userId={id.toString()}
@@ -420,34 +424,32 @@ const EditShop = () => {
                                             message: error,
                                         });
                                     }}
-                                    buttonLabel="Change Cover"
+                                    buttonLabel={t('change_cover')}
                                 />
                             </div>
                         </div>
                     </div>
-                </div>
-
+                </div>{' '}
                 <div className="mb-6">
                     <Tabs
                         tabs={[
-                            { name: 'Basic Info', icon: 'store' },
-                            { name: 'Shop Details', icon: 'map-pin' },
-                            { name: 'Working Hours', icon: 'clock' },
-                            { name: 'Gallery', icon: 'image' },
+                            { name: t('basic_info'), icon: 'store' },
+                            { name: t('shop_details'), icon: 'map-pin' },
+                            { name: t('working_hours'), icon: 'clock' },
+                            { name: t('gallery'), icon: 'image' },
                         ]}
                         onTabClick={(tab) => setActiveTab(tab)}
                         activeTab={activeTab}
                     />
                 </div>
-
                 {activeTab === 0 && (
                     <div className="panel mb-5">
                         <div className="mb-5">
-                            <h5 className="text-lg font-semibold dark:text-white-light">Basic Information</h5>
+                            <h5 className="text-lg font-semibold dark:text-white-light">{t('basic_information')}</h5>
                         </div>
                         <div className="flex flex-col sm:flex-row">
                             <div className="mb-5 w-full sm:w-2/12 ltr:sm:mr-4 rtl:sm:ml-4">
-                                <label className="mb-2 block text-sm font-semibold">Shop Logo</label>
+                                <label className="mb-2 block text-sm font-semibold">{t('shop_logo')}</label>
                                 <ImageUpload
                                     bucket="shops"
                                     userId={id.toString()}
@@ -462,45 +464,44 @@ const EditShop = () => {
                                         });
                                     }}
                                 />
-                            </div>
+                            </div>{' '}
                             <div className="grid flex-1 grid-cols-1 gap-5 sm:grid-cols-2">
                                 <div>
                                     <label htmlFor="shop_name" className="mb-2 block text-sm font-semibold text-gray-700 dark:text-white">
-                                        Shop Name <span className="text-red-500">*</span>
+                                        {t('shop_name')} <span className="text-red-500">*</span>
                                     </label>
                                     <input type="text" id="shop_name" name="shop_name" className="form-input" value={form.shop_name} onChange={handleInputChange} required />
                                 </div>
                                 <div>
                                     <label htmlFor="owner" className="mb-2 block text-sm font-semibold text-gray-700 dark:text-white">
-                                        Owner
+                                        {t('shop_owner')}
                                     </label>
                                     <input type="text" id="owner" className="form-input bg-[#eee] dark:bg-[#1b2e4b]" value={form.profiles?.full_name || form.owner} disabled />
                                 </div>
                                 <div className="sm:col-span-2">
                                     <label htmlFor="shop_desc" className="mb-2 block text-sm font-semibold text-gray-700 dark:text-white">
-                                        Description
+                                        {t('shop_description')}
                                     </label>
                                     <textarea id="shop_desc" name="shop_desc" className="form-textarea min-h-[100px]" value={form.shop_desc} onChange={handleInputChange} />
                                 </div>
                                 <div>
-                                    <label className="block text-sm font-bold text-gray-700 dark:text-white ">Visibility</label>
+                                    <label className="block text-sm font-bold text-gray-700 dark:text-white ">{t('visibility')}</label>
                                     <label className="inline-flex cursor-pointer items-center">
                                         <input type="checkbox" name="public" className="form-checkbox" checked={form.public} onChange={handleInputChange} />
-                                        <span className="relative text-white-dark checked:bg-none ml-2">{form.public ? 'Public' : 'Private'}</span>
+                                        <span className="relative text-white-dark checked:bg-none ml-2">{form.public ? t('public') : t('private')}</span>
                                     </label>
                                 </div>{' '}
                                 <div className="relative" ref={statusRef}>
-                                    <label className="block text-sm font-bold text-gray-700 dark:text-white">Status</label>
+                                    <label className="block text-sm font-bold text-gray-700 dark:text-white">{t('status')}</label>{' '}
                                     <div
                                         className="cursor-pointer rounded border border-[#e0e6ed] bg-white p-2.5 text-dark dark:border-[#191e3a] dark:bg-black dark:text-white-dark flex items-center justify-between"
                                         onClick={() => {
                                             setForm((prev) => ({ ...prev, statusDropdownOpen: !prev.statusDropdownOpen }));
                                         }}
                                     >
-                                        <span>{form.status}</span>
+                                        <span>{t(form.status.toLowerCase())}</span>
                                         <IconCaretDown className={`h-4 w-4 transition-transform duration-300 ${form.statusDropdownOpen ? 'rotate-180' : ''}`} />
-                                    </div>
-
+                                    </div>{' '}
                                     {form.statusDropdownOpen && (
                                         <div className="absolute z-10 mt-1 w-full rounded-md border border-[#e0e6ed] bg-white shadow-lg dark:border-[#191e3a] dark:bg-black">
                                             <div className="max-h-64 overflow-y-auto">
@@ -514,32 +515,31 @@ const EditShop = () => {
                                                             setForm((prev) => ({ ...prev, status: status, statusDropdownOpen: false }));
                                                         }}
                                                     >
-                                                        {status}
+                                                        {t(status.toLowerCase())}
                                                     </div>
                                                 ))}
                                             </div>
                                         </div>
                                     )}
-                                </div>
+                                </div>{' '}
                                 <div ref={categoryRef} className="relative">
                                     <label htmlFor="category_id" className="mb-2 block text-sm font-semibold text-gray-700 dark:text-white">
-                                        Category
+                                        {t('category')}
                                     </label>
                                     <div
                                         className="cursor-pointer rounded border border-[#e0e6ed] bg-white p-2.5 text-dark dark:border-[#191e3a] dark:bg-black dark:text-white-dark flex items-center justify-between"
                                         onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
                                     >
-                                        <span>{form.category_id ? categories.find((c) => c.id === form.category_id)?.title || 'Select Category' : 'Select Category'}</span>
+                                        <span>{form.category_id ? categories.find((c) => c.id === form.category_id)?.title || t('select_category') : t('select_category')}</span>
                                         <IconCaretDown className={`h-4 w-4 transition-transform duration-300 ${isCategoryDropdownOpen ? 'rotate-180' : ''}`} />
-                                    </div>
-
+                                    </div>{' '}
                                     {isCategoryDropdownOpen && (
                                         <div className="absolute z-10 mt-1 w-full rounded-md border border-[#e0e6ed] bg-white shadow-lg dark:border-[#191e3a] dark:bg-black">
                                             <div className="p-2">
                                                 <input
                                                     type="text"
                                                     className="w-full rounded border border-[#e0e6ed] p-2 focus:border-primary focus:outline-none dark:border-[#191e3a] dark:bg-black dark:text-white-dark"
-                                                    placeholder="Search categories..."
+                                                    placeholder={t('search_categories')}
                                                     value={searchCategoryTerm}
                                                     onChange={(e) => setSearchCategoryTerm(e.target.value)}
                                                 />
@@ -568,7 +568,6 @@ const EditShop = () => {
                         </div>
                     </div>
                 )}
-
                 {activeTab === 1 && (
                     <div className="panel mb-5">
                         <div className="mb-5">
@@ -651,7 +650,6 @@ const EditShop = () => {
                         </div>
                     </div>
                 )}
-
                 {activeTab === 2 && (
                     <div className="panel mb-5">
                         <div className="mb-5">
@@ -700,7 +698,6 @@ const EditShop = () => {
                         </div>
                     </div>
                 )}
-
                 {activeTab === 3 && (
                     <div className="panel mb-5">
                         <div className="mb-5">
@@ -765,7 +762,6 @@ const EditShop = () => {
                         </div>
                     </div>
                 )}
-
                 <div className="flex justify-end gap-4">
                     <button type="button" className="btn btn-outline-danger" onClick={() => router.back()}>
                         Cancel

@@ -1,5 +1,6 @@
 import ComponentsAuthResetPasswordForm from '@/components/auth/components-auth-reset-password-form';
 import LanguageDropdown from '@/components/language-dropdown';
+import { getTranslation } from '@/i18n';
 import { Metadata } from 'next';
 import Link from 'next/link';
 import React from 'react';
@@ -9,6 +10,7 @@ export const metadata: Metadata = {
 };
 
 const ResetPassword = () => {
+    const { t } = getTranslation();
     return (
         <div>
             <div className="absolute inset-0">
@@ -39,20 +41,22 @@ const ResetPassword = () => {
                             <LanguageDropdown className="ms-auto w-max" />
                         </div>
                         <div className="w-full max-w-[440px] lg:mt-16">
+                            {' '}
                             <div className="mb-10">
-                                <h1 className="text-3xl font-extrabold uppercase !leading-snug text-primary md:text-4xl">Reset Password</h1>
-                                <p className="text-base font-bold leading-normal text-white-dark">Enter your email to receive password reset instructions</p>
+                                <h1 className="text-3xl font-extrabold uppercase !leading-snug text-primary md:text-4xl">{t('reset_password')}</h1>
+                                <p className="text-base font-bold leading-normal text-white-dark">{t('reset_password_instructions')}</p>
                             </div>
                             <ComponentsAuthResetPasswordForm />
-
                             <div className="text-center dark:text-white mt-4">
-                                Remember your password? &nbsp;
+                                {t('remember_password')} &nbsp;
                                 <Link href="/login" className="uppercase text-primary underline transition hover:text-black dark:hover:text-white">
-                                    SIGN IN
+                                    {t('sign_in')}
                                 </Link>
                             </div>
                         </div>
-                        <p className="absolute bottom-6 w-full text-center dark:text-white">© {new Date().getFullYear()}. All Rights Reserved.</p>
+                        <p className="absolute bottom-6 w-full text-center dark:text-white">
+                            © {new Date().getFullYear()}. {t('copyright_text')}
+                        </p>
                     </div>
                 </div>
             </div>

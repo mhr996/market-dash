@@ -10,8 +10,10 @@ import React, { useEffect, useState } from 'react';
 import supabase from '@/lib/supabase';
 import { Alert } from '@/components/elements/alerts/elements-alerts-default';
 import ConfirmModal from '@/components/modals/confirm-modal';
+import { getTranslation } from '@/i18n';
 
 const UsersList = () => {
+    const { t } = getTranslation();
     const [items, setItems] = useState<
         Array<{
             id: number;
@@ -99,13 +101,11 @@ const UsersList = () => {
                 setShowConfirmModal(true);
             }
         }
-    };
-
-    // Confirm deletion callback.
+    }; // Confirm deletion callback.
     const confirmDeletion = async () => {
         if (!userToDelete || !userToDelete.id) return;
 
-        setAlert({ visible: true, message: 'Deleting an Admin is not possible', type: 'danger' });
+        setAlert({ visible: true, message: t('deleting_admin_not_possible'), type: 'danger' });
         setShowConfirmModal(false);
         setUserToDelete(null);
 
@@ -145,12 +145,13 @@ const UsersList = () => {
 
     return (
         <div className="panel border-white-light px-0 dark:border-[#1b2e4b]">
+            {' '}
             {/* Alert */}
             {alert.visible && (
                 <div className="mb-4 ml-4 max-w-96">
                     <Alert
                         type={alert.type}
-                        title={alert.type === 'success' ? 'Success' : 'Error'}
+                        title={alert.type === 'success' ? t('success') : t('error')}
                         message={alert.message}
                         onClose={() => setAlert({ visible: false, message: '', type: 'success' })}
                     />
@@ -158,18 +159,19 @@ const UsersList = () => {
             )}
             <div className="invoice-table">
                 <div className="mb-4.5 flex flex-col gap-5 px-5 md:flex-row md:items-center">
+                    {' '}
                     <div className="flex items-center gap-2">
                         <button type="button" className="btn btn-danger gap-2">
                             <IconTrashLines />
-                            Delete
+                            {t('delete')}
                         </button>
                         <Link href="/users/add" className="btn btn-primary gap-2">
                             <IconPlus />
-                            Add New
+                            {t('add_new')}
                         </Link>
                     </div>
                     <div className="ltr:ml-auto rtl:mr-auto">
-                        <input type="text" className="form-input w-auto" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} />
+                        <input type="text" className="form-input w-auto" placeholder={t('search')} value={search} onChange={(e) => setSearch(e.target.value)} />
                     </div>
                 </div>
 
@@ -180,12 +182,13 @@ const UsersList = () => {
                         columns={[
                             {
                                 accessor: 'id',
-                                title: 'ID',
+                                title: t('id'),
                                 sortable: true,
                                 render: ({ id }) => <strong className="text-info">#{id.toString().slice(0, 6)}</strong>,
                             },
                             {
                                 accessor: 'full_name',
+                                title: t('full_name'),
                                 sortable: true,
                                 render: ({ full_name, avatar_url }) => (
                                     <div className="flex items-center font-semibold">
@@ -198,11 +201,12 @@ const UsersList = () => {
                             },
                             {
                                 accessor: 'email',
+                                title: t('email'),
                                 sortable: true,
                             },
                             {
                                 accessor: 'uid',
-                                title: 'UID',
+                                title: t('uid'),
                                 sortable: true,
                                 render: ({ uid }) =>
                                     uid ? (
@@ -216,24 +220,26 @@ const UsersList = () => {
                             },
                             {
                                 accessor: 'registration_date',
+                                title: t('registration_date'),
                                 sortable: true,
                                 render: ({ registration_date }) => <span>{registration_date ? new Date(registration_date).toLocaleDateString('TR') : ''}</span>,
                             },
                             {
                                 accessor: 'status',
+                                title: t('status'),
                                 sortable: true,
                                 render: ({ status }) => <span className={`badge badge-outline-${status === 'Active' ? 'success' : 'danger'} `}>{status}</span>,
                             },
                             {
                                 accessor: 'action',
-                                title: 'Actions',
+                                title: t('actions'),
                                 sortable: false,
                                 textAlignment: 'center',
                                 render: ({ id }) => (
                                     <div className="mx-auto flex w-max items-center gap-4">
                                         <div
                                             onClick={() => {
-                                                setAlert({ visible: true, message: "You can't edit an Admin User", type: 'danger' });
+                                                setAlert({ visible: true, message: t('cannot_edit_admin_user'), type: 'danger' });
                                             }}
                                             className="flex hover:text-info"
                                         >
@@ -260,26 +266,25 @@ const UsersList = () => {
                         onSortStatusChange={setSortStatus}
                         selectedRecords={selectedRecords}
                         onSelectedRecordsChange={setSelectedRecords}
-                        paginationText={({ from, to, totalRecords }) => `Showing  ${from} to ${to} of ${totalRecords} entries`}
+                        paginationText={({ from, to, totalRecords }) => `${t('showing')} ${from} ${t('to')} ${to} ${t('of')} ${totalRecords} ${t('entries')}`}
                         minHeight={300}
                     />
 
                     {loading && <div className="absolute inset-0 z-10 flex items-center justify-center bg-white dark:bg-black-dark-light bg-opacity-60 backdrop-blur-sm" />}
                 </div>
-            </div>
-
+            </div>{' '}
             {/* Confirm Deletion Modal */}
             <ConfirmModal
                 isOpen={showConfirmModal}
-                title="Confirm Deletion"
-                message="Are you sure you want to delete this user?"
+                title={t('confirm_deletion')}
+                message={t('confirm_delete_user')}
                 onCancel={() => {
                     setShowConfirmModal(false);
                     setUserToDelete(null);
                 }}
                 onConfirm={confirmDeletion}
-                confirmLabel="Delete"
-                cancelLabel="Cancel"
+                confirmLabel={t('delete')}
+                cancelLabel={t('cancel')}
                 size="sm"
             />
         </div>

@@ -4,6 +4,7 @@ import IconGoogle from '@/components/icon/icon-google';
 import IconInstagram from '@/components/icon/icon-instagram';
 import IconTwitter from '@/components/icon/icon-twitter';
 import LanguageDropdown from '@/components/language-dropdown';
+import { getTranslation } from '@/i18n';
 import { Metadata } from 'next';
 import Link from 'next/link';
 import React from 'react';
@@ -13,6 +14,7 @@ export const metadata: Metadata = {
 };
 
 const CoverRegister = () => {
+    const { t } = getTranslation();
     return (
         <div>
             <div className="absolute inset-0">
@@ -41,14 +43,13 @@ const CoverRegister = () => {
                                 <img src="/assets/images/logo.svg" alt="Logo" className="mx-auto w-10" />
                             </Link>
                             <LanguageDropdown className="ms-auto w-max" />
-                        </div>
+                        </div>{' '}
                         <div className="w-full max-w-[440px] lg:mt-16">
                             <div className="mb-10">
-                                <h1 className="text-3xl font-extrabold uppercase !leading-snug text-primary md:text-4xl">Sign Up</h1>
-                                <p className="text-base font-bold leading-normal text-white-dark">Enter your email and password to register</p>
+                                <h1 className="text-3xl font-extrabold uppercase !leading-snug text-primary md:text-4xl">{t('sign_up')}</h1>
+                                <p className="text-base font-bold leading-normal text-white-dark">{t('enter_email_password_register')}</p>
                             </div>
                             <ComponentsAuthRegisterForm />
-
                             {/* <div className="relative my-7 text-center md:mb-9">
                                 <span className="absolute inset-x-0 top-1/2 h-px w-full -translate-y-1/2 bg-white-light dark:bg-white-dark"></span>
                                 <span className="relative bg-white px-2 font-bold uppercase text-white-dark dark:bg-dark dark:text-white-light">or</span>
@@ -92,17 +93,17 @@ const CoverRegister = () => {
                                         </Link>
                                     </li>
                                 </ul>
-                            </div> */}
-
-
+                            </div> */}{' '}
                             <div className="text-center dark:text-white mt-4">
-                                Already have an account ?&nbsp;
+                                {t('already_have_account')} &nbsp;
                                 <Link href="/login" className="uppercase text-primary underline transition hover:text-black dark:hover:text-white">
-                                    SIGN IN
+                                    {t('sign_in')}
                                 </Link>
                             </div>
                         </div>
-                        <p className="absolute bottom-6 w-full text-center dark:text-white">© {new Date().getFullYear()}. All Rights Reserved.</p>
+                        <p className="absolute bottom-6 w-full text-center dark:text-white">
+                            © {new Date().getFullYear()}. {t('copyright_text')}
+                        </p>
                     </div>
                 </div>
             </div>

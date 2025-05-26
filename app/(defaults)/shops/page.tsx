@@ -10,6 +10,7 @@ import React, { useEffect, useState } from 'react';
 import supabase from '@/lib/supabase';
 import { Alert } from '@/components/elements/alerts/elements-alerts-default';
 import ConfirmModal from '@/components/modals/confirm-modal';
+import { getTranslation } from '@/i18n';
 
 // Updated shop type reflecting the join with profiles.
 interface Shop {
@@ -30,6 +31,7 @@ interface Shop {
 const ShopsList = () => {
     const [items, setItems] = useState<Shop[]>([]);
     const [loading, setLoading] = useState(true);
+    const { t } = getTranslation();
 
     const [page, setPage] = useState(1);
     const PAGE_SIZES = [10, 20, 30, 50, 100];
@@ -116,10 +118,10 @@ const ShopsList = () => {
             if (error) throw error;
             const updatedItems = items.filter((s) => s.id !== shopToDelete.id);
             setItems(updatedItems);
-            setAlert({ visible: true, message: 'Shop deleted successfully.', type: 'success' });
+            setAlert({ visible: true, message: t('shop_deleted_successfully'), type: 'success' });
         } catch (error) {
             console.error('Deletion error:', error);
-            setAlert({ visible: true, message: 'Error deleting shop.', type: 'danger' });
+            setAlert({ visible: true, message: t('error_deleting_shop'), type: 'danger' });
         } finally {
             setShowConfirmModal(false);
             setShopToDelete(null);
@@ -133,7 +135,7 @@ const ShopsList = () => {
                 <div className="mb-4 ml-4 max-w-96">
                     <Alert
                         type={alert.type}
-                        title={alert.type === 'success' ? 'Success' : 'Error'}
+                        title={alert.type === 'success' ? t('success') : t('error')}
                         message={alert.message}
                         onClose={() => setAlert({ visible: false, message: '', type: 'success' })}
                     />
@@ -144,15 +146,15 @@ const ShopsList = () => {
                     <div className="flex items-center gap-2">
                         <button type="button" className="btn btn-danger gap-2">
                             <IconTrashLines />
-                            Delete
+                            {t('delete')}
                         </button>
                         <Link href="/shops/add" className="btn btn-primary gap-2">
                             <IconPlus />
-                            Add New
+                            {t('add_new')}
                         </Link>
                     </div>
                     <div className="ltr:ml-auto rtl:mr-auto">
-                        <input type="text" className="form-input w-auto" placeholder="Search..." value={search} onChange={(e) => setSearch(e.target.value)} />
+                        <input type="text" className="form-input w-auto" placeholder={t('search')} value={search} onChange={(e) => setSearch(e.target.value)} />
                     </div>
                 </div>
 
@@ -163,13 +165,13 @@ const ShopsList = () => {
                         columns={[
                             {
                                 accessor: 'id',
-                                title: 'ID',
+                                title: t('id'),
                                 sortable: true,
                                 render: ({ id }) => <strong className="text-info">#{id}</strong>,
                             },
                             {
                                 accessor: 'shop_name',
-                                title: 'Shop Name',
+                                title: t('shop_name'),
                                 sortable: true,
                                 render: ({ shop_name, logo_url }) => (
                                     <div className="flex items-center font-semibold">
@@ -182,37 +184,37 @@ const ShopsList = () => {
                             },
                             {
                                 accessor: 'owner',
-                                title: 'Owner',
+                                title: t('owner'),
                                 sortable: true,
                                 render: ({ owner, profiles }) => <span>{profiles ? profiles.full_name : owner}</span>,
                             },
                             {
                                 accessor: 'created_at',
-                                title: 'Registration Date',
+                                title: t('registration_date'),
                                 sortable: true,
                                 render: ({ created_at }) => (created_at ? <span>{new Date(created_at).toLocaleDateString('TR')}</span> : ''),
                             },
                             {
                                 accessor: 'status',
-                                title: 'Status',
+                                title: t('status'),
                                 sortable: true,
                                 render: ({ status }) => {
                                     let statusClass = 'warning';
                                     if (status === 'Approved') statusClass = 'success';
                                     else if (status === 'Rejected') statusClass = 'danger';
 
-                                    return <span className={`badge badge-outline-${statusClass}`}>{status || 'Pending'}</span>;
+                                    return <span className={`badge badge-outline-${statusClass}`}>{status ? t(status.toLowerCase()) : t('pending')}</span>;
                                 },
                             },
                             {
                                 accessor: 'visibility',
-                                title: 'Visibility',
+                                title: t('visibility'),
                                 sortable: true,
-                                render: ({ public: isPublic }) => <span className={`badge badge-outline-${isPublic ? 'success' : 'danger'}`}>{isPublic ? 'Public' : 'Private'}</span>,
+                                render: ({ public: isPublic }) => <span className={`badge badge-outline-${isPublic ? 'success' : 'danger'}`}>{isPublic ? t('public') : t('private')}</span>,
                             },
                             {
                                 accessor: 'action',
-                                title: 'Actions',
+                                title: t('actions'),
                                 sortable: false,
                                 textAlignment: 'center',
                                 render: ({ id }) => (
@@ -241,7 +243,7 @@ const ShopsList = () => {
                         onSortStatusChange={setSortStatus}
                         selectedRecords={selectedRecords}
                         onSelectedRecordsChange={setSelectedRecords}
-                        paginationText={({ from, to, totalRecords }) => `Showing ${from} to ${to} of ${totalRecords} entries`}
+                        paginationText={({ from, to, totalRecords }) => `${t('showing')} ${from} ${t('to')} ${to} ${t('of')} ${totalRecords} ${t('entries')}`}
                         minHeight={300}
                     />
 
@@ -252,15 +254,15 @@ const ShopsList = () => {
             {/* Confirm Deletion Modal */}
             <ConfirmModal
                 isOpen={showConfirmModal}
-                title="Confirm Deletion"
-                message="Are you sure you want to delete this shop?"
+                title={t('confirm_deletion')}
+                message={t('confirm_delete_shop')}
                 onCancel={() => {
                     setShowConfirmModal(false);
                     setShopToDelete(null);
                 }}
                 onConfirm={confirmDeletion}
-                confirmLabel="Delete"
-                cancelLabel="Cancel"
+                confirmLabel={t('delete')}
+                cancelLabel={t('cancel')}
                 size="sm"
             />
         </div>

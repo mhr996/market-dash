@@ -4,6 +4,7 @@ import IconGoogle from '@/components/icon/icon-google';
 import IconInstagram from '@/components/icon/icon-instagram';
 import IconTwitter from '@/components/icon/icon-twitter';
 import LanguageDropdown from '@/components/language-dropdown';
+import { getTranslation } from '@/i18n';
 import { Metadata } from 'next';
 import Link from 'next/link';
 import React from 'react';
@@ -13,6 +14,7 @@ export const metadata: Metadata = {
 };
 
 const CoverLogin = () => {
+    const { t } = getTranslation();
     return (
         <div>
             <div className="absolute inset-0">
@@ -41,11 +43,11 @@ const CoverLogin = () => {
                                 <img src="/assets/images/logo.svg" alt="Logo" className="mx-auto w-10" />
                             </Link>
                             <LanguageDropdown className="ms-auto w-max" />
-                        </div>
+                        </div>{' '}
                         <div className="w-full max-w-[440px] lg:mt-16">
                             <div className="mb-10">
-                                <h1 className="text-3xl font-extrabold uppercase !leading-snug text-primary md:text-4xl">Sign in</h1>
-                                <p className="text-base font-bold leading-normal text-white-dark">Enter your email and password to login</p>
+                                <h1 className="text-3xl font-extrabold uppercase !leading-snug text-primary md:text-4xl">{t('sign_in')}</h1>
+                                <p className="text-base font-bold leading-normal text-white-dark">{t('enter_email_password_login')}</p>
                             </div>
                             <ComponentsAuthLoginForm />
 
@@ -94,7 +96,6 @@ const CoverLogin = () => {
                                 </ul>
                             </div> */}
 
-
                             <div className="text-center dark:text-white mt-4">
                                 Don&apos;t have an account ?&nbsp;
                                 <Link href="/register" className="uppercase text-primary underline transition hover:text-black dark:hover:text-white">
@@ -102,7 +103,9 @@ const CoverLogin = () => {
                                 </Link>
                             </div>
                         </div>
-                        <p className="absolute bottom-6 w-full text-center dark:text-white">© {new Date().getFullYear()}. All Rights Reserved.</p>
+                        <p className="absolute bottom-6 w-full text-center dark:text-white">
+                            © {new Date().getFullYear()}. {t('copyright_text')}
+                        </p>
                     </div>
                 </div>
             </div>

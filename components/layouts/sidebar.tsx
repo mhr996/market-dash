@@ -150,7 +150,7 @@ const Sidebar = () => {
                                         <Link href="/categories" className="group">
                                             <div className="flex items-center">
                                                 <IconMenuTables className="shrink-0 group-hover:!text-primary" />
-                                                <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Categories</span>
+                                                <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">{t('categories')}</span>
                                             </div>
                                         </Link>
                                     </li>
@@ -204,11 +204,10 @@ const Sidebar = () => {
                                 <Link href="/licenses" className="group">
                                     <div className="flex items-center">
                                         <IconMenuDragAndDrop className="shrink-0 group-hover:!text-primary" />
-                                        <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Licenses</span>
+                                        <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">{t('licenses')}</span>
                                     </div>
                                 </Link>
                             </li>
-                         
                         </ul>
                     </PerfectScrollbar>
                 </div>

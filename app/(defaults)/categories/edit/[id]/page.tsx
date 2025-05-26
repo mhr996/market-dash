@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import supabase from '@/lib/supabase';
 import { Alert } from '@/components/elements/alerts/elements-alerts-default';
+import { getTranslation } from '@/i18n';
 
 interface Category {
     id: number;
@@ -18,6 +19,7 @@ const EditCategory = () => {
     const id = params?.id as string;
 
     const router = useRouter();
+    const { t } = getTranslation();
     const [loading, setLoading] = useState(true);
     const [form, setForm] = useState<Category>({
         id: 0,
@@ -39,7 +41,7 @@ const EditCategory = () => {
                 setForm(data);
             } catch (error) {
                 console.error('Error fetching category:', error);
-                setAlert({ visible: true, message: 'Error loading category data', type: 'danger' });
+                setAlert({ visible: true, message: t('error_loading_category'), type: 'danger' });
             } finally {
                 setLoading(false);
             }
@@ -62,7 +64,7 @@ const EditCategory = () => {
         try {
             // Validate required fields
             if (!form.title) {
-                throw new Error('Category title is required');
+                throw new Error(t('category_title_required'));
             }
 
             // Create update payload with fields we want to update
@@ -83,88 +85,83 @@ const EditCategory = () => {
                 // Check if the update was successful
                 const { data: updatedCategory, error: fetchError } = await supabase.from('categories').select('*').eq('id', id).single();
 
-                if (fetchError) throw fetchError;
-
-                // Update was successful
+                if (fetchError) throw fetchError; // Update was successful
                 setForm(updatedCategory);
             } catch (error) {
                 console.error('Error updating category:', error);
                 throw error;
             }
 
-            setAlert({ visible: true, message: 'Category updated successfully!', type: 'success' });
+            setAlert({ visible: true, message: t('category_updated_successfully'), type: 'success' });
         } catch (error) {
             console.error(error);
             setAlert({
                 visible: true,
-                message: error instanceof Error ? error.message : 'Error updating category',
+                message: error instanceof Error ? error.message : t('error_updating_category'),
                 type: 'danger',
             });
         } finally {
             setLoading(false);
         }
     };
-
     if (loading) {
-        return <div className="flex items-center justify-center h-screen">Loading...</div>;
+        return <div className="flex items-center justify-center h-screen">{t('loading')}</div>;
     }
 
     return (
         <div className="container mx-auto p-6">
             <div className="mb-6 flex items-center justify-between">
                 <div className="flex items-center gap-5">
+                    {' '}
                     <button onClick={() => router.back()} className="hover:text-primary">
-                        <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 text-primary rtl:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                         </svg>
-                    </button>
-
+                    </button>{' '}
                     <ul className="flex space-x-2 rtl:space-x-reverse items-center">
                         <li>
                             <Link href="/" className="text-primary hover:underline">
-                                Home
+                                {t('home')}
                             </Link>
                         </li>
                         <li className="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
                             <Link href="/categories" className="text-primary hover:underline">
-                                Categories
+                                {t('categories')}
                             </Link>
                         </li>
                         <li className="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
-                            <span className="text-black dark:text-white-dark">Edit Category</span>
+                            <span className="text-black dark:text-white-dark">{t('edit_category')}</span>
                         </li>
                     </ul>
                 </div>
-            </div>
-
+            </div>{' '}
             {alert.visible && (
                 <div className="mb-4">
-                    <Alert type={alert.type} title={alert.type === 'success' ? 'Success' : 'Error'} message={alert.message} onClose={() => setAlert({ ...alert, visible: false })} />
+                    <Alert type={alert.type} title={alert.type === 'success' ? t('success') : t('error')} message={alert.message} onClose={() => setAlert({ ...alert, visible: false })} />
                 </div>
-            )}
-
+            )}{' '}
             {/* Edit Form */}
             <div className="panel mb-5">
                 <div className="mb-5">
-                    <h5 className="text-lg font-semibold dark:text-white-light">Edit Category</h5>
+                    <h5 className="text-lg font-semibold dark:text-white-light">{t('edit_category')}</h5>
                 </div>
                 <form onSubmit={handleSubmit}>
                     <div className="grid grid-cols-1 gap-5">
                         <div>
                             <label htmlFor="title" className="mb-2 block text-sm font-semibold text-gray-700 dark:text-white">
-                                Title <span className="text-red-500">*</span>
+                                {t('title')} <span className="text-red-500">*</span>
                             </label>
                             <input type="text" id="title" name="title" className="form-input" value={form.title} onChange={handleInputChange} required />
                         </div>
                         <div>
                             <label htmlFor="desc" className="mb-2 block text-sm font-semibold text-gray-700 dark:text-white">
-                                Description
+                                {t('description')}
                             </label>
                             <textarea id="desc" name="desc" className="form-textarea min-h-[100px]" value={form.desc} onChange={handleInputChange} />
-                        </div>
+                        </div>{' '}
                         <div>
                             <button type="submit" className="btn btn-primary" disabled={loading}>
-                                {loading ? 'Saving...' : 'Save Changes'}
+                                {loading ? t('saving') : t('save_changes')}
                             </button>
                         </div>
                     </div>

@@ -4,6 +4,7 @@ import supabase from '@/lib/supabase';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import IconEdit from '@/components/icon/icon-edit';
+import { getTranslation } from '@/i18n';
 
 interface Product {
     id: string;
@@ -40,6 +41,7 @@ const ProductDetailsPage = ({ params }: ProductDetailsPageProps) => {
     const [product, setProduct] = useState<Product | null>(null);
     const [loading, setLoading] = useState(true);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
+    const { t } = getTranslation();
 
     useEffect(() => {
         const fetchProduct = async () => {
@@ -70,10 +72,10 @@ const ProductDetailsPage = ({ params }: ProductDetailsPageProps) => {
         return (
             <div className="flex h-screen items-center justify-center">
                 <div className="text-center">
-                    <h2 className="mb-2 text-xl font-bold">Product Not Found</h2>
-                    <p className="mb-4 text-gray-500">The product you're looking for doesn't exist or has been removed.</p>
+                    <h2 className="mb-2 text-xl font-bold">{t('product_not_found')}</h2>
+                    <p className="mb-4 text-gray-500">{t('no_description_available')}</p>
                     <Link href="/products" className="btn btn-primary">
-                        Back to Products
+                        {t('back_to_products')}
                     </Link>
                 </div>
             </div>
@@ -83,26 +85,26 @@ const ProductDetailsPage = ({ params }: ProductDetailsPageProps) => {
     return (
         <div className="container mx-auto p-6">
             <div className="flex items-center gap-5 mb-6">
+                {' '}
                 <div onClick={() => router.back()}>
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 mb-4 cursor-pointer text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 mb-4 cursor-pointer text-primary rtl:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                     </svg>
                 </div>
-
                 {/* Breadcrumb Navigation */}
                 <ul className="flex space-x-2 rtl:space-x-reverse mb-4">
                     <li>
                         <Link href="/" className="text-primary hover:underline">
-                            Home
+                            {t('home')}
                         </Link>
                     </li>
                     <li className="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
                         <Link href="/products" className="text-primary hover:underline">
-                            Products
+                            {t('products')}
                         </Link>
                     </li>
                     <li className="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
-                        <span>Product Preview</span>
+                        <span>{t('preview')}</span>
                     </li>
                 </ul>
             </div>
@@ -112,7 +114,7 @@ const ProductDetailsPage = ({ params }: ProductDetailsPageProps) => {
                     <h2 className="text-2xl font-bold">{product.title}</h2>
                     <Link href={`/products/edit/${product.id}`} className="btn btn-primary gap-2">
                         <IconEdit className="h-5 w-5" />
-                        Edit Product
+                        {t('edit_product')}
                     </Link>
                 </div>
 
@@ -140,12 +142,12 @@ const ProductDetailsPage = ({ params }: ProductDetailsPageProps) => {
                     {/* Product Details */}
                     <div className="space-y-6">
                         <div>
-                            <h3 className="text-lg font-semibold">Description</h3>
+                            <h3 className="text-lg font-semibold">{t('description')}</h3>
                             <p className="mt-2 text-gray-600 dark:text-gray-400">{product.desc}</p>
                         </div>
 
                         <div>
-                            <h3 className="text-lg font-semibold">Price</h3>
+                            <h3 className="text-lg font-semibold">{t('price')}</h3>
                             {product.sale_price ? (
                                 <div className="mt-2">
                                     <div className="flex items-center gap-3">
@@ -163,15 +165,16 @@ const ProductDetailsPage = ({ params }: ProductDetailsPageProps) => {
                                         {(product.discount_start || product.discount_end) && (
                                             <div className="mt-2 text-sm">
                                                 <div className="flex flex-col gap-1">
+                                                    {' '}
                                                     {product.discount_start && (
                                                         <div className="flex items-center">
-                                                            <span className="font-medium mr-2">Start:</span>
+                                                            <span className="font-medium mr-2">{t('starts')}:</span>
                                                             <span>{new Date(product.discount_start).toLocaleString()}</span>
                                                         </div>
                                                     )}
                                                     {product.discount_end && (
                                                         <div className="flex items-center">
-                                                            <span className="font-medium mr-2">End:</span>
+                                                            <span className="font-medium mr-2">{t('ends')}:</span>
                                                             <span>{new Date(product.discount_end).toLocaleString()}</span>
                                                         </div>
                                                     )}
@@ -186,13 +189,13 @@ const ProductDetailsPage = ({ params }: ProductDetailsPageProps) => {
                         </div>
 
                         <div>
-                            <h3 className="text-lg font-semibold">Shop</h3>
+                            <h3 className="text-lg font-semibold">{t('shop')}</h3>
                             <p className="mt-2">{product.shops?.shop_name}</p>
                         </div>
 
                         {product.categories && (
                             <div>
-                                <h3 className="text-lg font-semibold">Category</h3>
+                                <h3 className="text-lg font-semibold">{t('category')}</h3>
                                 <div className="mt-2">
                                     <h4 className="font-medium">{product.categories.title}</h4>
                                     <p className="text-gray-600 dark:text-gray-400">{product.categories.desc}</p>
@@ -201,7 +204,7 @@ const ProductDetailsPage = ({ params }: ProductDetailsPageProps) => {
                         )}
 
                         <div>
-                            <h3 className="text-lg font-semibold">Added</h3>
+                            <h3 className="text-lg font-semibold">{t('created_date')}</h3>
                             <p className="mt-2">{new Date(product.created_at).toLocaleDateString()}</p>
                         </div>
                     </div>

@@ -5,11 +5,12 @@ import { IRootState } from '@/store';
 import supabase from '@/lib/supabase';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
+import { getTranslation } from '@/i18n';
 
 // Dynamically import ReactApexChart with SSR disabled
-const ReactApexChart = dynamic(() => import('react-apexcharts'), { 
+const ReactApexChart = dynamic(() => import('react-apexcharts'), {
     ssr: false,
-    loading: () => <div className="h-[200px] flex items-center justify-center">Loading chart...</div>
+    loading: () => <div className="h-[200px] flex items-center justify-center">Loading chart...</div>,
 });
 
 // Icons
@@ -52,6 +53,7 @@ const HomePage = () => {
     const isDark = useSelector((state: IRootState) => state.themeConfig.theme === 'dark' || state.themeConfig.isDarkMode);
     const isRtl = useSelector((state: IRootState) => state.themeConfig.rtlClass) === 'rtl';
     const [isMounted, setIsMounted] = useState(false);
+    const { t } = getTranslation();
     const [stats, setStats] = useState<Stats>({
         shops: 0,
         products: 0,
@@ -318,15 +320,15 @@ const HomePage = () => {
     const getActivityTitle = (item: any) => {
         switch (item.type) {
             case 'order':
-                return `New order placed: $${item.total_amount?.toFixed(2) || '0.00'}`;
+                return `${t('new_order_placed')}: $${item.total_amount?.toFixed(2) || '0.00'}`;
             case 'user':
-                return `New user registered: ${item.email || 'Unknown'}`;
+                return `${t('new_user_registered')}: ${item.email || t('unknown')}`;
             case 'product':
-                return `New product added: ${item.title || 'Unknown'}`;
+                return `${t('new_product_added')}: ${item.title || t('unknown')}`;
             case 'shop':
-                return `New shop created: ${item.shop_name || 'Unknown'}`;
+                return `${t('new_shop_created')}: ${item.shop_name || t('unknown')}`;
             default:
-                return 'Unknown activity';
+                return t('unknown_activity');
         }
     };
 
@@ -337,16 +339,14 @@ const HomePage = () => {
 
     return (
         <div>
-         
-
             <div className="pt-5 max-w-[1600px]">
                 {/* Welcome Banner */}
                 <div className="mb-6">
                     <div className="panel h-full dark:!border-[#191e3a] !bg-gradient-to-r from-blue-500/25 via-sky-500/25 to-cyan-500/25 dark:!bg-gradient-to-r dark:from-blue-500/10 dark:via-sky-500/10 dark:to-cyan-500/10">
                         <div className="flex flex-col sm:flex-row items-start justify-between mb-5">
                             <div>
-                                <h5 className="font-semibold text-lg dark:text-white-light">Welcome to Vristo Dashboard</h5>
-                                <p className="text-white-dark mt-1">Track your business metrics and performance at a glance.</p>
+                                <h5 className="font-semibold text-lg dark:text-white-light">{t('welcome_to_dashboard')}</h5>
+                                <p className="text-white-dark mt-1">{t('track_metrics')}</p>
                             </div>
                             <div className="dropdown mt-4 sm:mt-0">
                                 <span className="badge bg-primary text-white text-xs rounded-full px-3 py-1.5">
@@ -358,22 +358,22 @@ const HomePage = () => {
                         <div className="grid grid-cols-1 md:grid-cols-3 gap-6">
                             <div className="md:col-span-2">
                                 <div className="mb-5">
-                                    <h4 className="text-2xl font-bold text-gray-600 dark:text-white-dark">Business Performance</h4>
-                                    <p className="text-white-dark mt-2">Your business is growing! Explore the dashboard to dive deeper into your metrics and analytics.</p>
+                                    <h4 className="text-2xl font-bold text-gray-600 dark:text-white-dark">{t('business_performance')}</h4>
+                                    <p className="text-white-dark mt-2">{t('business_growing')}</p>
                                 </div>
 
                                 <div className="flex flex-wrap gap-3 mt-5">
                                     <Link href="/analytics" className="btn btn-primary">
                                         <IconMenuCharts className="ltr:mr-2 rtl:ml-2" />
-                                        Analytics
+                                        {t('analytics')}
                                     </Link>
                                     <Link href="/products" className="btn btn-outline-primary">
                                         <IconMenuComponents className="ltr:mr-2 rtl:ml-2" />
-                                        Products
+                                        {t('products')}
                                     </Link>
                                     <Link href="/orders" className="btn btn-outline-primary">
                                         <IconMenuNotes className="ltr:mr-2 rtl:ml-2" />
-                                        Orders
+                                        {t('orders')}
                                     </Link>
                                 </div>
 
@@ -384,7 +384,7 @@ const HomePage = () => {
                                                 <circle opacity="0.5" cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" />
                                                 <path d="M8.5 12.5L10.5 14.5L15.5 9.5" stroke="currentColor" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" />
                                             </svg>
-                                            <p className="text-xs font-semibold">System Normal</p>
+                                            <p className="text-xs font-semibold">{t('system_normal')}</p>
                                         </div>
                                         <div className="flex flex-col items-center justify-center px-4">
                                             <svg className="h-5 w-5 text-info mb-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -392,20 +392,20 @@ const HomePage = () => {
                                                 <circle cx="12" cy="12" r="10" stroke="currentColor" strokeWidth="1.5" />
                                             </svg>
                                             <p className="text-xs font-semibold">
-                                                Last Update: <span className="text-info">Today</span>
+                                                {t('last_update')}: <span className="text-info">{t('today')}</span>
                                             </p>
                                         </div>
                                     </div>
                                 </div>
                             </div>
                             <div className="relative">
-                                <h4 className="text-lg font-semibold dark:text-white-light mb-4">Revenue Trend</h4>
+                                <h4 className="text-lg font-semibold dark:text-white-light mb-4">{t('revenue_trend')}</h4>
                                 <div className="h-[200px] mb-3">
                                     {isMounted && typeof window !== 'undefined' && (
                                         <ReactApexChart series={performanceChartData.series} options={performanceChartData.options} type="area" height={200} />
                                     )}
                                 </div>
-                                <div className="absolute bottom-0 left-0 right-0 text-center text-xs text-gray-500 dark:text-gray-400">Performance over last 6 months</div>
+                                <div className="absolute bottom-0 left-0 right-0 text-center text-xs text-gray-500 dark:text-gray-400">{t('performance_last_months')}</div>
                             </div>
                         </div>
                     </div>
@@ -425,7 +425,7 @@ const HomePage = () => {
                                 </div>
                                 <div className="ltr:ml-5 rtl:mr-5 w-full">
                                     <div className="flex items-center justify-between">
-                                        <h5 className="text-[15px] font-semibold dark:text-white-light">Total Revenue</h5>
+                                        <h5 className="text-[15px] font-semibold dark:text-white-light">{t('total_revenue')}</h5>
                                         <div className={`badge ${stats.revenueGrowth >= 0 ? 'badge-outline-success' : 'badge-outline-danger'}`}>
                                             {stats.revenueGrowth >= 0 ? '+' : ''}
                                             {stats.revenueGrowth.toFixed(1)}%
@@ -433,7 +433,7 @@ const HomePage = () => {
                                     </div>
                                     <div className="mt-2 flex items-center">
                                         <div className="text-xl font-bold ltr:mr-3 rtl:ml-3 dark:text-white-light">${stats.revenue.toFixed(2)}</div>
-                                        <div className="badge bg-primary/30 text-primary dark:bg-primary dark:text-white-light">YTD</div>
+                                        <div className="badge bg-primary/30 text-primary dark:bg-primary dark:text-white-light">{t('ytd')}</div>
                                     </div>
                                     <div className="mt-4 h-1 bg-[#d3d3d3] dark:bg-dark/40">
                                         <div className={`h-full rounded-full bg-gradient-to-r from-[#4361ee] to-[#805dca]`} style={{ width: `${Math.min(100, Math.abs(stats.revenueGrowth))}%` }}></div>
@@ -452,7 +452,7 @@ const HomePage = () => {
                                 </div>
                                 <div className="ltr:ml-5 rtl:mr-5 w-full">
                                     <div className="flex items-center justify-between">
-                                        <h5 className="text-[15px] font-semibold dark:text-white-light">Users</h5>
+                                        <h5 className="text-[15px] font-semibold dark:text-white-light">{t('users')}</h5>
                                         <div className={`badge ${stats.userGrowth >= 0 ? 'badge-outline-success' : 'badge-outline-danger'}`}>
                                             {stats.userGrowth >= 0 ? '+' : ''}
                                             {stats.userGrowth.toFixed(1)}%
@@ -460,7 +460,7 @@ const HomePage = () => {
                                     </div>
                                     <div className="mt-2 flex items-center">
                                         <div className="text-xl font-bold ltr:mr-3 rtl:ml-3 dark:text-white-light">{stats.users}</div>
-                                        <div className="badge bg-primary/30 text-primary dark:bg-primary dark:text-white-light">Total</div>
+                                        <div className="badge bg-primary/30 text-primary dark:bg-primary dark:text-white-light">{t('total')}</div>
                                     </div>
                                     <div className="mt-4 h-1 bg-[#d3d3d3] dark:bg-dark/40">
                                         <div className={`h-full rounded-full bg-gradient-to-r from-[#4361ee] to-[#805dca]`} style={{ width: `${Math.min(100, Math.abs(stats.userGrowth))}%` }}></div>
@@ -482,7 +482,7 @@ const HomePage = () => {
                                 </div>
                                 <div className="ltr:ml-5 rtl:mr-5 w-full">
                                     <div className="flex items-center justify-between">
-                                        <h5 className="text-[15px] font-semibold dark:text-white-light">Shops</h5>
+                                        <h5 className="text-[15px] font-semibold dark:text-white-light">{t('shops')}</h5>
                                         <div className={`badge ${stats.shopGrowth >= 0 ? 'badge-outline-success' : 'badge-outline-danger'}`}>
                                             {stats.shopGrowth >= 0 ? '+' : ''}
                                             {stats.shopGrowth.toFixed(1)}%
@@ -490,7 +490,7 @@ const HomePage = () => {
                                     </div>
                                     <div className="mt-2 flex items-center">
                                         <div className="text-xl font-bold ltr:mr-3 rtl:ml-3 dark:text-white-light">{stats.shops}</div>
-                                        <div className="badge bg-success/30 text-success dark:bg-success dark:text-white-light">Total</div>
+                                        <div className="badge bg-success/30 text-success dark:bg-success dark:text-white-light">{t('total')}</div>
                                     </div>
                                     <div className="mt-4 h-1 bg-[#d3d3d3] dark:bg-dark/40">
                                         <div className={`h-full rounded-full bg-gradient-to-r from-[#1abc9c] to-[#0ead69]`} style={{ width: `${Math.min(100, Math.abs(stats.shopGrowth))}%` }}></div>
@@ -509,7 +509,7 @@ const HomePage = () => {
                                 </div>
                                 <div className="ltr:ml-5 rtl:mr-5 w-full">
                                     <div className="flex items-center justify-between">
-                                        <h5 className="text-[15px] font-semibold dark:text-white-light">Orders</h5>
+                                        <h5 className="text-[15px] font-semibold dark:text-white-light">{t('orders')}</h5>
                                         <div className={`badge ${stats.orderGrowth >= 0 ? 'badge-outline-success' : 'badge-outline-danger'}`}>
                                             {stats.orderGrowth >= 0 ? '+' : ''}
                                             {stats.orderGrowth.toFixed(1)}%
@@ -517,7 +517,7 @@ const HomePage = () => {
                                     </div>
                                     <div className="mt-2 flex items-center">
                                         <div className="text-xl font-bold ltr:mr-3 rtl:ml-3 dark:text-white-light">{stats.orders}</div>
-                                        <div className="badge bg-danger/30 text-danger dark:bg-danger dark:text-white-light">Total</div>
+                                        <div className="badge bg-danger/30 text-danger dark:bg-danger dark:text-white-light">{t('total')}</div>
                                     </div>
                                     <div className="mt-4 h-1 bg-[#d3d3d3] dark:bg-dark/40">
                                         <div className={`h-full rounded-full bg-gradient-to-r from-[#e7515a] to-[#f07178]`} style={{ width: `${Math.min(100, Math.abs(stats.orderGrowth))}%` }}></div>
@@ -536,7 +536,7 @@ const HomePage = () => {
                                 </div>
                                 <div className="ltr:ml-5 rtl:mr-5 w-full">
                                     <div className="flex items-center justify-between">
-                                        <h5 className="text-[15px] font-semibold dark:text-white-light">Products</h5>
+                                        <h5 className="text-[15px] font-semibold dark:text-white-light">{t('products')}</h5>
                                         <div className={`badge ${stats.productGrowth >= 0 ? 'badge-outline-success' : 'badge-outline-danger'}`}>
                                             {stats.productGrowth >= 0 ? '+' : ''}
                                             {stats.productGrowth.toFixed(1)}%
@@ -544,7 +544,7 @@ const HomePage = () => {
                                     </div>
                                     <div className="mt-2 flex items-center">
                                         <div className="text-xl font-bold ltr:mr-3 rtl:ml-3 dark:text-white-light">{stats.products}</div>
-                                        <div className="badge bg-warning/30 text-warning dark:bg-warning dark:text-white-light">Total</div>
+                                        <div className="badge bg-warning/30 text-warning dark:bg-warning dark:text-white-light">{t('total')}</div>
                                     </div>
                                     <div className="mt-4 h-1 bg-[#d3d3d3] dark:bg-dark/40">
                                         <div className={`h-full rounded-full bg-gradient-to-r from-[#e2a03f] to-[#ffbd5a]`} style={{ width: `${Math.min(100, Math.abs(stats.productGrowth))}%` }}></div>
@@ -560,7 +560,7 @@ const HomePage = () => {
                     {/* Quick Links */}
                     <div className="panel h-full lg:col-span-1">
                         <div className="mb-5 flex items-center justify-between">
-                            <h5 className="text-lg font-semibold dark:text-white-light">Quick Links</h5>
+                            <h5 className="text-lg font-semibold dark:text-white-light">{t('quick_links')}</h5>
                         </div>
                         <div className="mb-5 space-y-4">
                             <Link
@@ -572,7 +572,7 @@ const HomePage = () => {
                                         <IconStore className="h-5 w-5" />
                                     </div>
                                     <div className="ltr:ml-3 rtl:mr-3">
-                                        <h5 className="text-sm font-semibold dark:text-white-light">Manage Shops</h5>
+                                        <h5 className="text-sm font-semibold dark:text-white-light">{t('manage_shops')}</h5>
                                     </div>
                                 </div>
                                 <div className="text-success">
@@ -590,7 +590,7 @@ const HomePage = () => {
                                         <IconBox className="h-5 w-5" />
                                     </div>
                                     <div className="ltr:ml-3 rtl:mr-3">
-                                        <h5 className="text-sm font-semibold dark:text-white-light">View Products</h5>
+                                        <h5 className="text-sm font-semibold dark:text-white-light">{t('view_products')}</h5>
                                     </div>
                                 </div>
                                 <div className="text-warning">
@@ -608,7 +608,7 @@ const HomePage = () => {
                                         <IconShoppingCart className="h-5 w-5" />
                                     </div>
                                     <div className="ltr:ml-3 rtl:mr-3">
-                                        <h5 className="text-sm font-semibold dark:text-white-light">Check Orders</h5>
+                                        <h5 className="text-sm font-semibold dark:text-white-light">{t('check_orders')}</h5>
                                     </div>
                                 </div>
                                 <div className="text-danger">
@@ -626,7 +626,7 @@ const HomePage = () => {
                                         <IconUsersGroup className="h-5 w-5" />
                                     </div>
                                     <div className="ltr:ml-3 rtl:mr-3">
-                                        <h5 className="text-sm font-semibold dark:text-white-light">User Management</h5>
+                                        <h5 className="text-sm font-semibold dark:text-white-light">{t('user_management')}</h5>
                                     </div>
                                 </div>
                                 <div className="text-primary">
@@ -659,7 +659,7 @@ const HomePage = () => {
                     {/* Recent Activity */}
                     <div className="panel h-full lg:col-span-2">
                         <div className="mb-5 flex items-center justify-between">
-                            <h5 className="text-lg font-semibold dark:text-white-light">Recent Activity</h5>
+                            <h5 className="text-lg font-semibold dark:text-white-light">{t('recent_activity')}</h5>
                         </div>
 
                         <div className="space-y-7">

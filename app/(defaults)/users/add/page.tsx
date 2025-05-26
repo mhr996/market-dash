@@ -5,9 +5,11 @@ import Link from 'next/link';
 import supabase from '@/lib/supabase';
 import { Alert } from '@/components/elements/alerts/elements-alerts-default';
 import CountrySelect from '@/components/country-select/country-select';
+import { getTranslation } from '@/i18n';
 
 const AddUserPage = () => {
     const router = useRouter();
+    const { t } = getTranslation();
     const [form, setForm] = useState({
         full_name: '',
         email: '',
@@ -40,7 +42,7 @@ const AddUserPage = () => {
         setLoading(true);
         // Basic validation: full name and email are required
         if (!form.full_name || !form.email) {
-            setAlert({ visible: true, message: 'Full name and email are required.', type: 'danger' });
+            setAlert({ visible: true, message: t('full_name_email_required'), type: 'danger' });
             setLoading(false);
             return;
         }
@@ -51,7 +53,7 @@ const AddUserPage = () => {
             const token = sessionData?.session?.access_token;
 
             if (!token) {
-                throw new Error('Not authenticated');
+                throw new Error(t('not_authenticated'));
             }
 
             // Call our secure API endpoint to invite the user
@@ -79,16 +81,15 @@ const AddUserPage = () => {
                     },
                 }),
             });
-
             const result = await response.json();
 
             if (!response.ok) {
-                throw new Error(result.error || 'Failed to invite user');
+                throw new Error(result.error || t('failed_to_invite_user'));
             }
 
             setAlert({
                 visible: true,
-                message: 'User added successfully! An invitation email has been sent to the user.',
+                message: t('user_added_invitation_sent'),
                 type: 'success',
             });
 
@@ -98,7 +99,7 @@ const AddUserPage = () => {
             }, 2000);
         } catch (error: any) {
             console.error(error);
-            setAlert({ visible: true, message: error.message || 'Error adding user', type: 'danger' });
+            setAlert({ visible: true, message: error.message || t('error_adding_user'), type: 'danger' });
         } finally {
             setLoading(false);
         }
@@ -107,62 +108,60 @@ const AddUserPage = () => {
     return (
         <div className="container mx-auto p-6">
             <div className="flex items-center gap-5 mb-6">
+                {' '}
                 <div onClick={() => router.back()}>
-                    <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 mb-4 cursor-pointer text-primary" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                    <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 mb-4 cursor-pointer text-primary rtl:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                     </svg>
                 </div>
-
-                {/* Breadcrumb Navigation */}
+                {/* Breadcrumb Navigation */}{' '}
                 <ul className="flex space-x-2 rtl:space-x-reverse mb-4">
                     <li>
                         <Link href="/" className="text-primary hover:underline">
-                            Home
+                            {t('home')}
                         </Link>
                     </li>
                     <li className="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
                         <Link href="/users" className="text-primary hover:underline">
-                            Users
+                            {t('users')}
                         </Link>
                     </li>
                     <li className="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
-                        <span>Add New User</span>
+                        <span>{t('add_new_user')}</span>
                     </li>
                 </ul>
-            </div>
-
+            </div>{' '}
             {alert.visible && (
                 <div className="mb-4">
-                    <Alert type={alert.type} title={alert.type === 'success' ? 'Success' : 'Error'} message={alert.message} onClose={() => setAlert({ ...alert, visible: false })} />
+                    <Alert type={alert.type} title={alert.type === 'success' ? t('success') : t('error')} message={alert.message} onClose={() => setAlert({ ...alert, visible: false })} />
                 </div>
-            )}
-
+            )}{' '}
             {/* Form Container */}
             <div className="rounded-md border border-[#ebedf2] bg-white p-4 dark:border-[#191e3a] dark:bg-black">
-                <h6 className="mb-5 text-lg font-bold">Add New User</h6>
-              
+                <h6 className="mb-5 text-lg font-bold">{t('add_new_user')}</h6>
+
                 <form onSubmit={handleSubmit} className="grid grid-cols-1 gap-5 sm:grid-cols-2">
                     <div>
                         <label htmlFor="full_name" className="block text-sm font-bold text-gray-700 dark:text-white">
-                            Full Name *
+                            {t('full_name')} *
                         </label>
-                        <input type="text" id="full_name" name="full_name" value={form.full_name} onChange={handleInputChange} className="form-input" placeholder="Enter full name" required />
+                        <input type="text" id="full_name" name="full_name" value={form.full_name} onChange={handleInputChange} className="form-input" placeholder={t('enter_full_name')} required />
                     </div>
                     <div>
                         <label htmlFor="email" className="block text-sm font-bold text-gray-700 dark:text-white">
-                            Email *
+                            {t('email')} *
                         </label>
-                        <input type="email" id="email" name="email" value={form.email} onChange={handleInputChange} className="form-input" placeholder="Enter email" required />
+                        <input type="email" id="email" name="email" value={form.email} onChange={handleInputChange} className="form-input" placeholder={t('enter_email')} required />
                     </div>
                     <div>
                         <label htmlFor="username" className="block text-sm font-bold text-gray-700 dark:text-white">
-                            Username
+                            {t('username')}
                         </label>
-                        <input type="text" id="username" name="username" value={form.username} onChange={handleInputChange} className="form-input" placeholder="Enter username" />
-                    </div>
+                        <input type="text" id="username" name="username" value={form.username} onChange={handleInputChange} className="form-input" placeholder={t('enter_username')} />
+                    </div>{' '}
                     <div>
                         <label htmlFor="country" className="block text-sm font-bold text-gray-700 dark:text-white">
-                            Country
+                            {t('country')}
                         </label>
                         <CountrySelect
                             id="country"
@@ -179,32 +178,31 @@ const AddUserPage = () => {
                     </div>
                     <div>
                         <label htmlFor="address" className="block text-sm font-bold text-gray-700 dark:text-white">
-                            Address
+                            {t('address')}
                         </label>
-                        <input type="text" id="address" name="address" value={form.address} onChange={handleInputChange} className="form-input" placeholder="Enter address" />
+                        <input type="text" id="address" name="address" value={form.address} onChange={handleInputChange} className="form-input" placeholder={t('enter_address')} />
                     </div>
                     <div>
                         <label htmlFor="location" className="block text-sm font-bold text-gray-700 dark:text-white">
-                            Location
+                            {t('location')}
                         </label>
-                        <input type="text" id="location" name="location" value={form.location} onChange={handleInputChange} className="form-input" placeholder="Enter location" />
+                        <input type="text" id="location" name="location" value={form.location} onChange={handleInputChange} className="form-input" placeholder={t('enter_location')} />
                     </div>
                     <div>
                         <label htmlFor="phone" className="block text-sm font-bold text-gray-700 dark:text-white">
-                            Phone
+                            {t('phone')}
                         </label>
-                        <input type="text" id="phone" name="phone" value={form.phone} onChange={handleInputChange} className="form-input" placeholder="Enter phone number" />
+                        <input type="text" id="phone" name="phone" value={form.phone} onChange={handleInputChange} className="form-input" placeholder={t('enter_phone')} />
                     </div>
                     <div>
                         <label htmlFor="website" className="block text-sm font-bold text-gray-700 dark:text-white">
-                            Website
-                        </label>
-                        <input type="text" id="website" name="website" value={form.website} onChange={handleInputChange} className="form-input" placeholder="Enter website" />
+                            {t('website')}
+                        </label>{' '}
+                        <input type="text" id="website" name="website" value={form.website} onChange={handleInputChange} className="form-input" placeholder={t('enter_website')} />
                     </div>
-
                     <div className="sm:col-span-2">
                         <button type="submit" disabled={loading} className="btn btn-primary">
-                            {loading ? 'Sending Invitation...' : 'Add User & Send Invitation'}
+                            {loading ? t('sending_invitation') : t('add_user_send_invitation')}
                         </button>
                     </div>
                 </form>

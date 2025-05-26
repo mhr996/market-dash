@@ -104,7 +104,7 @@ const Header = () => {
 
     const themeConfig = useSelector((state: IRootState) => state.themeConfig);
     const setLocale = (flag: string) => {
-        if (flag.toLowerCase() === 'ae') {
+        if (flag.toLowerCase() === 'ae' || flag.toLowerCase() === 'he') {
             dispatch(toggleRTL('rtl'));
         } else {
             dispatch(toggleRTL('ltr'));
@@ -184,7 +184,6 @@ const Header = () => {
 
                     <div className="hidden ltr:mr-2 rtl:ml-2 sm:block">
                         <ul className="flex items-center space-x-2 rtl:space-x-reverse dark:text-[#d0d2d6]">
-                          
                             <li>
                                 <Link href="/products/add" className="block rounded-full bg-white-light/40 p-2 hover:bg-white-light/90 hover:text-primary dark:bg-dark/40 dark:hover:bg-dark/60">
                                     <IconEdit />
@@ -448,7 +447,6 @@ const Header = () => {
                                             Profile
                                         </Link>
                                     </li>
-                                  
 
                                     <li className="border-t border-white-light dark:border-white-light/10">
                                         <button onClick={handleSignOut} className="!py-3 text-danger flex w-full items-center">
@@ -461,8 +459,6 @@ const Header = () => {
                         </div>
                     </div>
                 </div>
-
-           
             </div>
         </header>
     );
