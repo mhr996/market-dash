@@ -162,6 +162,14 @@ const Sidebar = () => {
                                             </div>
                                         </Link>
                                     </li>
+                                    <li className="nav-item">
+                                        <Link href="/revenue" className="group">
+                                            <div className="flex items-center">
+                                                <IconMenuCharts className="shrink-0 group-hover:!text-primary" />
+                                                <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">{t('revenue')}</span>
+                                            </div>
+                                        </Link>
+                                    </li>
                                 </ul>
                             </li>
 
@@ -205,6 +213,14 @@ const Sidebar = () => {
                                     <div className="flex items-center">
                                         <IconMenuDragAndDrop className="shrink-0 group-hover:!text-primary" />
                                         <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">{t('licenses')}</span>
+                                    </div>
+                                </Link>
+                            </li>
+                            <li className="nav-item">
+                                <Link href="/subscriptions" className="group">
+                                    <div className="flex items-center">
+                                        <IconMenuDatatables className="shrink-0 group-hover:!text-primary" />
+                                        <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">{t('subscriptions')}</span>
                                     </div>
                                 </Link>
                             </li>

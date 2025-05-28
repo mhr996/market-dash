@@ -82,28 +82,36 @@ const AddShopPage = () => {
     const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
     const [activeTab, setActiveTab] = useState(0);
     const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
-    const [searchCategoryTerm, setSearchCategoryTerm] = useState('');
-
-    // Set up default work hours
-    const defaultWorkHours: WorkHours[] = [
-        { day: 'Monday', open: true, startTime: '09:00', endTime: '18:00' },
-        { day: 'Tuesday', open: true, startTime: '09:00', endTime: '18:00' },
-        { day: 'Wednesday', open: true, startTime: '09:00', endTime: '18:00' },
-        { day: 'Thursday', open: true, startTime: '09:00', endTime: '18:00' },
-        { day: 'Friday', open: true, startTime: '09:00', endTime: '18:00' },
-        { day: 'Saturday', open: false, startTime: '10:00', endTime: '16:00' },
-        { day: 'Sunday', open: false, startTime: '10:00', endTime: '16:00' },
-    ];
-
-    // Initialize work_hours with default hours
+    const [searchCategoryTerm, setSearchCategoryTerm] = useState(''); // Define default work hours in a useEffect to make it reactive to language changes
     useEffect(() => {
+        // Create default work hours with current language translations
+        const defaultWorkHours: WorkHours[] = [
+            { day: t('monday'), open: true, startTime: '09:00', endTime: '18:00' },
+            { day: t('tuesday'), open: true, startTime: '09:00', endTime: '18:00' },
+            { day: t('wednesday'), open: true, startTime: '09:00', endTime: '18:00' },
+            { day: t('thursday'), open: true, startTime: '09:00', endTime: '18:00' },
+            { day: t('friday'), open: true, startTime: '09:00', endTime: '18:00' },
+            { day: t('saturday'), open: false, startTime: '10:00', endTime: '16:00' },
+            { day: t('sunday'), open: false, startTime: '10:00', endTime: '16:00' },
+        ];
+
+        // If work_hours is null, initialize with default hours
         if (form.work_hours === null) {
             setForm((prev) => ({
                 ...prev,
                 work_hours: defaultWorkHours,
             }));
+        } else {
+            // If work_hours already exists, update only the day names with current translations
+            setForm((prev) => ({
+                ...prev,
+                work_hours: prev.work_hours ? prev.work_hours.map((workHour, index) => ({
+                    ...workHour,
+                    day: defaultWorkHours[index].day, // Update day with current translation
+                })) : null,
+            }));
         }
-    }, []);
+    }, [t]); // Re-run when the translation function changes (language changes)
 
     // Fetch current user, all users, and categories
     useEffect(() => {
@@ -676,13 +684,13 @@ const AddShopPage = () => {
                         <div className="mb-5">
                             <h5 className="text-lg font-semibold dark:text-white-light">{t('working_hours')}</h5>
                             <p className="text-gray-500 dark:text-gray-400 mt-1">{t('set_working_hours')}</p>
-                        </div>
+                        </div>{' '}
                         <div className="grid grid-cols-1 gap-6">
-                            {(form.work_hours || defaultWorkHours).map((day, index) => (
-                                <div key={day.day} className="border border-gray-200 dark:border-gray-700 rounded-md p-4">
+                            {form.work_hours?.map((day, index) => (
+                                <div key={index} className="border border-gray-200 dark:border-gray-700 rounded-md p-4">
                                     <div className="flex flex-wrap items-center justify-between gap-4">
                                         <div className="flex items-center">
-                                            <h6 className="text-lg font-semibold min-w-[100px]">{day.day}</h6>{' '}
+                                            <h6 className="text-lg mx-2 font-semibold min-w-[100px]">{day.day}</h6>{' '}
                                             <label className="inline-flex cursor-pointer">
                                                 <input type="checkbox" className="form-checkbox" checked={day.open} onChange={(e) => handleWorkHoursChange(index, 'open', e.target.checked)} />
                                                 <span className="relative text-white-dark checked:bg-none ml-2">{day.open ? t('open') : t('closed')}</span>
@@ -693,7 +701,7 @@ const AddShopPage = () => {
                                             <div className={`flex flex-wrap items-center gap-4 ${day.open ? 'mt-4 sm:mt-0' : ''}`}>
                                                 {' '}
                                                 <div className="flex items-center">
-                                                    <span className="mr-2">{t('from')}:</span>
+                                                    <span className="mx-2">{t('from')}:</span>
                                                     <input
                                                         type="time"
                                                         className="form-input w-auto"
@@ -703,7 +711,7 @@ const AddShopPage = () => {
                                                     />
                                                 </div>
                                                 <div className="flex items-center">
-                                                    <span className="mr-2">{t('to')}:</span>
+                                                    <span className="mx-2">{t('to')}:</span>
                                                     <input
                                                         type="time"
                                                         className="form-input w-auto"

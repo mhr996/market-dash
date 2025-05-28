@@ -181,10 +181,10 @@ const ShopsList = () => {
                                         <div>{shop_name}</div>
                                     </div>
                                 ),
-                            },
+                            }, 
                             {
                                 accessor: 'owner',
-                                title: t('owner'),
+                                title: t('shop_owner'),
                                 sortable: true,
                                 render: ({ owner, profiles }) => <span>{profiles ? profiles.full_name : owner}</span>,
                             },

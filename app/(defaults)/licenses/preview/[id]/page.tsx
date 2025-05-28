@@ -4,6 +4,10 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import supabase from '@/lib/supabase';
 import IconEdit from '@/components/icon/icon-edit';
+import IconArrowBackward from '@/components/icon/icon-arrow-backward';
+import IconEye from '@/components/icon/icon-eye';
+import { DataTableSortStatus, DataTable } from 'mantine-datatable';
+import { sortBy } from 'lodash';
 import { getTranslation } from '@/i18n';
 
 interface License {
@@ -13,7 +17,20 @@ interface License {
     price: number;
     shops: number;
     products: number;
+    commission_type: string;
+    commission_value: number;
     created_at: string;
+}
+
+interface Subscriber {
+    id: number;
+    profile_id: string;
+    created_at: string;
+    status: string;
+    profiles?: {
+        full_name: string;
+        email: string;
+    };
 }
 
 interface LicenseDetailsPageProps {
@@ -25,8 +42,18 @@ interface LicenseDetailsPageProps {
 const LicenseDetailsPage = ({ params }: LicenseDetailsPageProps) => {
     const router = useRouter();
     const [license, setLicense] = useState<License | null>(null);
+    const [subscribers, setSubscribers] = useState<Subscriber[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadingSubscribers, setLoadingSubscribers] = useState(true);
     const { t } = getTranslation();
+
+    // State for subscribers table pagination and search
+    const [search, setSearch] = useState('');
+    const [filteredSubscribers, setFilteredSubscribers] = useState<Subscriber[]>([]);
+    const [sortStatus, setSortStatus] = useState<DataTableSortStatus>({
+        columnAccessor: 'id',
+        direction: 'asc',
+    });
 
     useEffect(() => {
         const fetchLicense = async () => {
@@ -42,6 +69,45 @@ const LicenseDetailsPage = ({ params }: LicenseDetailsPageProps) => {
         };
         fetchLicense();
     }, [params.id]);
+
+    useEffect(() => {
+        const fetchSubscribers = async () => {
+            if (!license) return;
+
+            try {
+                setLoadingSubscribers(true);
+                const { data, error } = await supabase.from('subscriptions').select('*, profiles:profile_id(full_name, email)').eq('license_id', params.id);
+
+                if (error) throw error;
+                setSubscribers(data as Subscriber[]);
+            } catch (error) {
+                console.error('Error fetching subscribers:', error);
+            } finally {
+                setLoadingSubscribers(false);
+            }
+        };
+
+        if (license) {
+            fetchSubscribers();
+        }
+    }, [license, params.id]);
+
+    useEffect(() => {
+        // Filter subscribers based on search term
+        const filtered = subscribers.filter((item) => {
+            const searchTerm = search.toLowerCase();
+            return (
+                item.id.toString().includes(searchTerm) ||
+                item.profiles?.full_name.toLowerCase().includes(searchTerm) ||
+                item.profiles?.email.toLowerCase().includes(searchTerm) ||
+                item.status.toLowerCase().includes(searchTerm)
+            );
+        });
+
+        // Apply sorting
+        const sorted = sortBy(filtered, sortStatus.columnAccessor);
+        setFilteredSubscribers(sortStatus.direction === 'desc' ? sorted.reverse() : sorted);
+    }, [subscribers, search, sortStatus]);
 
     if (loading) {
         return (
@@ -72,6 +138,7 @@ const LicenseDetailsPage = ({ params }: LicenseDetailsPageProps) => {
 
     return (
         <div className="container mx-auto p-6">
+            {' '}
             {/* Header with back button */}
             <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
                 {' '}
@@ -85,7 +152,6 @@ const LicenseDetailsPage = ({ params }: LicenseDetailsPageProps) => {
                     {t('edit_license')}
                 </Link>
             </div>
-
             {/* Breadcrumb Navigation */}
             <ul className="flex space-x-2 rtl:space-x-reverse mb-4">
                 <li>
@@ -102,7 +168,6 @@ const LicenseDetailsPage = ({ params }: LicenseDetailsPageProps) => {
                     <span>{license.title}</span>
                 </li>
             </ul>
-
             {/* License details card */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 {/* Main License Info */}
@@ -113,17 +178,15 @@ const LicenseDetailsPage = ({ params }: LicenseDetailsPageProps) => {
                             <h5 className="text-xl font-bold text-gray-800 dark:text-white-light">{license.title}</h5>
                             <span className="badge bg-primary text-white text-base px-4 py-1.5">{formatCurrency(license.price)}</span>
                         </div>
-
                         {/* Description */}
                         <div className="mb-6">
                             <h6 className="text-base font-semibold text-gray-700 dark:text-white-light mb-2">{t('description')}</h6>
                             <p className="text-gray-600 dark:text-gray-400">{license.desc || t('no_description_available')}</p>
-                        </div>
-
+                        </div>{' '}
                         {/* Features */}
                         <div>
                             <h6 className="text-base font-semibold text-gray-700 dark:text-white-light mb-3">{t('features')}</h6>
-                            <div className="grid grid-cols-1 sm:grid-cols-2 gap-4 mb-4">
+                            <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-4">
                                 <div className="flex items-center p-4 border border-gray-200 dark:border-gray-700 rounded-md bg-white-light/30 dark:bg-dark/40">
                                     <div className="flex h-11 w-11 min-w-[2.75rem] items-center justify-center rounded-md bg-primary-light dark:bg-primary text-primary dark:text-white-light">
                                         <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
@@ -153,6 +216,93 @@ const LicenseDetailsPage = ({ params }: LicenseDetailsPageProps) => {
                                         <h5 className="text-xl font-semibold text-gray-800 dark:text-white-light">{license.products}</h5>
                                     </div>
                                 </div>
+
+                                <div className="flex items-center p-4 border border-gray-200 dark:border-gray-700 rounded-md bg-white-light/30 dark:bg-dark/40">
+                                    <div className="flex h-11 w-11 min-w-[2.75rem] items-center justify-center rounded-md bg-success-light dark:bg-success text-success dark:text-success-light">
+                                        <svg className="h-6 w-6" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">
+                                            <path
+                                                d="M10.0464 14.4463C10.2442 14.6441 10.5622 14.6441 10.76 14.4463L14.76 10.4463C14.9578 10.2485 14.9578 9.93057 14.76 9.73278C14.5622 9.53499 14.2442 9.53499 14.0464 9.73278L10.4 13.3792L8.95355 11.9328C8.75576 11.735 8.43782 11.735 8.24003 11.9328C8.04224 12.1306 8.04224 12.4485 8.24003 12.6463L10.0464 14.4463Z"
+                                                fill="currentColor"
+                                            />
+                                            <path
+                                                d="M4.49999 12C4.49999 7.85786 7.85785 4.5 12 4.5C16.1421 4.5 19.5 7.85786 19.5 12C19.5 16.1421 16.1421 19.5 12 19.5C7.85785 19.5 4.49999 16.1421 4.49999 12Z"
+                                                stroke="currentColor"
+                                                strokeWidth="1.5"
+                                            />
+                                        </svg>
+                                    </div>
+                                    <div className="ltr:ml-4 rtl:mr-4">
+                                        <p className="text-gray-400 text-sm">{t('commission_rate')}</p>
+                                        <h5 className="text-xl font-semibold text-gray-800 dark:text-white-light">
+                                            {license.commission_value}
+                                            {license.commission_type === 'percentage' ? '%' : ' USD'}
+                                        </h5>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                        {/* Subscribers Table */}
+                        <div className="mt-8">
+                            <div className="flex justify-between items-center mb-5">
+                                <h6 className="text-base font-semibold text-gray-700 dark:text-white-light">{t('subscriptions')}</h6>
+                                <input type="text" className="form-input w-auto" placeholder={t('search')} value={search} onChange={(e) => setSearch(e.target.value)} />
+                            </div>
+
+                            <div className="datatables relative">
+                                <DataTable
+                                    className={`${loadingSubscribers ? 'filter blur-sm pointer-events-none' : 'table-hover whitespace-nowrap'}`}
+                                    records={filteredSubscribers}
+                                    columns={[
+                                        {
+                                            accessor: 'id',
+                                            title: t('id'),
+                                            sortable: true,
+                                            render: ({ id }) => <strong className="text-info">#{id}</strong>,
+                                        },
+                                        {
+                                            accessor: 'profiles.full_name',
+                                            title: t('user'),
+                                            sortable: true,
+                                            render: ({ profiles }) => (
+                                                <div>
+                                                    <p className="font-semibold">{profiles?.full_name || t('not_available')}</p>
+                                                    <p className="text-gray-600 text-xs">{profiles?.email || ''}</p>
+                                                </div>
+                                            ),
+                                        },
+                                        {
+                                            accessor: 'status',
+                                            title: t('status'),
+                                            sortable: true,
+                                            render: ({ status }) => <span className={`badge badge-outline-${status === 'Active' ? 'success' : 'danger'}`}>{status}</span>,
+                                        },
+                                        {
+                                            accessor: 'created_at',
+                                            title: t('created_date'),
+                                            sortable: true,
+                                            render: ({ created_at }) => (created_at ? <span>{new Date(created_at).toLocaleDateString()}</span> : ''),
+                                        },
+                                        {
+                                            accessor: 'action',
+                                            title: t('actions'),
+                                            sortable: false,
+                                            textAlignment: 'center',
+                                            render: ({ id }) => (
+                                                <div className="mx-auto flex w-max items-center gap-4">
+                                                    <Link href={`/subscriptions/preview/${id}`} className="flex hover:text-primary">
+                                                        <IconEye />
+                                                    </Link>
+                                                </div>
+                                            ),
+                                        },
+                                    ]}
+                                    highlightOnHover
+                                    sortStatus={sortStatus}
+                                    onSortStatusChange={setSortStatus}
+                                    minHeight={200}
+                                    noRecordsText={subscribers.length === 0 ? t('no_subscribers') : ''}
+                                />
+                                {loadingSubscribers && <div className="absolute inset-0 z-10 flex items-center justify-center bg-white dark:bg-black-dark-light bg-opacity-60 backdrop-blur-sm" />}
                             </div>
                         </div>
                     </div>
@@ -181,6 +331,13 @@ const LicenseDetailsPage = ({ params }: LicenseDetailsPageProps) => {
                                 <div className="flex items-center">
                                     <span className="text-xl font-bold text-primary">{formatCurrency(license.price)}</span>
                                     <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">{t('per_license')}</span>
+                                </div>
+                            </div>
+                            <div>
+                                <h6 className="text-sm font-semibold text-gray-700 dark:text-white-light mb-2">{t('subscriptions')}</h6>
+                                <div className="flex items-center">
+                                    <span className="text-xl font-bold text-success">{subscribers.length}</span>
+                                    <span className="text-sm text-gray-500 dark:text-gray-400 ml-2">{t('users')}</span>
                                 </div>
                             </div>
 

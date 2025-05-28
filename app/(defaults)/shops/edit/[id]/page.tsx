@@ -499,7 +499,7 @@ const EditShop = () => {
                                             setForm((prev) => ({ ...prev, statusDropdownOpen: !prev.statusDropdownOpen }));
                                         }}
                                     >
-                                        <span>{t(form.status.toLowerCase())}</span>
+                                        <span>{t(form.status?.toLowerCase())}</span>
                                         <IconCaretDown className={`h-4 w-4 transition-transform duration-300 ${form.statusDropdownOpen ? 'rotate-180' : ''}`} />
                                     </div>{' '}
                                     {form.statusDropdownOpen && (

@@ -13,6 +13,10 @@ import IconCalendar from '@/components/icon/icon-calendar';
 import IconUser from '@/components/icon/icon-user';
 import IconMail from '@/components/icon/icon-mail';
 import IconX from '@/components/icon/icon-x';
+import IconCash from '@/components/icon/icon-cash-banknotes';
+import { DataTableSortStatus, DataTable } from 'mantine-datatable';
+import { sortBy } from 'lodash';
+import { getTranslation } from '@/i18n';
 import 'leaflet/dist/leaflet.css';
 
 // Import the map component dynamically with no SSR
@@ -33,6 +37,19 @@ interface Category {
     desc: string;
 }
 
+interface ShopSale {
+    id: number;
+    order_id: string;
+    product_name: string;
+    quantity: number;
+    price: number;
+    total: number;
+    commission: number;
+    commission_rate: number;
+    date: string;
+    status: string;
+}
+
 interface Shop {
     id: number;
     shop_name: string;
@@ -50,6 +67,8 @@ interface Shop {
     gallery?: string[] | null;
     latitude?: number | null; // Geographical location data
     longitude?: number | null; // Geographical location data
+    balance?: number; // Shop balance/revenue
+    commission_rate?: number; // Commission rate percentage
     profiles?: {
         id: string;
         full_name: string;
@@ -64,18 +83,55 @@ const ShopPreview = () => {
     // Fix: Type assertion to access id from params
     const params = useParams();
     const id = params?.id as string;
+    const { t } = getTranslation();
 
     const router = useRouter();
     const [shop, setShop] = useState<Shop | null>(null);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'owner' | 'details'>('owner');
+    const [activeTab, setActiveTab] = useState<'owner' | 'details' | 'revenue'>('owner');
     const [categories, setCategories] = useState<Category[]>([]);
     const [unauthorized, setUnauthorized] = useState(false);
+    const [productsCount, setProductsCount] = useState<number>(0);
+    const [ordersCount, setOrdersCount] = useState<number>(0);
+    const [newProductsCount, setNewProductsCount] = useState<number>(0);
+    const [newOrdersCount, setNewOrdersCount] = useState<number>(0);
+    const [timeFilter, setTimeFilter] = useState<'weekly' | 'monthly' | 'yearly'>('monthly');
+    const [shopSales, setShopSales] = useState<ShopSale[]>([]);
+    const [page, setPage] = useState(1);
+    const PAGE_SIZES = [10, 20, 30, 50];
+    const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
+    const [initialRecords, setInitialRecords] = useState<ShopSale[]>([]);
+    const [records, setRecords] = useState<ShopSale[]>([]);
+    const [search, setSearch] = useState('');
+    const [sortStatus, setSortStatus] = useState<DataTableSortStatus>({
+        columnAccessor: 'date',
+        direction: 'desc',
+    });
+    const [shopRevenueSummary, setShopRevenueSummary] = useState({
+        totalRevenue: 0,
+        totalCommission: 0,
+        commissionRate: 0,
+        netRevenue: 0,
+    });
     const [alert, setAlert] = useState<{ visible: boolean; message: string; type: 'success' | 'danger' }>({
         visible: false,
         message: '',
         type: 'danger',
     });
+
+    // Format currency helper function
+    const formatCurrency = (amount: number) => {
+        return '$' + amount.toLocaleString('en-US', { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+    };
+
+    // Format date helper function
+    const formatDate = (dateString: string) => {
+        return new Date(dateString).toLocaleDateString('en-US', {
+            year: 'numeric',
+            month: 'short',
+            day: 'numeric',
+        });
+    };
 
     useEffect(() => {
         const fetchShop = async () => {
@@ -102,7 +158,6 @@ const ShopPreview = () => {
                     setLoading(false);
                     return;
                 }
-
                 setShop(data);
 
                 // Also fetch all categories for reference
@@ -110,6 +165,37 @@ const ShopPreview = () => {
 
                 if (categoriesError) throw categoriesError;
                 setCategories(categoriesData || []);
+
+                // Fetch products count
+                const { count: productsCount, error: productsError } = await supabase.from('products').select('id', { count: 'exact' }).eq('shop', data.id);
+
+                if (productsError) throw productsError;
+                setProductsCount(productsCount || 0);
+
+                // Calculate new products in the last 7 days
+                const lastWeekDate = new Date();
+                lastWeekDate.setDate(lastWeekDate.getDate() - 7);
+
+                const { count: newProducts, error: newProductsError } = await supabase
+                    .from('products')
+                    .select('id', { count: 'exact' })
+                    .eq('shop', data.id)
+                    .gte('created_at', lastWeekDate.toISOString());
+
+                if (newProductsError) throw newProductsError;
+                setNewProductsCount(newProducts || 0);
+
+                // Fetch orders count
+                const { count: ordersCount, error: ordersError } = await supabase.from('orders').select('id', { count: 'exact' }).eq('shop', data.id);
+
+                if (ordersError) throw ordersError;
+                setOrdersCount(ordersCount || 0);
+
+                // Calculate new orders in the last 7 days
+                const { count: newOrders, error: newOrdersError } = await supabase.from('orders').select('id', { count: 'exact' }).eq('shop', data.id).gte('created_at', lastWeekDate.toISOString());
+
+                if (newOrdersError) throw newOrdersError;
+                setNewOrdersCount(newOrders || 0);
             } catch (error) {
                 console.error(error);
                 setAlert({ visible: true, message: 'Error fetching shop details', type: 'danger' });
@@ -122,6 +208,114 @@ const ShopPreview = () => {
             fetchShop();
         }
     }, [id]);
+
+    // Generate dummy shop sales data when shop data is loaded and revenue tab is active
+    useEffect(() => {
+        if (shop && activeTab === 'revenue') {
+            // Generate dummy sales data for this specific shop
+            const today = new Date();
+            const generateSalesData = () => {
+                // Generate dummy sales data for demonstration
+                const dummyData: ShopSale[] = [];
+                const statusOptions = ['Completed', 'Processing', 'Shipped', 'Delivered', 'Refunded'];
+                const productNames = [
+                    'Premium T-Shirt',
+                    'Designer Jeans',
+                    'Wireless Headphones',
+                    'Smart Watch',
+                    'Leather Wallet',
+                    'Desk Lamp',
+                    'Coffee Mug',
+                    'Yoga Mat',
+                    'Phone Case',
+                    'Water Bottle',
+                    'Sunglasses',
+                    'Backpack',
+                    'Running Shoes',
+                    'Wall Art',
+                ];
+
+                // Generate 50 random sales entries
+                for (let i = 1; i <= 50; i++) {
+                    const randomDate = new Date(today);
+                    // Random date within the last 3 months
+                    randomDate.setDate(today.getDate() - Math.floor(Math.random() * 90));
+
+                    const quantity = Math.floor(Math.random() * 5) + 1;
+                    const price = parseFloat((Math.random() * 100 + 10).toFixed(2));
+                    const total = quantity * price;
+                    const commission_rate = shop.commission_rate || 10; // Default 10% if not specified
+                    const commission = parseFloat(((total * commission_rate) / 100).toFixed(2));
+
+                    dummyData.push({
+                        id: i,
+                        order_id: `ORD-${Math.floor(10000 + Math.random() * 90000)}`,
+                        product_name: productNames[Math.floor(Math.random() * productNames.length)],
+                        quantity,
+                        price,
+                        total,
+                        commission,
+                        commission_rate,
+                        date: randomDate.toISOString(),
+                        status: statusOptions[Math.floor(Math.random() * statusOptions.length)],
+                    });
+                }
+
+                // Sort by date, newest first
+                return dummyData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+            };
+
+            const salesData = generateSalesData();
+            setShopSales(salesData);
+            setInitialRecords(salesData);
+
+            // Filter data based on timeFilter
+            filterDataByTime(salesData);
+
+            // Calculate summary metrics
+            calculateRevenueSummary(salesData);
+        }
+    }, [shop, activeTab, timeFilter]);
+
+    // Function to filter data by selected time period
+    const filterDataByTime = (data: ShopSale[]) => {
+        const today = new Date();
+        let filteredData = [...data];
+
+        if (timeFilter === 'weekly') {
+            // Last 7 days
+            const weekAgo = new Date(today);
+            weekAgo.setDate(today.getDate() - 7);
+            filteredData = data.filter((item) => new Date(item.date) >= weekAgo);
+        } else if (timeFilter === 'monthly') {
+            // Last 30 days
+            const monthAgo = new Date(today);
+            monthAgo.setDate(today.getDate() - 30);
+            filteredData = data.filter((item) => new Date(item.date) >= monthAgo);
+        } else if (timeFilter === 'yearly') {
+            // This year
+            const startOfYear = new Date(today.getFullYear(), 0, 1);
+            filteredData = data.filter((item) => new Date(item.date) >= startOfYear);
+        }
+
+        setInitialRecords(filteredData);
+        calculateRevenueSummary(filteredData);
+    };
+
+    // Calculate revenue summary metrics
+    const calculateRevenueSummary = (data: ShopSale[]) => {
+        const totalRevenue = data.reduce((sum, sale) => sum + sale.total, 0);
+        const totalCommission = data.reduce((sum, sale) => sum + sale.commission, 0);
+        const commissionRate = shop?.commission_rate || 10;
+        const netRevenue = totalRevenue - totalCommission;
+
+        setShopRevenueSummary({
+            totalRevenue,
+            totalCommission,
+            commissionRate,
+            netRevenue,
+        });
+    };
 
     const defaultWorkHours: WorkHours[] = [
         { day: 'Monday', open: true, startTime: '09:00', endTime: '18:00' },
@@ -136,6 +330,45 @@ const ShopPreview = () => {
     const workHours = shop?.work_hours || defaultWorkHours;
     const phoneNumbers = shop?.phone_numbers || [''];
     const gallery = shop?.gallery || [];
+
+    // Table pagination effects
+    useEffect(() => {
+        if (activeTab === 'revenue') {
+            setPage(1);
+        }
+    }, [pageSize, activeTab]);
+
+    useEffect(() => {
+        if (activeTab === 'revenue') {
+            const from = (page - 1) * pageSize;
+            const to = from + pageSize;
+            setRecords([...initialRecords.slice(from, to)]);
+        }
+    }, [page, pageSize, initialRecords, activeTab]);
+
+    // Search effect for shop sales
+    useEffect(() => {
+        if (activeTab === 'revenue' && shopSales.length > 0) {
+            const filtered = shopSales.filter((item) => {
+                return (
+                    item.product_name.toLowerCase().includes(search.toLowerCase()) ||
+                    item.order_id.toLowerCase().includes(search.toLowerCase()) ||
+                    item.status.toLowerCase().includes(search.toLowerCase())
+                );
+            });
+            setInitialRecords(filtered);
+            calculateRevenueSummary(filtered);
+        }
+    }, [search, shopSales, activeTab]);
+
+    // Sort effect for shop sales
+    useEffect(() => {
+        if (activeTab === 'revenue' && initialRecords.length > 0) {
+            const data = sortBy(initialRecords, sortStatus.columnAccessor as keyof ShopSale);
+            setInitialRecords(sortStatus.direction === 'desc' ? data.reverse() : data);
+            setPage(1);
+        }
+    }, [sortStatus, activeTab]);
 
     if (loading) {
         return <div className="flex items-center justify-center h-screen">Loading...</div>;
@@ -192,7 +425,6 @@ const ShopPreview = () => {
                     Edit Shop
                 </Link>
             </div>
-
             {/* Breadcrumb Navigation */}
             <ul className="flex space-x-2 rtl:space-x-reverse mb-4">
                 <li>
@@ -209,13 +441,11 @@ const ShopPreview = () => {
                     <span>{shop.shop_name}</span>
                 </li>
             </ul>
-
             {alert.visible && (
                 <div className="mb-4">
                     <Alert type={alert.type} title={alert.type === 'success' ? 'Success' : 'Error'} message={alert.message} onClose={() => setAlert({ ...alert, visible: false })} />
                 </div>
             )}
-
             {/* Shop Header with Cover Image */}
             <div className="mb-6 rounded-md overflow-hidden">
                 <div className="relative h-64 w-full">
@@ -238,7 +468,6 @@ const ShopPreview = () => {
                     </div>
                 </div>
             </div>
-
             {/* Tabs Navigation */}
             <div className="mb-5">
                 <div className="flex border-b border-[#ebedf2] dark:border-[#191e3a]">
@@ -251,7 +480,7 @@ const ShopPreview = () => {
                             <IconUser className="h-5 w-5" />
                             Owner Information
                         </div>
-                    </button>
+                    </button>{' '}
                     <button
                         type="button"
                         className={`p-4 border-b-2 ${activeTab === 'details' ? 'border-primary text-primary' : 'border-transparent hover:border-gray-300'}`}
@@ -262,11 +491,213 @@ const ShopPreview = () => {
                             Shop Details
                         </div>
                     </button>
+                    <button
+                        type="button"
+                        className={`p-4 border-b-2 ${activeTab === 'revenue' ? 'border-primary text-primary' : 'border-transparent hover:border-gray-300'}`}
+                        onClick={() => setActiveTab('revenue')}
+                    >
+                        <div className="flex items-center gap-2">
+                            <IconCash className="h-5 w-5" />
+                            {t('shop_revenue')}
+                        </div>
+                    </button>
                 </div>
-            </div>
-
+            </div>{' '}
             {/* Tab Content */}
             <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
+                {activeTab === 'revenue' && (
+                    <div className="lg:col-span-3">
+                        {/* Shop Revenue Content */}
+                        <div className="panel mb-5">
+                            <div className="flex flex-wrap justify-between items-center mb-5">
+                                <h5 className="text-lg font-semibold dark:text-white-light">{t('shop_revenue_summary')}</h5>
+
+                                {/* Time Filter */}
+                                <div className="flex items-center">
+                           
+                                    <div className="flex bg-white dark:bg-black border border-[#e0e6ed] dark:border-[#1b2e4b] rounded-md overflow-hidden">
+                                        <button
+                                            type="button"
+                                            className={`px-4 py-2 text-sm ${timeFilter === 'weekly' ? 'bg-primary text-white' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+                                            onClick={() => setTimeFilter('weekly')}
+                                        >
+                                            {t('weekly')}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className={`px-4 py-2 text-sm ${timeFilter === 'monthly' ? 'bg-primary text-white' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+                                            onClick={() => setTimeFilter('monthly')}
+                                        >
+                                            {t('monthly')}
+                                        </button>
+                                        <button
+                                            type="button"
+                                            className={`px-4 py-2 text-sm ${timeFilter === 'yearly' ? 'bg-primary text-white' : 'hover:bg-gray-100 dark:hover:bg-gray-800'}`}
+                                            onClick={() => setTimeFilter('yearly')}
+                                        >
+                                            {t('this_year')}
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Revenue Summary Cards */}
+                            <div className="grid grid-cols-1 sm:grid-cols-2 xl:grid-cols-4 gap-5 mb-5">
+                                {/* Total Revenue Card */}
+                                <div className="panel bg-primary/10 !border-0 border-l-4 !border-l-primary">
+                                    <div className="flex items-center">
+                                        <div className="flex-none">
+                                            <div className="rounded-md bg-primary/20 p-3">
+                                                <IconCash className="h-6 w-6 text-primary" />
+                                            </div>
+                                        </div>
+                                        <div className="ml-4">
+                                            <h5 className="text-lg font-semibold">{t('total_revenue')}</h5>
+                                            <p className="text-xl mt-1">{formatCurrency(shopRevenueSummary.totalRevenue)}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Commission Rate Card */}
+                                <div className="panel bg-success/10 !border-0 border-l-4 !border-l-success">
+                                    <div className="flex items-center">
+                                        <div className="flex-none">
+                                            <div className="rounded-md bg-success/20 p-3">
+                                                <IconCash className="h-6 w-6 text-success" />
+                                            </div>
+                                        </div>
+                                        <div className="ml-4">
+                                            <h5 className="text-lg font-semibold">{t('commission_rate')}</h5>
+                                            <p className="text-xl mt-1">{shopRevenueSummary.commissionRate}%</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Total Commission Card */}
+                                <div className="panel bg-warning/10 !border-0 border-l-4 !border-l-warning">
+                                    <div className="flex items-center">
+                                        <div className="flex-none">
+                                            <div className="rounded-md bg-warning/20 p-3">
+                                                <IconCash className="h-6 w-6 text-warning" />
+                                            </div>
+                                        </div>
+                                        <div className="ml-4">
+                                            <h5 className="text-lg font-semibold">{t('commission_amount')}</h5>
+                                            <p className="text-xl mt-1">{formatCurrency(shopRevenueSummary.totalCommission)}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Net Revenue Card */}
+                                <div className="panel bg-info/10 !border-0 border-l-4 !border-l-info">
+                                    <div className="flex items-center">
+                                        <div className="flex-none">
+                                            <div className="rounded-md bg-info/20 p-3">
+                                                <IconCash className="h-6 w-6 text-info" />
+                                            </div>
+                                        </div>
+                                        <div className="ml-4">
+                                            <h5 className="text-lg font-semibold">{t('net_revenue')}</h5>
+                                            <p className="text-xl mt-1">{formatCurrency(shopRevenueSummary.netRevenue)}</p>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Shop Sales Table */}
+                        <div className="panel border-white-light px-0 dark:border-[#1b2e4b]">
+                            <div className="invoice-table">
+                                <div className="mb-4.5 flex flex-col gap-5 px-5 md:flex-row md:items-center">
+                                    <h5 className="text-lg font-semibold dark:text-white-light">{t('sales_history')}</h5>
+                                    <div className="ltr:ml-auto rtl:mr-auto">
+                                        <input type="text" className="form-input w-auto" placeholder={t('search')} value={search} onChange={(e) => setSearch(e.target.value)} />
+                                    </div>
+                                </div>
+                                <div className="datatables pagination-padding relative">
+                                    <DataTable
+                                        className="table-hover whitespace-nowrap"
+                                        records={records}
+                                        columns={[
+                                            {
+                                                accessor: 'order_id',
+                                                title: t('order_id'),
+                                                sortable: true,
+                                                render: ({ order_id }) => <span className="font-semibold text-primary">{order_id}</span>,
+                                            },
+                                            {
+                                                accessor: 'product_name',
+                                                title: t('product'),
+                                                sortable: true,
+                                            },
+                                            {
+                                                accessor: 'quantity',
+                                                title: t('qty'),
+                                                sortable: true,
+                                            },
+                                            {
+                                                accessor: 'price',
+                                                title: t('price'),
+                                                sortable: true,
+                                                render: ({ price }) => formatCurrency(price),
+                                            },
+                                            {
+                                                accessor: 'total',
+                                                title: t('total'),
+                                                sortable: true,
+                                                render: ({ total }) => formatCurrency(total),
+                                            },
+                                            {
+                                                accessor: 'commission',
+                                                title: t('commission'),
+                                                sortable: true,
+                                                render: ({ commission }) => formatCurrency(commission),
+                                            },
+                                            {
+                                                accessor: 'date',
+                                                title: t('date'),
+                                                sortable: true,
+                                                render: ({ date }) => formatDate(date),
+                                            },
+                                            {
+                                                accessor: 'status',
+                                                title: t('status'),
+                                                sortable: true,
+                                                render: ({ status }) => (
+                                                    <span
+                                                        className={`badge ${
+                                                            status === 'Completed'
+                                                                ? 'bg-success'
+                                                                : status === 'Processing'
+                                                                  ? 'bg-info'
+                                                                  : status === 'Shipped'
+                                                                    ? 'bg-warning'
+                                                                    : status === 'Delivered'
+                                                                      ? 'bg-primary'
+                                                                      : 'bg-danger'
+                                                        }`}
+                                                    >
+                                                        {status}
+                                                    </span>
+                                                ),
+                                            },
+                                        ]}
+                                        totalRecords={initialRecords.length}
+                                        recordsPerPage={pageSize}
+                                        page={page}
+                                        onPageChange={setPage}
+                                        recordsPerPageOptions={PAGE_SIZES}
+                                        onRecordsPerPageChange={setPageSize}
+                                        sortStatus={sortStatus}
+                                        onSortStatusChange={setSortStatus}
+                                        paginationText={({ from, to, totalRecords }) => `${t('showing')} ${from} ${t('to')} ${to} ${t('of')} ${totalRecords} ${t('entries')}`}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
+
                 {activeTab === 'owner' && (
                     <>
                         {/* Owner Information */}
@@ -502,10 +933,10 @@ const ShopPreview = () => {
                                                 </svg>
                                             </div>
                                             <h6 className="text-sm font-semibold ltr:ml-3 rtl:mr-3">Products</h6>
-                                        </div>
+                                        </div>{' '}
                                         <div className="flex items-center justify-between">
-                                            <p className="text-3xl font-bold dark:text-white-light">24</p>
-                                            <span className="badge bg-success/20 text-success dark:bg-success dark:text-white-light">+3 New</span>
+                                            <p className="text-3xl font-bold dark:text-white-light">{productsCount}</p>
+                                            {newProductsCount > 0 && <span className="badge bg-success/20 text-success dark:bg-success dark:text-white-light">+{newProductsCount} New</span>}
                                         </div>
                                     </div>
 
@@ -543,8 +974,8 @@ const ShopPreview = () => {
                                             <h6 className="text-sm font-semibold ltr:ml-3 rtl:mr-3">Orders</h6>
                                         </div>
                                         <div className="flex items-center justify-between">
-                                            <p className="text-3xl font-bold dark:text-white-light">45</p>
-                                            <span className="badge bg-success/20 text-success dark:bg-success dark:text-white-light">+5 New</span>
+                                            <p className="text-3xl font-bold dark:text-white-light">{ordersCount}</p>
+                                            {newOrdersCount > 0 && <span className="badge bg-success/20 text-success dark:bg-success dark:text-white-light">+{newOrdersCount} New</span>}
                                         </div>
                                     </div>
 
@@ -566,8 +997,7 @@ const ShopPreview = () => {
                                             <h6 className="text-sm font-semibold ltr:ml-3 rtl:mr-3">Revenue</h6>
                                         </div>
                                         <div className="flex items-center justify-between">
-                                            <p className="text-3xl font-bold dark:text-white-light">$2,450</p>
-                                            <span className="badge bg-success/20 text-success dark:bg-success dark:text-white-light">+2.5%</span>
+                                            <p className="text-3xl font-bold dark:text-white-light">${shop?.balance ? shop.balance.toFixed(2) : '0.00'}</p>
                                         </div>
                                     </div>
                                 </div>

@@ -15,6 +15,8 @@ const AddLicensePage = () => {
         price: 0,
         shops: 0,
         products: 0,
+        commission_type: 'percentage',
+        commission_value: 0,
     });
     const [alert, setAlert] = useState<{ visible: boolean; message: string; type: 'success' | 'danger' }>({
         visible: false,
@@ -161,6 +163,51 @@ const AddLicensePage = () => {
                                 {t('products_allowed')} <span className="text-red-500">*</span>
                             </label>
                             <input type="number" id="products" name="products" value={form.products} onChange={handleInputChange} className="form-input" placeholder="0" required min="0" />
+                        </div>
+                    </div>
+                    {/* Commission Rate Field */}
+                    <div className="space-y-4 border-2 border-dashed border-gray-200 p-4 rounded-lg dark:border-gray-700">
+                        <div>
+                            <label htmlFor="commission_type" className="block text-sm font-bold text-gray-700 dark:text-white mb-2">
+                                {t('commission_rate')}
+                            </label>
+                            <div className="flex space-x-4 mb-4">
+                                <label className="inline-flex items-center">
+                                    <input
+                                        type="radio"
+                                        name="commission_type"
+                                        className="form-radio"
+                                        checked={form.commission_type === 'percentage'}
+                                        onChange={() => setForm({ ...form, commission_type: 'percentage' })}
+                                    />
+                                    <span className="ml-2">{t('percentage')}</span>
+                                </label>
+                                <label className="inline-flex items-center">
+                                    <input
+                                        type="radio"
+                                        name="commission_type"
+                                        className="form-radio"
+                                        checked={form.commission_type === 'fixed'}
+                                        onChange={() => setForm({ ...form, commission_type: 'fixed' })}
+                                    />
+                                    <span className="ml-2">{t('fixed')}</span>
+                                </label>
+                            </div>
+                            <div className="flex">
+                                <span className="inline-flex items-center px-3 bg-gray-100 text-gray-600 dark:bg-gray-700 dark:text-gray-400 border border-r-0 border-gray-300 dark:border-gray-600 rounded-l-md">
+                                    {form.commission_type === 'percentage' ? '%' : '$'}
+                                </span>
+                                <input
+                                    type="number"
+                                    id="commission_value"
+                                    name="commission_value"
+                                    step="0.01"
+                                    value={form.commission_value}
+                                    onChange={handleInputChange}
+                                    className="form-input rounded-l-none"
+                                    placeholder="0.00"
+                                />
+                            </div>
                         </div>
                     </div>
                     {/* Action Buttons */}
