@@ -14,6 +14,7 @@ import IconUser from '@/components/icon/icon-user';
 import IconMail from '@/components/icon/icon-mail';
 import IconX from '@/components/icon/icon-x';
 import IconCash from '@/components/icon/icon-cash-banknotes';
+import IconCreditCard from '@/components/icon/icon-credit-card';
 import { DataTableSortStatus, DataTable } from 'mantine-datatable';
 import { sortBy } from 'lodash';
 import { getTranslation } from '@/i18n';
@@ -50,6 +51,16 @@ interface ShopSale {
     status: string;
 }
 
+interface ShopTransaction {
+    id: number;
+    transaction_id: string;
+    amount: number;
+    date: string;
+    status: 'pending' | 'completed' | 'failed';
+    description: string;
+    payment_method: string;
+}
+
 interface Shop {
     id: number;
     shop_name: string;
@@ -84,11 +95,10 @@ const ShopPreview = () => {
     const params = useParams();
     const id = params?.id as string;
     const { t } = getTranslation();
-
     const router = useRouter();
     const [shop, setShop] = useState<Shop | null>(null);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'owner' | 'details' | 'revenue'>('owner');
+    const [activeTab, setActiveTab] = useState<'owner' | 'details' | 'revenue' | 'transactions'>('owner');
     const [categories, setCategories] = useState<Category[]>([]);
     const [unauthorized, setUnauthorized] = useState(false);
     const [productsCount, setProductsCount] = useState<number>(0);
@@ -118,6 +128,22 @@ const ShopPreview = () => {
         message: '',
         type: 'danger',
     });
+
+    // Transaction-related state
+    const [shopTransactions, setShopTransactions] = useState<ShopTransaction[]>([]);
+    const [transactionRecords, setTransactionRecords] = useState<ShopTransaction[]>([]);
+    const [transactionSearch, setTransactionSearch] = useState('');
+    const [transactionPage, setTransactionPage] = useState(1);
+    const [transactionPageSize, setTransactionPageSize] = useState(PAGE_SIZES[0]);
+    const [transactionSortStatus, setTransactionSortStatus] = useState<DataTableSortStatus>({
+        columnAccessor: 'date',
+        direction: 'desc',
+    });
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [paymentAmount, setPaymentAmount] = useState('');
+    const [paymentDescription, setPaymentDescription] = useState('');
+    const [sendingPayment, setSendingPayment] = useState(false);
+    const [platformBalance, setPlatformBalance] = useState(2450.75); // Dummy balance owed to shop
 
     // Format currency helper function
     const formatCurrency = (amount: number) => {
@@ -317,6 +343,116 @@ const ShopPreview = () => {
         });
     };
 
+    // Generate dummy shop transaction data when transactions tab is active
+    useEffect(() => {
+        if (shop && activeTab === 'transactions') {
+            const generateTransactionData = () => {
+                const today = new Date();
+                const dummyTransactions: ShopTransaction[] = [];
+                const statusOptions: ('pending' | 'completed' | 'failed')[] = ['completed', 'pending', 'failed'];
+                const paymentMethods = ['Bank Transfer', 'PayPal', 'Stripe', 'Wire Transfer'];
+                const descriptions = ['Monthly commission payout', 'Weekly revenue transfer', 'Bonus payment', 'Performance incentive', 'Platform fee refund', 'Sale commission'];
+
+                // Generate 25 transaction entries
+                for (let i = 1; i <= 25; i++) {
+                    const randomDate = new Date(today);
+                    randomDate.setDate(today.getDate() - Math.floor(Math.random() * 60)); // Last 2 months
+
+                    const amount = parseFloat((Math.random() * 500 + 50).toFixed(2));
+                    const status = statusOptions[Math.floor(Math.random() * statusOptions.length)];
+
+                    dummyTransactions.push({
+                        id: i,
+                        transaction_id: `TXN-${Math.floor(100000 + Math.random() * 900000)}`,
+                        amount,
+                        date: randomDate.toISOString(),
+                        status,
+                        description: descriptions[Math.floor(Math.random() * descriptions.length)],
+                        payment_method: paymentMethods[Math.floor(Math.random() * paymentMethods.length)],
+                    });
+                }
+
+                return dummyTransactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
+            };
+
+            const transactionData = generateTransactionData();
+            setShopTransactions(transactionData);
+            setTransactionRecords(transactionData);
+        }
+    }, [shop, activeTab]);
+
+    // Transaction search and pagination
+    useEffect(() => {
+        setTransactionPage(1);
+    }, [transactionPageSize]);
+
+    useEffect(() => {
+        const from = (transactionPage - 1) * transactionPageSize;
+        const to = from + transactionPageSize;
+        setTransactionRecords([...shopTransactions].slice(from, to));
+    }, [transactionPage, transactionPageSize, shopTransactions]);
+
+    useEffect(() => {
+        const filteredTransactions = shopTransactions.filter((item) => {
+            return (
+                item.transaction_id.toLowerCase().includes(transactionSearch.toLowerCase()) ||
+                item.description.toLowerCase().includes(transactionSearch.toLowerCase()) ||
+                item.payment_method.toLowerCase().includes(transactionSearch.toLowerCase()) ||
+                item.status.toLowerCase().includes(transactionSearch.toLowerCase())
+            );
+        });
+
+        const sortedTransactions = sortBy(filteredTransactions, transactionSortStatus.columnAccessor);
+        setTransactionRecords(transactionSortStatus.direction === 'desc' ? sortedTransactions.reverse() : sortedTransactions);
+    }, [transactionSearch, transactionSortStatus, shopTransactions]);
+
+    // Handle sending payment
+    const handleSendPayment = async () => {
+        if (!paymentAmount || parseFloat(paymentAmount) <= 0) {
+            setAlert({ visible: true, message: 'Please enter a valid payment amount', type: 'danger' });
+            return;
+        }
+
+        setSendingPayment(true);
+
+        try {
+            // Simulate API call delay
+            await new Promise((resolve) => setTimeout(resolve, 2000));
+
+            const newTransaction: ShopTransaction = {
+                id: shopTransactions.length + 1,
+                transaction_id: `TXN-${Math.floor(100000 + Math.random() * 900000)}`,
+                amount: parseFloat(paymentAmount),
+                date: new Date().toISOString(),
+                status: 'pending',
+                description: paymentDescription || 'Admin payment',
+                payment_method: 'Bank Transfer',
+            };
+
+            const updatedTransactions = [newTransaction, ...shopTransactions];
+            setShopTransactions(updatedTransactions);
+            setTransactionRecords(updatedTransactions);
+
+            // Update platform balance
+            setPlatformBalance((prev) => prev - parseFloat(paymentAmount));
+
+            setAlert({ visible: true, message: 'Payment sent successfully!', type: 'success' });
+            setShowPaymentModal(false);
+            setPaymentAmount('');
+            setPaymentDescription('');
+        } catch (error) {
+            setAlert({ visible: true, message: 'Failed to send payment', type: 'danger' });
+        } finally {
+            setSendingPayment(false);
+        }
+    };
+
+    // Handle send all balance
+    const handleSendAllBalance = () => {
+        setPaymentAmount(platformBalance.toString());
+        setPaymentDescription('Complete balance payout');
+    };
+
     const defaultWorkHours: WorkHours[] = [
         { day: 'Monday', open: true, startTime: '09:00', endTime: '18:00' },
         { day: 'Tuesday', open: true, startTime: '09:00', endTime: '18:00' },
@@ -490,7 +626,7 @@ const ShopPreview = () => {
                             <IconMapPin className="h-5 w-5" />
                             Shop Details
                         </div>
-                    </button>
+                    </button>{' '}
                     <button
                         type="button"
                         className={`p-4 border-b-2 ${activeTab === 'revenue' ? 'border-primary text-primary' : 'border-transparent hover:border-gray-300'}`}
@@ -499,6 +635,16 @@ const ShopPreview = () => {
                         <div className="flex items-center gap-2">
                             <IconCash className="h-5 w-5" />
                             {t('shop_revenue')}
+                        </div>
+                    </button>
+                    <button
+                        type="button"
+                        className={`p-4 border-b-2 ${activeTab === 'transactions' ? 'border-primary text-primary' : 'border-transparent hover:border-gray-300'}`}
+                        onClick={() => setActiveTab('transactions')}
+                    >
+                        <div className="flex items-center gap-2">
+                            <IconCreditCard className="h-5 w-5" />
+                            {t('shop_transactions')}
                         </div>
                     </button>
                 </div>
@@ -514,7 +660,6 @@ const ShopPreview = () => {
 
                                 {/* Time Filter */}
                                 <div className="flex items-center">
-                           
                                     <div className="flex bg-white dark:bg-black border border-[#e0e6ed] dark:border-[#1b2e4b] rounded-md overflow-hidden">
                                         <button
                                             type="button"
@@ -993,7 +1138,7 @@ const ShopPreview = () => {
                                                         strokeLinecap="round"
                                                     />
                                                 </svg>
-                                            </div>
+                                            </div>{' '}
                                             <h6 className="text-sm font-semibold ltr:ml-3 rtl:mr-3">Revenue</h6>
                                         </div>
                                         <div className="flex items-center justify-between">
@@ -1004,6 +1149,158 @@ const ShopPreview = () => {
                             </div>
                         </div>
                     </>
+                )}
+
+                {activeTab === 'transactions' && (
+                    <div className="lg:col-span-3">
+                        {/* Shop Transactions Content */}
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                            {/* Platform Balance Card */}
+                            <div className="lg:col-span-3">
+                                <div className="panel bg-gradient-to-r from-blue-500 to-blue-600 text-white">
+                                    <div className="flex items-center justify-between">
+                                        <div>
+                                            <h5 className="text-lg font-semibold mb-2">{t('shop_balance')}</h5>
+                                            <p className="text-3xl font-bold">{formatCurrency(platformBalance)}</p>
+                                            <p className="text-blue-100 mt-1">{t('amount_owed_to_shop')}</p>
+                                        </div>
+                                        <div className="text-right">
+                                            <button className="btn btn-primary bg-white text-blue-600 hover:bg-gray-100" onClick={() => setShowPaymentModal(true)}>
+                                                {t('send_payment')}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Transaction History Table */}
+                        <div className="panel border-white-light px-0 dark:border-[#1b2e4b]">
+                            <div className="invoice-table">
+                                <div className="mb-4.5 flex flex-col gap-5 px-5 md:flex-row md:items-center">
+                                    <h5 className="text-lg font-semibold dark:text-white-light">{t('transaction_history')}</h5>
+                                    <div className="ltr:ml-auto rtl:mr-auto">
+                                        <input
+                                            type="text"
+                                            className="form-input w-auto"
+                                            placeholder={t('search_transactions')}
+                                            value={transactionSearch}
+                                            onChange={(e) => setTransactionSearch(e.target.value)}
+                                        />
+                                    </div>
+                                </div>
+                                <div className="datatables pagination-padding relative">
+                                    <DataTable
+                                        className="table-hover whitespace-nowrap"
+                                        records={transactionRecords}
+                                        columns={[
+                                            {
+                                                accessor: 'transaction_id',
+                                                title: t('transaction_id'),
+                                                sortable: true,
+                                                render: ({ transaction_id }) => <div className="font-mono text-sm text-primary">{transaction_id}</div>,
+                                            },
+                                            {
+                                                accessor: 'amount',
+                                                title: t('amount'),
+                                                sortable: true,
+                                                render: ({ amount }) => <div className="font-semibold text-success">+{formatCurrency(amount)}</div>,
+                                            },
+                                            {
+                                                accessor: 'description',
+                                                title: t('description'),
+                                                sortable: true,
+                                            },
+                                            {
+                                                accessor: 'payment_method',
+                                                title: t('payment_method'),
+                                                sortable: true,
+                                            },
+                                            {
+                                                accessor: 'date',
+                                                title: t('date'),
+                                                sortable: true,
+                                                render: ({ date }) => formatDate(date),
+                                            },
+                                            {
+                                                accessor: 'status',
+                                                title: t('status'),
+                                                sortable: true,
+                                                render: ({ status }) => (
+                                                    <span className={`badge ${status === 'completed' ? 'bg-success' : status === 'pending' ? 'bg-warning' : 'bg-danger'}`}>{t(status)}</span>
+                                                ),
+                                            },
+                                        ]}
+                                        totalRecords={shopTransactions.length}
+                                        recordsPerPage={transactionPageSize}
+                                        page={transactionPage}
+                                        onPageChange={setTransactionPage}
+                                        recordsPerPageOptions={PAGE_SIZES}
+                                        onRecordsPerPageChange={setTransactionPageSize}
+                                        sortStatus={transactionSortStatus}
+                                        onSortStatusChange={setTransactionSortStatus}
+                                        paginationText={({ from, to, totalRecords }) => `${t('showing')} ${from} ${t('to')} ${to} ${t('of')} ${totalRecords} ${t('entries')}`}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Payment Modal */}
+                        {showPaymentModal && (
+                            <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                                <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
+                                    <div className="flex justify-between items-center mb-4">
+                                        <h3 className="text-lg font-semibold dark:text-white">{t('send_payment')}</h3>
+                                        <button onClick={() => setShowPaymentModal(false)} className="text-gray-500 hover:text-gray-700">
+                                            <IconX className="w-5 h-5" />
+                                        </button>
+                                    </div>
+                                    <div className="space-y-4">
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('payment_amount')}</label>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                min="0"
+                                                className="form-input w-full"
+                                                placeholder="0.00"
+                                                value={paymentAmount}
+                                                onChange={(e) => setPaymentAmount(e.target.value)}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-sm font-medium text-gray-700 dark:text-gray-300 mb-1">{t('description')}</label>
+                                            <input
+                                                type="text"
+                                                className="form-input w-full"
+                                                placeholder={t('payment_description_placeholder')}
+                                                value={paymentDescription}
+                                                onChange={(e) => setPaymentDescription(e.target.value)}
+                                            />
+                                        </div>
+                                        <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded">
+                                            <p className="text-sm text-gray-600 dark:text-gray-400">
+                                                {t('current_balance')}: <span className="font-semibold">{formatCurrency(platformBalance)}</span>
+                                            </p>
+                                        </div>
+                                        <div className="flex gap-3">
+                                            <button type="button" className="btn btn-outline-primary flex-1" onClick={handleSendAllBalance}>
+                                                {t('send_all_balance')}
+                                            </button>
+                                        </div>
+                                        <div className="flex gap-3 pt-4 border-t">
+                                            <button type="button" className="btn btn-outline-danger flex-1" onClick={() => setShowPaymentModal(false)}>
+                                                {t('cancel')}
+                                            </button>
+                                            <button type="button" className="btn btn-primary flex-1" onClick={handleSendPayment} disabled={sendingPayment}>
+                                                {sendingPayment ? t('sending') : t('send_payment')}
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
                 )}
             </div>
         </div>

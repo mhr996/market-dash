@@ -4,7 +4,21 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import supabase from '@/lib/supabase';
 import IconArrowBackward from '@/components/icon/icon-arrow-backward';
+import IconEdit from '@/components/icon/icon-edit';
+import { DataTable, DataTableSortStatus } from 'mantine-datatable';
+import { sortBy } from 'lodash';
 import { getTranslation } from '@/i18n';
+
+interface PaymentHistory {
+    id: number;
+    subscription_id: number;
+    amount: number;
+    payment_date: string;
+    payment_method: string;
+    status: string;
+    transaction_id?: string;
+    created_at: string;
+}
 
 interface Subscription {
     id: number;
@@ -39,8 +53,22 @@ interface SubscriptionDetailsPageProps {
 const SubscriptionDetailsPage = ({ params }: SubscriptionDetailsPageProps) => {
     const router = useRouter();
     const [subscription, setSubscription] = useState<Subscription | null>(null);
+    const [paymentHistory, setPaymentHistory] = useState<PaymentHistory[]>([]);
     const [loading, setLoading] = useState(true);
+    const [loadingPayments, setLoadingPayments] = useState(false);
     const { t } = getTranslation();
+
+    // Pagination state for payment history
+    const [page, setPage] = useState(1);
+    const PAGE_SIZES = [10, 20, 30, 50];
+    const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
+    const [initialRecords, setInitialRecords] = useState<PaymentHistory[]>([]);
+    const [records, setRecords] = useState<PaymentHistory[]>([]);
+    const [search, setSearch] = useState('');
+    const [sortStatus, setSortStatus] = useState<DataTableSortStatus>({
+        columnAccessor: 'payment_date',
+        direction: 'desc',
+    });
 
     useEffect(() => {
         const fetchSubscription = async () => {
@@ -49,6 +77,9 @@ const SubscriptionDetailsPage = ({ params }: SubscriptionDetailsPageProps) => {
 
                 if (error) throw error;
                 setSubscription(data);
+
+                // Fetch payment history for this subscription
+                await fetchPaymentHistory(data.id);
             } catch (error) {
                 console.error('Error fetching subscription:', error);
             } finally {
@@ -58,6 +89,103 @@ const SubscriptionDetailsPage = ({ params }: SubscriptionDetailsPageProps) => {
 
         fetchSubscription();
     }, [params.id]);
+
+    const fetchPaymentHistory = async (subscriptionId: number) => {
+        setLoadingPayments(true);
+        try {
+            // Generate dummy payment history data for demonstration
+            const dummyPayments: PaymentHistory[] = [
+                {
+                    id: 1,
+                    subscription_id: subscriptionId,
+                    amount: subscription?.license?.price || 0,
+                    payment_date: '2024-01-15',
+                    payment_method: 'Credit Card',
+                    status: 'Completed',
+                    transaction_id: 'txn_1234567890',
+                    created_at: '2024-01-15T10:30:00Z',
+                },
+                {
+                    id: 2,
+                    subscription_id: subscriptionId,
+                    amount: subscription?.license?.price || 0,
+                    payment_date: '2024-02-15',
+                    payment_method: 'Credit Card',
+                    status: 'Completed',
+                    transaction_id: 'txn_2345678901',
+                    created_at: '2024-02-15T10:30:00Z',
+                },
+                {
+                    id: 3,
+                    subscription_id: subscriptionId,
+                    amount: subscription?.license?.price || 0,
+                    payment_date: '2024-03-15',
+                    payment_method: 'PayPal',
+                    status: 'Completed',
+                    transaction_id: 'txn_3456789012',
+                    created_at: '2024-03-15T10:30:00Z',
+                },
+                {
+                    id: 4,
+                    subscription_id: subscriptionId,
+                    amount: subscription?.license?.price || 0,
+                    payment_date: '2024-04-15',
+                    payment_method: 'Credit Card',
+                    status: 'Failed',
+                    transaction_id: 'txn_4567890123',
+                    created_at: '2024-04-15T10:30:00Z',
+                },
+                {
+                    id: 5,
+                    subscription_id: subscriptionId,
+                    amount: subscription?.license?.price || 0,
+                    payment_date: '2024-05-15',
+                    payment_method: 'Bank Transfer',
+                    status: 'Completed',
+                    transaction_id: 'txn_5678901234',
+                    created_at: '2024-05-15T10:30:00Z',
+                },
+            ];
+
+            setPaymentHistory(dummyPayments);
+            setInitialRecords(dummyPayments);
+        } catch (error) {
+            console.error('Error fetching payment history:', error);
+        } finally {
+            setLoadingPayments(false);
+        }
+    };
+
+    // Pagination effects for payment history
+    useEffect(() => {
+        setPage(1);
+    }, [pageSize]);
+
+    useEffect(() => {
+        const from = (page - 1) * pageSize;
+        const to = from + pageSize;
+        setRecords([...initialRecords.slice(from, to)]);
+    }, [page, pageSize, initialRecords]);
+
+    useEffect(() => {
+        setInitialRecords(
+            paymentHistory.filter((payment) => {
+                const searchTerm = search.toLowerCase();
+                return (
+                    payment.transaction_id?.toLowerCase().includes(searchTerm) ||
+                    payment.payment_method.toLowerCase().includes(searchTerm) ||
+                    payment.status.toLowerCase().includes(searchTerm) ||
+                    payment.amount.toString().includes(searchTerm)
+                );
+            }),
+        );
+    }, [paymentHistory, search]);
+
+    useEffect(() => {
+        const sorted = sortBy(initialRecords, sortStatus.columnAccessor as keyof PaymentHistory);
+        setRecords(sortStatus.direction === 'desc' ? sorted.reverse() : sorted);
+        setPage(1);
+    }, [sortStatus, initialRecords]);
 
     if (loading) {
         return (
@@ -80,35 +208,36 @@ const SubscriptionDetailsPage = ({ params }: SubscriptionDetailsPageProps) => {
 
     return (
         <div className="container mx-auto p-6">
-            {/* Breadcrumb Navigation with back button */}
-            <div className="flex items-center gap-5 mb-6">
-                {' '}
-                <div onClick={() => router.back()}>
+            {/* Header with back button and edit button */}
+            <div className="flex flex-wrap items-center justify-between gap-4 mb-6">
+                <div onClick={() => router.back()} className="cursor-pointer">
                     <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 mb-4 cursor-pointer text-primary rtl:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                     </svg>
                 </div>
-                {/* Breadcrumb Navigation */}{' '}
-                <ul className="flex space-x-2 rtl:space-x-reverse mb-4">
-                    <li>
-                        <Link href="/" className="text-primary hover:underline">
-                            {t('home')}
-                        </Link>
-                    </li>
-                    <li className="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
-                        <Link href="/subscriptions" className="text-primary hover:underline">
-                            {t('subscriptions')}
-                        </Link>
-                    </li>
-                    <li className="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
-                        <span>
-                            {t('subscriptions')} #{subscription.id}
-                        </span>
-                    </li>
-                </ul>
+                <Link href={`/subscriptions/edit/${subscription.id}`} className="btn btn-primary flex items-center gap-2">
+                    <IconEdit className="h-5 w-5" />
+                    {t('edit_subscription')}
+                </Link>
             </div>
-
-
+            {/* Breadcrumb Navigation */}
+            <ul className="flex space-x-2 rtl:space-x-reverse mb-4">
+                <li>
+                    <Link href="/" className="text-primary hover:underline">
+                        {t('home')}
+                    </Link>
+                </li>
+                <li className="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
+                    <Link href="/subscriptions" className="text-primary hover:underline">
+                        {t('subscriptions')}
+                    </Link>
+                </li>
+                <li className="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
+                    <span>
+                        {t('subscriptions')} #{subscription.id}
+                    </span>
+                </li>
+            </ul>
             {/* Subscription details */}
             <div className="grid grid-cols-1 lg:grid-cols-12 gap-6">
                 {/* Main Subscription Info */}
@@ -225,6 +354,78 @@ const SubscriptionDetailsPage = ({ params }: SubscriptionDetailsPageProps) => {
                                     {t('back_to_subscriptions')}
                                 </Link>
                             </div>
+                        </div>
+                    </div>
+                </div>
+            </div>{' '}
+            {/* Subscription History */}
+            <div className="mt-8">
+                <div className="panel border-white-light px-0 dark:border-[#1b2e4b]">
+                    <div className="invoice-table">
+                        <div className="mb-4.5 flex flex-col gap-5 px-5 md:flex-row md:items-center">
+                            <h5 className="text-lg font-semibold dark:text-white-light">{t('payment_history')}</h5>
+                            <div className="ltr:ml-auto rtl:mr-auto">
+                                <input type="text" className="form-input w-auto" placeholder={t('search')} value={search} onChange={(e) => setSearch(e.target.value)} />
+                            </div>
+                        </div>
+                        <div className="datatables pagination-padding relative">
+                            <DataTable
+                                className={`${loadingPayments ? 'filter blur-sm pointer-events-none' : 'table-hover whitespace-nowrap'}`}
+                                records={records}
+                                columns={[
+                                    {
+                                        accessor: 'id',
+                                        title: t('payment_id'),
+                                        sortable: true,
+                                        render: ({ id }) => <strong className="text-info">#{id}</strong>,
+                                    },
+                                    {
+                                        accessor: 'amount',
+                                        title: t('amount'),
+                                        sortable: true,
+                                        render: ({ amount }) => <span className="font-semibold text-success">${amount}</span>,
+                                    },
+                                    {
+                                        accessor: 'payment_date',
+                                        title: t('payment_date'),
+                                        sortable: true,
+                                        render: ({ payment_date }) => new Date(payment_date).toLocaleDateString(),
+                                    },
+                                    {
+                                        accessor: 'payment_method',
+                                        title: t('payment_method'),
+                                        sortable: true,
+                                    },
+                                    {
+                                        accessor: 'status',
+                                        title: t('status'),
+                                        sortable: true,
+                                        render: ({ status }) => (
+                                            <span
+                                                className={`badge ${status === 'Completed' ? 'bg-success' : status === 'Pending' ? 'bg-warning' : status === 'Failed' ? 'bg-danger' : 'bg-secondary'}`}
+                                            >
+                                                {status}
+                                            </span>
+                                        ),
+                                    },
+                                    {
+                                        accessor: 'transaction_id',
+                                        title: t('transaction_id'),
+                                        sortable: true,
+                                        render: ({ transaction_id }) => <span className="text-sm text-gray-600 dark:text-gray-400 font-mono">{transaction_id}</span>,
+                                    },
+                                ]}
+                                totalRecords={initialRecords.length}
+                                recordsPerPage={pageSize}
+                                page={page}
+                                onPageChange={(p) => setPage(p)}
+                                recordsPerPageOptions={PAGE_SIZES}
+                                onRecordsPerPageChange={setPageSize}
+                                sortStatus={sortStatus}
+                                onSortStatusChange={setSortStatus}
+                                minHeight={200}
+                                paginationText={({ from, to, totalRecords }) => `${t('showing')} ${from} ${t('to')} ${to} ${t('of')} ${totalRecords} ${t('entries')}`}
+                            />
                         </div>
                     </div>
                 </div>

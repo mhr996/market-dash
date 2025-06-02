@@ -1,5 +1,6 @@
 'use client';
 import IconEye from '@/components/icon/icon-eye';
+import IconEdit from '@/components/icon/icon-edit';
 import { sortBy } from 'lodash';
 import { DataTableSortStatus, DataTable } from 'mantine-datatable';
 import Link from 'next/link';
@@ -178,6 +179,9 @@ const SubscriptionsList = () => {
                                     <div className="mx-auto flex w-max items-center gap-4">
                                         <Link href={`/subscriptions/preview/${id}`} className="flex hover:text-primary">
                                             <IconEye />
+                                        </Link>
+                                        <Link href={`/subscriptions/edit/${id}`} className="flex hover:text-info">
+                                            <IconEdit />
                                         </Link>
                                     </div>
                                 ),
