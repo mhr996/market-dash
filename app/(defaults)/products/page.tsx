@@ -74,6 +74,7 @@ const ProductsList = () => {
                 if (error) throw error;
 
                 setItems(data as Product[]);
+                console.log('Fetched products:', data);
             } catch (error) {
                 console.error('Error fetching products:', error);
             } finally {

@@ -90,12 +90,9 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                // Fetch user's shops
-                const { data: userData } = await supabase.auth.getUser();
-                if (userData?.user) {
-                    const { data: userShops } = await supabase.from('shops').select('id, shop_name').eq('owner', userData.user.id);
-                    if (userShops) setShops(userShops);
-                }
+                // Fetch all shops (admin can assign any shop to any product)
+                const { data: allShops } = await supabase.from('shops').select('id, shop_name').order('shop_name', { ascending: true });
+                if (allShops) setShops(allShops);
 
                 // Fetch categories
                 const { data: categoriesData } = await supabase.from('categories').select('*').order('title', { ascending: true });
