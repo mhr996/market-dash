@@ -37,3 +37,5 @@ yarn-error.log*
 next-env.d.ts
 
 full-ui-example
+
+current_db.sql
