@@ -51,7 +51,7 @@ table tr .mantine-Checkbox-root {
     @apply bg-white-light/20 dark:!bg-[#1a2941]/40;
 }
 .datatables table {
-    @apply font-nunito !text-black dark:!text-white-dark;
+    @apply ltr:font-nunito rtl:font-almarai !text-black dark:!text-white-dark;
 }
 .datatables .mantine-Text-root {
     @apply flex-none !font-nunito text-sm font-medium;
