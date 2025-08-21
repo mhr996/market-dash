@@ -111,7 +111,7 @@ const StatisticsPage = () => {
                 `,
                 )
                 .order('visit_count', { ascending: false })
-                .limit(10);
+                .limit(50);
 
             // Get product and order counts for each shop
             const shopsWithCounts = await Promise.all(
@@ -153,7 +153,7 @@ const StatisticsPage = () => {
                 `,
                 )
                 .order('view_count', { ascending: false })
-                .limit(10);
+                .limit(50);
 
             setTopProducts(
                 (topProductsData || []).map((product) => ({
@@ -181,7 +181,7 @@ const StatisticsPage = () => {
                 `,
                 )
                 .order('cart_count', { ascending: false })
-                .limit(10);
+                .limit(50);
 
             setMostCartedProducts(
                 (mostCartedData || []).map((product) => ({

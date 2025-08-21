@@ -36,6 +36,7 @@ import IconMenuAuthentication from '@/components/icon/menu/icon-menu-authenticat
 import IconMenuDocumentation from '@/components/icon/menu/icon-menu-documentation';
 import { usePathname } from 'next/navigation';
 import { getTranslation } from '@/i18n';
+import IconTrendingUp from '../icon/icon-trending-up';
 
 const Sidebar = () => {
     const dispatch = useDispatch();
@@ -173,7 +174,7 @@ const Sidebar = () => {
                                     <li className="nav-item">
                                         <Link href="/statistics" className="group">
                                             <div className="flex items-center">
-                                                <IconMenuCharts className="shrink-0 group-hover:!text-primary" />
+                                                <IconTrendingUp className="shrink-0 group-hover:!text-primary" />
                                                 <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">{t('statistics')}</span>
                                             </div>
                                         </Link>
