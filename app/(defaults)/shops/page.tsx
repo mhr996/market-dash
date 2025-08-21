@@ -42,8 +42,8 @@ const ShopsList = () => {
 
     const [search, setSearch] = useState('');
     const [sortStatus, setSortStatus] = useState<DataTableSortStatus>({
-        columnAccessor: 'shop_name',
-        direction: 'asc',
+        columnAccessor: 'id',
+        direction: 'desc',
     });
 
     // New state for confirm modal and alert.
@@ -181,7 +181,7 @@ const ShopsList = () => {
                                         <div>{shop_name}</div>
                                     </div>
                                 ),
-                            }, 
+                            },
                             {
                                 accessor: 'owner',
                                 title: t('shop_owner'),

@@ -40,8 +40,8 @@ const OrdersList = () => {
 
     const [search, setSearch] = useState('');
     const [sortStatus, setSortStatus] = useState<DataTableSortStatus>({
-        columnAccessor: 'name',
-        direction: 'asc',
+        columnAccessor: 'id',
+        direction: 'desc',
     });
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [orderToDelete, setOrderToDelete] = useState<OrderData | null>(null);

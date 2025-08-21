@@ -66,7 +66,7 @@ const SubscriptionDetailsPage = ({ params }: SubscriptionDetailsPageProps) => {
     const [records, setRecords] = useState<PaymentHistory[]>([]);
     const [search, setSearch] = useState('');
     const [sortStatus, setSortStatus] = useState<DataTableSortStatus>({
-        columnAccessor: 'payment_date',
+        columnAccessor: 'id',
         direction: 'desc',
     });
 

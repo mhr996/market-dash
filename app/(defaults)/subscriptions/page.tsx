@@ -40,7 +40,7 @@ const SubscriptionsList = () => {
     const [search, setSearch] = useState('');
     const [sortStatus, setSortStatus] = useState<DataTableSortStatus>({
         columnAccessor: 'id',
-        direction: 'asc',
+        direction: 'desc',
     });
 
     // State for alert

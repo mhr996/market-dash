@@ -96,7 +96,7 @@ const RevenuePage = () => {
     const [records, setRecords] = useState<ShopRevenue[]>([]);
     const [search, setSearch] = useState('');
     const [sortStatus, setSortStatus] = useState<DataTableSortStatus>({
-        columnAccessor: 'revenue',
+        columnAccessor: 'id',
         direction: 'desc',
     });
 

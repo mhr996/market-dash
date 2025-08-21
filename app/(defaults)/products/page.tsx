@@ -54,8 +54,8 @@ const ProductsList = () => {
 
     const [search, setSearch] = useState('');
     const [sortStatus, setSortStatus] = useState<DataTableSortStatus>({
-        columnAccessor: 'title',
-        direction: 'asc',
+        columnAccessor: 'id',
+        direction: 'desc',
     });
 
     // Modal and alert states

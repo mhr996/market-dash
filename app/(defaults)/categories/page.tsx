@@ -33,8 +33,8 @@ const CategoriesList = () => {
 
     const [search, setSearch] = useState('');
     const [sortStatus, setSortStatus] = useState<DataTableSortStatus>({
-        columnAccessor: 'title',
-        direction: 'asc',
+        columnAccessor: 'id',
+        direction: 'desc',
     });
 
     // State for confirm modal and alert

@@ -33,7 +33,6 @@
 /* file upload with preview */
 @import './file-upload-preview.css';
 
-
 /* form element*/
 @import './form-elements.css';
 
@@ -54,6 +53,19 @@
 
     body.dark {
         @apply bg-[#060818];
+    }
+
+    /* Arabic Language Support */
+    [dir='rtl'] body {
+        @apply font-almarai;
+    }
+
+    [dir='rtl'] * {
+        direction: rtl;
+    }
+
+    [dir='rtl'] .ltr {
+        direction: ltr;
     }
 
     /* Panel */
