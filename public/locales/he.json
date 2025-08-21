@@ -443,5 +443,6 @@
     "send_all_balance": "שלח את כל היתרה",
     "sending": "שולח...",
     "completed": "הושלם",
-    "failed": "נכשל"
+    "failed": "נכשל",
+    "select_logo": "בחר לוגו"
 }

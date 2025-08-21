@@ -488,5 +488,6 @@
     "sending": "جاري الإرسال...",
     "completed": "مكتمل",
     "pending": "قيد الانتظار",
-    "failed": "فشل"
+    "failed": "فشل",
+    "select_logo": "اختر اللوغو"
 }

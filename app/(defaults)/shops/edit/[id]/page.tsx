@@ -4,7 +4,8 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import supabase from '@/lib/supabase';
 import { Alert } from '@/components/elements/alerts/elements-alerts-default';
-import ImageUpload from '@/components/image-upload/image-upload';
+import ImprovedImageUpload from '@/components/image-upload/improved-image-upload';
+import StorageManager from '@/utils/storage-manager';
 import IconPhone from '@/components/icon/icon-phone';
 import IconMapPin from '@/components/icon/icon-map-pin';
 import IconClock from '@/components/icon/icon-clock';
@@ -77,8 +78,6 @@ const EditShop = () => {
     const [searchCategoryTerm, setSearchCategoryTerm] = useState('');
     const categoryRef = useRef<HTMLDivElement>(null);
     const statusRef = useRef<HTMLDivElement>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
 
     const [form, setForm] = useState<Shop>({
         id: 0,
@@ -177,42 +176,6 @@ const EditShop = () => {
         }));
     };
 
-    const handleLogoUpload = async (url: string) => {
-        try {
-            const { error } = await supabase.from('shops').update({ logo_url: url }).eq('id', id).select();
-
-            if (error) throw error;
-
-            setForm((prev) => ({
-                ...prev,
-                logo_url: url,
-            }));
-
-            setAlert({ visible: true, message: 'Logo updated successfully!', type: 'success' });
-        } catch (error) {
-            console.error('Error updating logo:', error);
-            setAlert({ visible: true, message: 'Error updating logo', type: 'danger' });
-        }
-    };
-
-    const handleCoverImageUpload = async (url: string) => {
-        try {
-            const { error } = await supabase.from('shops').update({ cover_image_url: url }).eq('id', id).select();
-
-            if (error) throw error;
-
-            setForm((prev) => ({
-                ...prev,
-                cover_image_url: url,
-            }));
-
-            setAlert({ visible: true, message: 'Cover image updated successfully!', type: 'success' });
-        } catch (error) {
-            console.error('Error updating cover image:', error);
-            setAlert({ visible: true, message: 'Error updating cover image', type: 'danger' });
-        }
-    };
-
     const handleWorkHoursChange = (index: number, field: keyof WorkHours, value: string | boolean) => {
         setForm((prev) => {
             const updatedWorkHours = [...(prev.work_hours || defaultWorkHours)];
@@ -257,33 +220,57 @@ const EditShop = () => {
         }
     };
 
-    // Gallery image handling
-    const handleFileSelect = () => {
-        fileInputRef.current?.click();
+    // New image upload handlers for improved system
+    const handleLogoUpload = (url: string) => {
+        setForm((prev) => ({
+            ...prev,
+            logo_url: url,
+        }));
     };
 
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = Array.from(e.target.files || []);
-        if (files.length > 0) {
-            setSelectedFiles((prev) => [...prev, ...files]);
-
-            // Reset the input so the same file can be selected again
-            if (fileInputRef.current) {
-                fileInputRef.current.value = '';
-            }
-        }
+    const handleCoverUpload = (url: string) => {
+        setForm((prev) => ({
+            ...prev,
+            cover_image_url: url,
+        }));
     };
 
-    const removeSelectedFile = (index: number) => {
-        setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
+    const handleGalleryUpload = (urls: string | string[]) => {
+        const urlArray = Array.isArray(urls) ? urls : [urls];
+        setForm((prev) => ({
+            ...prev,
+            gallery: urlArray,
+        }));
     };
 
-    const removeGalleryImage = (index: number) => {
-        setForm((prev) => {
-            const updatedGallery = [...(prev.gallery || [])];
+    const handleGalleryError = (error: string) => {
+        setAlert({ visible: true, message: error, type: 'danger' });
+    };
+
+    const removeGalleryImage = async (index: number) => {
+        if (!form.gallery || form.gallery.length === 0) return;
+
+        try {
+            const imageUrl = form.gallery[index];
+
+            // Remove from storage using the improved storage manager
+            await StorageManager.removeShopGalleryImage(parseInt(id as string), imageUrl);
+
+            // Update form state
+            const updatedGallery = [...form.gallery];
             updatedGallery.splice(index, 1);
-            return { ...prev, gallery: updatedGallery };
-        });
+
+            setForm((prev) => ({
+                ...prev,
+                gallery: updatedGallery,
+            }));
+
+            // Update database
+            await supabase.from('shops').update({ gallery: updatedGallery }).eq('id', id);
+        } catch (error) {
+            console.error('Error removing gallery image:', error);
+            setAlert({ visible: true, message: 'Error removing image', type: 'danger' });
+        }
     };
 
     const filteredCategories = categories.filter((category) => category.title.toLowerCase().includes(searchCategoryTerm.toLowerCase()));
@@ -298,37 +285,19 @@ const EditShop = () => {
                 throw new Error('Shop name is required');
             }
 
-            // Upload any new gallery images
-            const galleryUrls = [...(form.gallery || [])];
-
-            if (selectedFiles.length > 0) {
-                for (const file of selectedFiles) {
-                    const fileExt = file.name.split('.').pop();
-                    const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
-
-                    const { error: uploadError } = await supabase.storage.from('shop-gallery').upload(`${id}/${fileName}`, file);
-
-                    if (uploadError) throw uploadError;
-
-                    const {
-                        data: { publicUrl },
-                    } = supabase.storage.from('shop-gallery').getPublicUrl(`${id}/${fileName}`);
-
-                    galleryUrls.push(publicUrl);
-                }
-            }
-
-            // Create update payload with all fields we want to update
+            // Create update payload with all fields
             const updatePayload = {
                 shop_name: form.shop_name,
                 shop_desc: form.shop_desc,
+                logo_url: form.logo_url,
+                cover_image_url: form.cover_image_url,
                 public: form.public,
                 status: form.status,
                 address: form.address,
                 work_hours: form.work_hours || defaultWorkHours,
                 phone_numbers: form.phone_numbers?.filter((phone) => phone.trim() !== '') || [],
                 category_id: form.category_id,
-                gallery: galleryUrls,
+                gallery: form.gallery,
                 latitude: form.latitude,
                 longitude: form.longitude,
             };
@@ -345,7 +314,6 @@ const EditShop = () => {
 
             // Update the form with the fetched data
             setForm(updatedShop);
-            setSelectedFiles([]);
             setAlert({ visible: true, message: 'Shop updated successfully!', type: 'success' });
 
             // Scroll to top to show alert
@@ -411,12 +379,36 @@ const EditShop = () => {
                         <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center">
                             <div className="text-center">
                                 <h2 className="text-xl font-bold text-white mb-4">{t('shop_cover_image')}</h2>
-                                <ImageUpload
-                                    bucket="shops-covers"
-                                    userId={id.toString()}
-                                    url={form.cover_image_url}
-                                    placeholderImage="/assets/images/img-placeholder-fallback.webp"
-                                    onUploadComplete={handleCoverImageUpload}
+                                <ImprovedImageUpload
+                                    type="shop-cover"
+                                    shopId={parseInt(id as string)}
+                                    currentUrl={form.cover_image_url}
+                                    onUploadComplete={async (url) => {
+                                        if (typeof url === 'string') {
+                                            // Update form state
+                                            setForm((prev) => ({ ...prev, cover_image_url: url }));
+
+                                            // Update database immediately
+                                            try {
+                                                const { error } = await supabase.from('shops').update({ cover_image_url: url }).eq('id', id);
+
+                                                if (error) throw error;
+
+                                                setAlert({
+                                                    visible: true,
+                                                    type: 'success',
+                                                    message: t('cover_image_updated_successfully'),
+                                                });
+                                            } catch (error) {
+                                                console.error('Error updating cover image in database:', error);
+                                                setAlert({
+                                                    visible: true,
+                                                    type: 'danger',
+                                                    message: t('error_updating_cover_image'),
+                                                });
+                                            }
+                                        }
+                                    }}
                                     onError={(error) => {
                                         setAlert({
                                             visible: true,
@@ -450,12 +442,36 @@ const EditShop = () => {
                         <div className="flex flex-col sm:flex-row">
                             <div className="mb-5 w-full sm:w-2/12 ltr:sm:mr-4 rtl:sm:ml-4">
                                 <label className="mb-2 block text-sm font-semibold">{t('shop_logo')}</label>
-                                <ImageUpload
-                                    bucket="shops"
-                                    userId={id.toString()}
-                                    url={form.logo_url}
-                                    placeholderImage="/assets/images/shop-placeholder.jpg"
-                                    onUploadComplete={handleLogoUpload}
+                                <ImprovedImageUpload
+                                    type="shop-logo"
+                                    shopId={parseInt(id as string)}
+                                    currentUrl={form.logo_url}
+                                    onUploadComplete={async (url) => {
+                                        if (typeof url === 'string') {
+                                            // Update form state
+                                            setForm((prev) => ({ ...prev, logo_url: url }));
+
+                                            // Update database immediately
+                                            try {
+                                                const { error } = await supabase.from('shops').update({ logo_url: url }).eq('id', id);
+
+                                                if (error) throw error;
+
+                                                setAlert({
+                                                    visible: true,
+                                                    type: 'success',
+                                                    message: t('logo_updated_successfully'),
+                                                });
+                                            } catch (error) {
+                                                console.error('Error updating logo in database:', error);
+                                                setAlert({
+                                                    visible: true,
+                                                    type: 'danger',
+                                                    message: t('error_updating_logo'),
+                                                });
+                                            }
+                                        }
+                                    }}
                                     onError={(error) => {
                                         setAlert({
                                             visible: true,
@@ -705,61 +721,16 @@ const EditShop = () => {
                             <p className="text-gray-500 dark:text-gray-400 mt-1">Upload images for your shop gallery</p>
                         </div>
 
-                        <div className="mb-5">
-                            <div
-                                onClick={handleFileSelect}
-                                className="flex h-32 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 hover:border-primary hover:bg-gray-100 dark:border-[#1b2e4b] dark:bg-black dark:hover:border-primary dark:hover:bg-[#1b2e4b]"
-                            >
-                                <IconUpload className="mb-2 h-6 w-6" />
-                                <p className="text-sm text-gray-600 dark:text-gray-400">Click to upload</p>
-                                <p className="text-[10px] text-gray-500 dark:text-gray-500">JPG, PNG, GIF up to 2MB</p>
-                            </div>
-                            <input ref={fileInputRef} type="file" className="hidden" accept="image/*" multiple onChange={handleFileChange} />
-                        </div>
-
-                        <div className="space-y-5">
-                            {/* Selected files that will be uploaded */}
-                            {selectedFiles.length > 0 && (
-                                <div>
-                                    <h6 className="font-semibold mb-3">Selected Images to Upload</h6>
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                                        {selectedFiles.map((file, index) => (
-                                            <div key={index} className="group relative h-32">
-                                                <img src={URL.createObjectURL(file)} alt={`Selected ${index + 1}`} className="h-full w-full rounded-lg object-cover" />
-                                                <button
-                                                    type="button"
-                                                    className="absolute right-0 top-0 hidden rounded-full bg-red-500 p-1 text-white hover:bg-red-600 group-hover:block"
-                                                    onClick={() => removeSelectedFile(index)}
-                                                >
-                                                    <IconX className="h-4 w-4" />
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-
-                            {/* Existing gallery images */}
-                            {form.gallery && form.gallery.length > 0 && (
-                                <div>
-                                    <h6 className="font-semibold mb-3">Current Gallery</h6>
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                                        {form.gallery.map((image, index) => (
-                                            <div key={index} className="group relative h-32">
-                                                <img src={image} alt={`Gallery ${index + 1}`} className="h-full w-full rounded-lg object-cover" />
-                                                <button
-                                                    type="button"
-                                                    className="absolute right-0 top-0 hidden rounded-full bg-red-500 p-1 text-white hover:bg-red-600 group-hover:block"
-                                                    onClick={() => removeGalleryImage(index)}
-                                                >
-                                                    <IconX className="h-4 w-4" />
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
+                        <ImprovedImageUpload
+                            type="shop-gallery"
+                            shopId={parseInt(id as string)}
+                            currentUrls={form.gallery || []}
+                            onUploadComplete={handleGalleryUpload}
+                            onError={handleGalleryError}
+                            maxFiles={10}
+                            buttonLabel="Add Gallery Image"
+                            className="mb-5"
+                        />
                     </div>
                 )}
                 <div className="flex justify-end gap-4">

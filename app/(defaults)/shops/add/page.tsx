@@ -4,7 +4,8 @@ import { useRouter } from 'next/navigation';
 import Link from 'next/link';
 import supabase from '@/lib/supabase';
 import { Alert } from '@/components/elements/alerts/elements-alerts-default';
-import ImageUpload from '@/components/image-upload/image-upload';
+import ImprovedImageUpload from '@/components/image-upload/improved-image-upload';
+import StorageManager from '@/utils/storage-manager';
 import IconX from '@/components/icon/icon-x';
 import IconPhone from '@/components/icon/icon-phone';
 import IconMapPin from '@/components/icon/icon-map-pin';
@@ -75,11 +76,14 @@ const AddShopPage = () => {
     const [searchTerm, setSearchTerm] = useState('');
     const [filteredUsers, setFilteredUsers] = useState<Profile[]>([]);
     const [showDropdown, setShowDropdown] = useState(false);
+
+    // Temporary file storage for logo and cover before shop creation
+    const [tempLogoFile, setTempLogoFile] = useState<File | null>(null);
+    const [tempCoverFile, setTempCoverFile] = useState<File | null>(null);
+
     const dropdownRef = useRef<HTMLDivElement>(null);
     const categoryRef = useRef<HTMLDivElement>(null);
     const statusRef = useRef<HTMLDivElement>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
-    const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
     const [activeTab, setActiveTab] = useState(0);
     const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
     const [searchCategoryTerm, setSearchCategoryTerm] = useState(''); // Define default work hours in a useEffect to make it reactive to language changes
@@ -105,13 +109,27 @@ const AddShopPage = () => {
             // If work_hours already exists, update only the day names with current translations
             setForm((prev) => ({
                 ...prev,
-                work_hours: prev.work_hours ? prev.work_hours.map((workHour, index) => ({
-                    ...workHour,
-                    day: defaultWorkHours[index].day, // Update day with current translation
-                })) : null,
+                work_hours: prev.work_hours
+                    ? prev.work_hours.map((workHour, index) => ({
+                          ...workHour,
+                          day: defaultWorkHours[index].day, // Update day with current translation
+                      }))
+                    : null,
             }));
         }
-    }, [t]); // Re-run when the translation function changes (language changes)
+    }, []); // Re-run when the translation function changes (language changes)
+
+    // Cleanup blob URLs on component unmount
+    useEffect(() => {
+        return () => {
+            if (form.logo_url && form.logo_url.startsWith('blob:')) {
+                URL.revokeObjectURL(form.logo_url);
+            }
+            if (form.cover_image_url && form.cover_image_url.startsWith('blob:')) {
+                URL.revokeObjectURL(form.cover_image_url);
+            }
+        };
+    }, [form.logo_url, form.cover_image_url]);
 
     // Fetch current user, all users, and categories
     useEffect(() => {
@@ -174,17 +192,24 @@ const AddShopPage = () => {
         }));
     };
 
-    const handleLogoUpload = (url: string) => {
+    // Handle temporary file storage for logo and cover
+    const handleTempLogoUpload = (file: File) => {
+        setTempLogoFile(file);
+        // Create preview URL
+        const previewUrl = URL.createObjectURL(file);
         setForm((prev) => ({
             ...prev,
-            logo_url: url,
+            logo_url: previewUrl,
         }));
     };
 
-    const handleCoverImageUpload = (url: string) => {
+    const handleTempCoverUpload = (file: File) => {
+        setTempCoverFile(file);
+        // Create preview URL
+        const previewUrl = URL.createObjectURL(file);
         setForm((prev) => ({
             ...prev,
-            cover_image_url: url,
+            cover_image_url: previewUrl,
         }));
     };
 
@@ -248,32 +273,13 @@ const AddShopPage = () => {
         }
     };
 
-    // Gallery image handling
-    const handleFileSelect = () => {
-        fileInputRef.current?.click();
-    };
-
-    const handleFileChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = Array.from(e.target.files || []);
-        if (files.length > 0) {
-            setSelectedFiles((prev) => [...prev, ...files]);
-
-            // Reset the input so the same file can be selected again
-            if (fileInputRef.current) {
-                fileInputRef.current.value = '';
-            }
-        }
-    };
-
-    const removeSelectedFile = (index: number) => {
-        setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
-    };
-
     const filteredCategories = categories.filter((category) => category.title.toLowerCase().includes(searchCategoryTerm.toLowerCase()));
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
-        setLoading(true); // Basic validation: shop name and owner are required.
+        setLoading(true);
+
+        // Basic validation: shop name and owner are required.
         if (!form.shop_name) {
             setAlert({ visible: true, message: t('shop_name_required'), type: 'danger' });
             setLoading(false);
@@ -286,12 +292,12 @@ const AddShopPage = () => {
         }
 
         try {
-            // Create a new insert payload
+            // Create shop data payload (initially without image URLs)
             const insertPayload = {
                 shop_name: form.shop_name,
                 shop_desc: form.shop_desc,
-                logo_url: form.logo_url,
-                cover_image_url: form.cover_image_url,
+                logo_url: '', // Will be set after upload
+                cover_image_url: '', // Will be set after upload
                 owner: form.owner,
                 public: form.public,
                 status: form.status,
@@ -299,39 +305,46 @@ const AddShopPage = () => {
                 work_hours: form.work_hours,
                 phone_numbers: form.phone_numbers.filter((phone) => phone.trim() !== ''),
                 category_id: form.category_id,
-                // Gallery will be added after shop creation
+                gallery: form.gallery,
+                latitude: form.latitude,
+                longitude: form.longitude,
             };
 
-            // Insert shop data
+            // Insert shop data first to get the shop ID
             const { data: newShop, error } = await supabase.from('shops').insert([insertPayload]).select().single();
 
             if (error) throw error;
 
-            // If we have files to upload
-            if (selectedFiles.length > 0 && newShop) {
-                const galleryUrls: string[] = [];
+            // Initialize the improved folder structure for the new shop
+            await StorageManager.initializeShopStructure(newShop.id);
 
-                for (const file of selectedFiles) {
-                    const fileExt = file.name.split('.').pop();
-                    const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+            // Now upload the images to the proper location using the shop ID
+            let finalLogoUrl = '';
+            let finalCoverUrl = '';
 
-                    const { error: uploadError } = await supabase.storage.from('shop-gallery').upload(`${newShop.id}/${fileName}`, file);
-
-                    if (uploadError) throw uploadError;
-
-                    const {
-                        data: { publicUrl },
-                    } = supabase.storage.from('shop-gallery').getPublicUrl(`${newShop.id}/${fileName}`);
-
-                    galleryUrls.push(publicUrl);
+            if (tempLogoFile) {
+                const logoResult = await StorageManager.uploadShopLogo(newShop.id, tempLogoFile);
+                if (logoResult.success && logoResult.url) {
+                    finalLogoUrl = logoResult.url;
                 }
+            }
 
-                // Update shop with gallery URLs
-                if (galleryUrls.length > 0) {
-                    const { error: updateError } = await supabase.from('shops').update({ gallery: galleryUrls }).eq('id', newShop.id);
-
-                    if (updateError) throw updateError;
+            if (tempCoverFile) {
+                const coverResult = await StorageManager.uploadShopCover(newShop.id, tempCoverFile);
+                if (coverResult.success && coverResult.url) {
+                    finalCoverUrl = coverResult.url;
                 }
+            }
+
+            // Update shop with final image URLs
+            if (finalLogoUrl || finalCoverUrl) {
+                await supabase
+                    .from('shops')
+                    .update({
+                        logo_url: finalLogoUrl,
+                        cover_image_url: finalCoverUrl,
+                    })
+                    .eq('id', newShop.id);
             }
 
             setAlert({ visible: true, message: t('shop_added_successfully'), type: 'success' });
@@ -389,21 +402,24 @@ const AddShopPage = () => {
                             {' '}
                             <div className="text-center flex flex-col items-center justify-center">
                                 <h2 className="text-xl font-bold text-white mb-4">{t('shop_cover_image')}</h2>
-                                <ImageUpload
-                                    bucket="shops-logos/covers"
-                                    userId="new"
-                                    url={form.cover_image_url}
-                                    placeholderImage="/assets/images/img-placeholder-fallback.webp"
-                                    onUploadComplete={handleCoverImageUpload}
-                                    onError={(error) => {
-                                        setAlert({
-                                            visible: true,
-                                            type: 'danger',
-                                            message: error,
-                                        });
-                                    }}
-                                    buttonLabel={t('select_cover')}
-                                />
+                                {/* Custom Cover Upload Component */}
+                                <div className="relative inline-block">
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) {
+                                                handleTempCoverUpload(file);
+                                            }
+                                        }}
+                                        className="hidden"
+                                        id="cover-upload"
+                                    />
+                                    <label htmlFor="cover-upload" className="btn btn-primary cursor-pointer">
+                                        {t('select_cover')}
+                                    </label>
+                                </div>
                             </div>
                         </div>
                     </div>
@@ -429,14 +445,28 @@ const AddShopPage = () => {
                             {/* Logo Column */}
                             <div className="flex flex-col items-center">
                                 <label className="block text-sm font-bold text-gray-700 dark:text-white mb-3">{t('shop_logo')}</label>
-                                <ImageUpload
-                                    bucket="shops-logos"
-                                    userId="new"
-                                    url={form.logo_url}
-                                    placeholderImage="/assets/images/shop-placeholder.jpg"
-                                    onUploadComplete={handleLogoUpload}
-                                    onError={(error) => setAlert({ visible: true, message: error, type: 'danger' })}
-                                />
+                                {/* Logo Preview */}
+                                <div className="mb-4">
+                                    <img src={form.logo_url || '/assets/images/shop-placeholder.jpg'} alt="Shop Logo" className="w-36 h-36 rounded-full object-cover border-2 border-gray-200" />
+                                </div>
+                                {/* Custom Logo Upload Component */}
+                                <div className="relative">
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => {
+                                            const file = e.target.files?.[0];
+                                            if (file) {
+                                                handleTempLogoUpload(file);
+                                            }
+                                        }}
+                                        className="hidden"
+                                        id="logo-upload"
+                                    />
+                                    <label htmlFor="logo-upload" className="btn btn-outline-primary btn-sm cursor-pointer">
+                                        {t('select_logo')}
+                                    </label>
+                                </div>
                             </div>
                             {/* Shop Info Column */}{' '}
                             <div className="space-y-5">
@@ -735,39 +765,13 @@ const AddShopPage = () => {
                             <p className="text-gray-500 dark:text-gray-400 mt-1">{t('upload_gallery_images_info')}</p>
                         </div>
 
-                        <div className="mb-5">
-                            <div
-                                onClick={handleFileSelect}
-                                className="flex h-32 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 hover:border-primary hover:bg-gray-100 dark:border-[#1b2e4b] dark:bg-black dark:hover:border-primary dark:hover:bg-[#1b2e4b]"
-                            >
-                                <IconUpload className="mb-2 h-6 w-6" />
-                                <p className="text-sm text-gray-600 dark:text-gray-400">{t('click_to_upload')}</p>
-                                <p className="text-[10px] text-gray-500 dark:text-gray-500">{t('image_formats_and_size')}</p>
+                        {/* Note: Gallery uploads will be available after shop creation */}
+                        <div className="flex items-center justify-center p-8 bg-gray-50 dark:bg-gray-800 rounded-lg border-2 border-dashed border-gray-300 dark:border-gray-600">
+                            <div className="text-center">
+                                <IconUpload className="mx-auto h-12 w-12 text-gray-400 mb-4" />
+                                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">{t('gallery_after_creation')}</h3>
+                                <p className="text-gray-500 dark:text-gray-400">{t('gallery_after_creation_desc')}</p>
                             </div>
-                            <input ref={fileInputRef} type="file" className="hidden" accept="image/*" multiple onChange={handleFileChange} />
-                        </div>
-
-                        <div className="space-y-5">
-                            {/* Selected files that will be uploaded */}
-                            {selectedFiles.length > 0 && (
-                                <div>
-                                    <h6 className="font-semibold mb-3">{t('selected_images_to_upload')}</h6>
-                                    <div className="grid grid-cols-2 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 gap-3">
-                                        {selectedFiles.map((file, index) => (
-                                            <div key={index} className="group relative h-32">
-                                                <img src={URL.createObjectURL(file)} alt={`Selected ${index + 1}`} className="h-full w-full rounded-lg object-cover" />
-                                                <button
-                                                    type="button"
-                                                    className="absolute right-0 top-0 hidden rounded-full bg-red-500 p-1 text-white hover:bg-red-600 group-hover:block"
-                                                    onClick={() => removeSelectedFile(index)}
-                                                >
-                                                    <IconX className="h-4 w-4" />
-                                                </button>
-                                            </div>
-                                        ))}
-                                    </div>
-                                </div>
-                            )}
                         </div>
                     </div>
                 )}{' '}

@@ -8,6 +8,7 @@ import { DataTableSortStatus, DataTable } from 'mantine-datatable';
 import Link from 'next/link';
 import React, { useEffect, useState } from 'react';
 import supabase from '@/lib/supabase';
+import StorageManager from '@/utils/storage-manager';
 import { Alert } from '@/components/elements/alerts/elements-alerts-default';
 import ConfirmModal from '@/components/modals/confirm-modal';
 import { getTranslation } from '@/i18n';
@@ -126,17 +127,8 @@ const ProductsList = () => {
     const confirmDeletion = async () => {
         if (!productToDelete) return;
         try {
-            // Delete images from storage first
-            if (productToDelete.images?.length) {
-                await Promise.all(
-                    productToDelete.images.map(async (imageUrl) => {
-                        const path = imageUrl.split('/').pop(); // Get filename from URL
-                        if (path) {
-                            await supabase.storage.from('products').remove([path]);
-                        }
-                    }),
-                );
-            }
+            // Delete product images from storage using new folder structure
+            await StorageManager.removeProductImages(parseInt(productToDelete.shop), parseInt(productToDelete.id));
 
             // Delete product record
             const { error } = await supabase.from('products').delete().eq('id', productToDelete.id);

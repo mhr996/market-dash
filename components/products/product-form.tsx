@@ -3,6 +3,8 @@ import { Alert } from '@/components/elements/alerts/elements-alerts-default';
 import React, { useEffect, useState, useRef } from 'react';
 import supabase from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
+import ImprovedImageUpload from '@/components/image-upload/improved-image-upload';
+import StorageManager from '@/utils/storage-manager';
 import IconX from '@/components/icon/icon-x';
 import IconCaretDown from '@/components/icon/icon-caret-down';
 import IconUpload from '@/components/icon/icon-camera';
@@ -36,10 +38,11 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
     const [loading, setLoading] = useState(false);
     const [shops, setShops] = useState<Shop[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
-    const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
     const [previewUrls, setPreviewUrls] = useState<string[]>([]);
     const [alert, setAlert] = useState<{ type: 'success' | 'danger'; message: string } | null>(null);
-    const fileInputRef = useRef<HTMLInputElement>(null);
+
+    // Temporary file storage for product images when creating new products
+    const [tempImageFiles, setTempImageFiles] = useState<File[]>([]);
 
     // Sale price states
     const [hasSalePrice, setHasSalePrice] = useState(false);
@@ -72,6 +75,17 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
         desc: '',
     });
     const [showNewCategoryForm, setShowNewCategoryForm] = useState(false);
+
+    // Cleanup blob URLs on component unmount
+    useEffect(() => {
+        return () => {
+            previewUrls.forEach((url) => {
+                if (url.startsWith('blob:')) {
+                    URL.revokeObjectURL(url);
+                }
+            });
+        };
+    }, [previewUrls]);
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
@@ -172,30 +186,33 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
         }
     }, [hasSalePrice, formData.price, discountType, discountValue]);
 
-    const handleFileSelect = () => {
-        fileInputRef.current?.click();
-    };
-
-    const handleFileChange = (e: React.ChangeEvent<HTMLInputElement>) => {
-        const files = Array.from(e.target.files || []);
-        if (files.length + previewUrls.length > 10) {
-            setAlert({ type: 'danger', message: 'Maximum 10 images allowed' });
-            return;
+    // Handle image uploads for both add and edit modes
+    const handleImagesUploaded = (url: string | string[]) => {
+        if (Array.isArray(url)) {
+            setPreviewUrls(url);
+        } else {
+            setPreviewUrls([url]);
         }
-        setSelectedFiles((prev) => [...prev, ...files]);
-
-        // Generate preview URLs
-        files.forEach((file) => {
-            const reader = new FileReader();
-            reader.onloadend = () => {
-                setPreviewUrls((prev) => [...prev, reader.result as string]);
-            };
-            reader.readAsDataURL(file);
-        });
     };
 
-    const removeImage = (index: number) => {
-        setSelectedFiles((prev) => prev.filter((_, i) => i !== index));
+    // Handle temporary file storage for new products
+    const handleTempImageUpload = (files: FileList) => {
+        const fileArray = Array.from(files);
+        setTempImageFiles((prev) => [...prev, ...fileArray]);
+
+        // Create preview URLs
+        const newPreviewUrls = fileArray.map((file) => URL.createObjectURL(file));
+        setPreviewUrls((prev) => [...prev, ...newPreviewUrls]);
+    };
+
+    // Remove temporary image
+    const removeTempImage = (index: number) => {
+        // Revoke the blob URL to prevent memory leaks
+        if (previewUrls[index] && previewUrls[index].startsWith('blob:')) {
+            URL.revokeObjectURL(previewUrls[index]);
+        }
+
+        setTempImageFiles((prev) => prev.filter((_, i) => i !== index));
         setPreviewUrls((prev) => prev.filter((_, i) => i !== index));
     };
 
@@ -240,7 +257,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
             return;
         }
 
-        if (!previewUrls.length && !selectedFiles.length) {
+        if (!previewUrls.length) {
             setAlert({ type: 'danger', message: t('image_required') });
             return;
         }
@@ -265,51 +282,135 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
 
         setLoading(true);
         try {
-            // Upload images first
-            const imageUrls: string[] = [];
+            let finalImageUrls: string[] = [];
 
-            // Only upload new files
-            if (selectedFiles.length) {
-                for (const file of selectedFiles) {
-                    const fileExt = file.name.split('.').pop();
-                    const fileName = `${Date.now()}-${Math.random().toString(36).substring(7)}.${fileExt}`;
+            if (productId) {
+                // Edit mode: use existing previewUrls (already uploaded via ImprovedImageUpload)
+                finalImageUrls = previewUrls;
+            } else {
+                // Add mode: upload temporary files first
+                if (tempImageFiles.length > 0 && formData.shop) {
+                    // Create a temporary product to get an ID for the folder structure
+                    const tempProductData = {
+                        title: formData.title,
+                        desc: formData.desc,
+                        price: parseFloat(formData.price),
+                        shop: formData.shop,
+                        category: formData.category ? parseInt(formData.category) : null,
+                        images: [], // Empty initially
+                        sale_price: hasSalePrice && finalPrice ? finalPrice : null,
+                        discount_type: hasSalePrice ? discountType : null,
+                        discount_value: hasSalePrice && discountValue ? parseFloat(discountValue) : null,
+                        discount_start: hasSalePrice && discountStart ? discountStart.toISOString() : null,
+                        discount_end: hasSalePrice && discountEnd ? discountEnd.toISOString() : null,
+                        active: formData.active,
+                    };
 
-                    const { error: uploadError } = await supabase.storage.from('products').upload(fileName, file);
+                    // Insert product first to get ID
+                    const { data: newProduct, error: insertError } = await supabase.from('products').insert([tempProductData]).select().single();
 
-                    if (uploadError) throw uploadError;
+                    if (insertError) throw insertError;
 
-                    const {
-                        data: { publicUrl },
-                    } = supabase.storage.from('products').getPublicUrl(fileName);
+                    // Now upload images using the product ID
+                    const uploadResults = await StorageManager.uploadProductImages(parseInt(formData.shop), newProduct.id, tempImageFiles);
 
-                    imageUrls.push(publicUrl);
+                    // Collect successful upload URLs
+                    for (const result of uploadResults) {
+                        if (result.success && result.url) {
+                            finalImageUrls.push(result.url);
+                        }
+                    }
+
+                    // Update the product with image URLs
+                    const { error: updateError } = await supabase.from('products').update({ images: finalImageUrls }).eq('id', newProduct.id);
+
+                    if (updateError) throw updateError;
+
+                    setAlert({ type: 'success', message: t('product_created_successfully') });
+
+                    // Reset form
+                    setFormData({
+                        title: '',
+                        desc: '',
+                        price: '',
+                        shop: '',
+                        category: '',
+                        active: true,
+                    });
+                    setPreviewUrls([]);
+                    setTempImageFiles([]);
+                    setHasSalePrice(false);
+                    setDiscountValue('');
+                    setFinalPrice(null);
+
+                    // Redirect to products page after creating a new product
+                    setTimeout(() => {
+                        router.push('/products');
+                    }, 1500);
+
+                    return; // Exit early for add mode
+                } else {
+                    // No images to upload for new product, create directly
+                    const productDataNoImages = {
+                        title: formData.title,
+                        desc: formData.desc,
+                        price: parseFloat(formData.price),
+                        shop: formData.shop,
+                        category: formData.category ? parseInt(formData.category) : null,
+                        images: [],
+                        sale_price: hasSalePrice && finalPrice ? finalPrice : null,
+                        discount_type: hasSalePrice ? discountType : null,
+                        discount_value: hasSalePrice && discountValue ? parseFloat(discountValue) : null,
+                        discount_start: hasSalePrice && discountStart ? discountStart.toISOString() : null,
+                        discount_end: hasSalePrice && discountEnd ? discountEnd.toISOString() : null,
+                        active: formData.active,
+                    };
+
+                    const { error } = await supabase.from('products').insert([productDataNoImages]);
+                    if (error) throw error;
+
+                    setAlert({ type: 'success', message: t('product_created_successfully') });
+
+                    // Reset form
+                    setFormData({
+                        title: '',
+                        desc: '',
+                        price: '',
+                        shop: '',
+                        category: '',
+                        active: true,
+                    });
+                    setPreviewUrls([]);
+                    setTempImageFiles([]);
+                    setHasSalePrice(false);
+                    setDiscountValue('');
+                    setFinalPrice(null);
+
+                    // Redirect to products page after creating a new product
+                    setTimeout(() => {
+                        router.push('/products');
+                    }, 1500);
+
+                    return; // Exit early for add mode
                 }
             }
 
-            // Add any existing image URLs (from editing)
-            for (const url of previewUrls) {
-                // Only add if it's already a URL (not a base64 string)
-                if (typeof url === 'string' && url.startsWith('http')) {
-                    imageUrls.push(url);
-                }
-            } //
-
-            const productData = {
-                title: formData.title,
-                desc: formData.desc,
-                price: parseFloat(formData.price),
-                shop: formData.shop,
-                category: formData.category ? parseInt(formData.category) : null,
-                images: imageUrls,
-                sale_price: hasSalePrice && finalPrice ? finalPrice : null,
-                discount_type: hasSalePrice ? discountType : null,
-                discount_value: hasSalePrice && discountValue ? parseFloat(discountValue) : null,
-                discount_start: hasSalePrice && discountStart ? discountStart.toISOString() : null,
-                discount_end: hasSalePrice && discountEnd ? discountEnd.toISOString() : null,
-                active: formData.active,
-            };
-
+            // This section is only for edit mode now
             if (productId) {
+                const productData = {
+                    title: formData.title,
+                    desc: formData.desc,
+                    price: parseFloat(formData.price),
+                    shop: formData.shop,
+                    category: formData.category ? parseInt(formData.category) : null,
+                    images: finalImageUrls,
+                    sale_price: hasSalePrice && finalPrice ? finalPrice : null,
+                    discount_type: hasSalePrice ? discountType : null,
+                    discount_value: hasSalePrice && discountValue ? parseFloat(discountValue) : null,
+                    discount_start: hasSalePrice && discountStart ? discountStart.toISOString() : null,
+                    discount_end: hasSalePrice && discountEnd ? discountEnd.toISOString() : null,
+                    active: formData.active,
+                };
                 try {
                     // First try with a direct update
                     const { error } = await supabase.from('products').update(productData).eq('id', productId);
@@ -392,33 +493,8 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                     console.error('Error updating product:', error);
                     throw error;
                 }
-            } else {
-                // Create new product
-                const { error } = await supabase.from('products').insert([productData]);
-                if (error) throw error;
-            }
 
-            setAlert({ type: 'success', message: productId ? t('product_updated_successfully') : t('product_created_successfully') });
-            // Reset form if creating new product
-            if (!productId) {
-                setFormData({
-                    title: '',
-                    desc: '',
-                    price: '',
-                    shop: '',
-                    category: '',
-                    active: true,
-                });
-                setSelectedFiles([]);
-                setPreviewUrls([]);
-                setHasSalePrice(false);
-                setDiscountValue('');
-                setFinalPrice(null);
-
-                // Redirect to products page after creating a new product
-                setTimeout(() => {
-                    router.push('/products');
-                }, 1500); // Short delay to allow user to see success message
+                setAlert({ type: 'success', message: t('product_updated_successfully') });
             }
         } catch (error) {
             console.error('Error saving product:', error);
@@ -749,34 +825,61 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                         {/* Image Upload */}
                         <div>
                             <label className="mb-3 block">{t('product_images')}</label>
-                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                                {/* Add New Image Button */}
-                                {previewUrls.length < 5 && (
-                                    <div
-                                        onClick={handleFileSelect}
-                                        className="flex h-32 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 hover:border-primary hover:bg-gray-100 dark:border-[#1b2e4b] dark:bg-black dark:hover:border-primary dark:hover:bg-[#1b2e4b]"
-                                    >
-                                        <IconUpload className="mb-2 h-6 w-6" />
-                                        <p className="text-sm text-gray-600 dark:text-gray-400">{t('click_to_upload')}</p>
-                                        <p className="text-[10px] text-gray-500 dark:text-gray-500">{t('image_formats')}</p>
-                                    </div>
-                                )}
 
-                                {/* Image Previews */}
-                                {previewUrls.map((url, index) => (
-                                    <div key={index} className="group relative h-32">
-                                        <img src={url} alt={`Preview ${index + 1}`} className="h-full w-full rounded-lg object-cover" />
-                                        <button
-                                            type="button"
-                                            className="absolute right-0 top-0 hidden rounded-full bg-red-500 p-1 text-white hover:bg-red-600 group-hover:block"
-                                            onClick={() => removeImage(index)}
-                                        >
-                                            <IconX className="h-4 w-4" />
-                                        </button>
+                            {productId ? (
+                                // Edit mode: use ImprovedImageUpload with existing productId
+                                <ImprovedImageUpload
+                                    type="product"
+                                    shopId={parseInt(formData.shop)}
+                                    productId={parseInt(productId)}
+                                    currentUrls={previewUrls}
+                                    onUploadComplete={handleImagesUploaded}
+                                    maxFiles={5}
+                                />
+                            ) : (
+                                // Add mode: use custom file upload
+                                <div>
+                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
+                                        {/* Add New Image Button */}
+                                        {previewUrls.length < 5 && (
+                                            <div className="flex h-32 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 hover:border-primary hover:bg-gray-100 dark:border-[#1b2e4b] dark:bg-black dark:hover:border-primary dark:hover:bg-[#1b2e4b]">
+                                                <input
+                                                    type="file"
+                                                    accept="image/*"
+                                                    multiple
+                                                    onChange={(e) => {
+                                                        if (e.target.files && e.target.files.length > 0) {
+                                                            handleTempImageUpload(e.target.files);
+                                                        }
+                                                    }}
+                                                    className="hidden"
+                                                    id="product-images-upload"
+                                                />
+                                                <label htmlFor="product-images-upload" className="flex h-full w-full cursor-pointer flex-col items-center justify-center">
+                                                    <IconUpload className="mb-2 h-6 w-6" />
+                                                    <p className="text-sm text-gray-600 dark:text-gray-400">{t('click_to_upload')}</p>
+                                                    <p className="text-[10px] text-gray-500 dark:text-gray-500">{t('image_formats')}</p>
+                                                </label>
+                                            </div>
+                                        )}
+
+                                        {/* Image Previews */}
+                                        {previewUrls.map((url, index) => (
+                                            <div key={index} className="group relative h-32">
+                                                <img src={url} alt={`Preview ${index + 1}`} className="h-full w-full rounded-lg object-cover" />
+                                                <button
+                                                    type="button"
+                                                    className="absolute right-0 top-0 hidden rounded-full bg-red-500 p-1 text-white hover:bg-red-600 group-hover:block"
+                                                    onClick={() => removeTempImage(index)}
+                                                >
+                                                    <IconX className="h-4 w-4" />
+                                                </button>
+                                            </div>
+                                        ))}
                                     </div>
-                                ))}
-                            </div>
-                            <input ref={fileInputRef} type="file" className="hidden" accept="image/*" multiple onChange={handleFileChange} />
+                                </div>
+                            )}
+
                             <p className="mt-2 text-xs text-gray-500 dark:text-gray-400">First image will be used as the product thumbnail.</p>
                         </div>
                     </div>

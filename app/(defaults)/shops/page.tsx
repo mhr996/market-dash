@@ -8,6 +8,7 @@ import { DataTableSortStatus, DataTable } from 'mantine-datatable';
 import Link from 'next/link';
 import React, { useEffect, useState } from 'react';
 import supabase from '@/lib/supabase';
+import StorageManager from '@/utils/storage-manager';
 import { Alert } from '@/components/elements/alerts/elements-alerts-default';
 import ConfirmModal from '@/components/modals/confirm-modal';
 import { getTranslation } from '@/i18n';
@@ -114,6 +115,9 @@ const ShopsList = () => {
     const confirmDeletion = async () => {
         if (!shopToDelete || !shopToDelete.id) return;
         try {
+            // Delete all shop data from storage (logo, cover, gallery, products)
+            await StorageManager.removeShopCompletely(shopToDelete.id);
+
             const { error } = await supabase.from('shops').delete().eq('id', shopToDelete.id);
             if (error) throw error;
             const updatedItems = items.filter((s) => s.id !== shopToDelete.id);

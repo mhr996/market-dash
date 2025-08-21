@@ -479,5 +479,6 @@
     "error_printing_order": "Error printing order receipt",
     "error_downloading_pdf": "Error downloading PDF",
     "pdf_error": "An error occurred while generating PDF",
-    "name": "Name"
+    "name": "Name",
+    "select_logo": "Select Logo"
 }
