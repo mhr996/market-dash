@@ -582,5 +582,15 @@
     "shop_b": "Shop B",
     "commission_earned": "Commission Earned",
     "top_categories": "Top Categories",
-    "new_registrations": "New Registrations"
+    "new_registrations": "New Registrations",
+    "product_features": "Product Features",
+    "add_feature": "Add Feature",
+    "no_features_added": "No features added yet",
+    "click_add_feature_to_start": "Click 'Add Feature' to start adding product features",
+    "feature_label": "Feature Label",
+    "feature_value": "Feature Value",
+    "feature_label_placeholder": "e.g., Brand, Color, Size",
+    "feature_value_placeholder": "e.g., Nike, Red, Large",
+    "remove_feature": "Remove Feature",
+    "features_help_text": "Features help customers understand product specifications and details."
 }

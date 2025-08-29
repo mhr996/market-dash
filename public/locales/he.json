@@ -554,5 +554,15 @@
     "shop_b": "חנות ב",
     "commission_earned": "עמלה שהורווחה",
     "top_categories": "קטגוריות מובילות",
-    "new_registrations": "הרשמות חדשות"
+    "new_registrations": "הרשמות חדשות",
+    "product_features": "תכונות המוצר",
+    "add_feature": "הוסף תכונה",
+    "no_features_added": "לא נוספו תכונות עדיין",
+    "click_add_feature_to_start": "לחץ על 'הוסף תכונה' כדי להתחיל להוסיף תכונות למוצר",
+    "feature_label": "שם התכונה",
+    "feature_value": "ערך התכונה",
+    "feature_label_placeholder": "למשל: מותג, צבע, גודל",
+    "feature_value_placeholder": "למשל: נייקי, אדום, גדול",
+    "remove_feature": "הסר תכונה",
+    "features_help_text": "תכונות עוזרות ללקוחות להבין את מפרטי המוצר ופרטיו."
 }

@@ -15,6 +15,7 @@ interface Product {
     price: string;
     images: string[];
     category: number | null;
+    features?: { label: string; value: string }[];
     shops: {
         shop_name: string;
         owner: string;
@@ -199,6 +200,20 @@ const ProductDetailsPage = ({ params }: ProductDetailsPageProps) => {
                                 <div className="mt-2">
                                     <h4 className="font-medium">{product.categories.title}</h4>
                                     <p className="text-gray-600 dark:text-gray-400">{product.categories.desc}</p>
+                                </div>
+                            </div>
+                        )}
+
+                        {product.features && product.features.length > 0 && (
+                            <div>
+                                <h3 className="text-lg font-semibold">{t('product_features')}</h3>
+                                <div className="mt-3 space-y-2">
+                                    {product.features.map((feature, index) => (
+                                        <div key={index} className="flex justify-between items-center py-2 px-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                            <span className="font-medium text-gray-700 dark:text-gray-300">{feature.label}</span>
+                                            <span className="text-gray-600 dark:text-gray-400">{feature.value}</span>
+                                        </div>
+                                    ))}
                                 </div>
                             </div>
                         )}

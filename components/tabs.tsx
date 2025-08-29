@@ -3,6 +3,8 @@ import IconStore from './icon/icon-store';
 import IconMapPin from './icon/icon-map-pin';
 import IconClock from './icon/icon-clock';
 import IconImage from './icon/icon-image';
+import IconInfoCircle from './icon/icon-info-circle';
+import IconListCheck from './icon/icon-list-check';
 
 interface TabProps {
     tabs: {
@@ -24,6 +26,10 @@ const Tabs: React.FC<TabProps> = ({ tabs, activeTab, onTabClick }) => {
                 return <IconClock className="h-5 w-5" />;
             case 'image':
                 return <IconImage className="h-5 w-5" />;
+            case 'info-circle':
+                return <IconInfoCircle className="h-5 w-5" />;
+            case 'list-check':
+                return <IconListCheck className="h-5 w-5" />;
             default:
                 return null;
         }

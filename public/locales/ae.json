@@ -599,5 +599,15 @@
     "shop_b": "المتجر ب",
     "commission_earned": "العمولة المكتسبة",
     "top_categories": "أفضل الفئات",
-    "new_registrations": "التسجيلات الجديدة"
+    "new_registrations": "التسجيلات الجديدة",
+    "product_features": "مميزات المنتج",
+    "add_feature": "إضافة ميزة",
+    "no_features_added": "لم يتم إضافة أي مميزات بعد",
+    "click_add_feature_to_start": "انقر على 'إضافة ميزة' لبدء إضافة مميزات المنتج",
+    "feature_label": "اسم الميزة",
+    "feature_value": "قيمة الميزة",
+    "feature_label_placeholder": "مثال: العلامة التجارية، اللون، الحجم",
+    "feature_value_placeholder": "مثال: نايك، أحمر، كبير",
+    "remove_feature": "إزالة الميزة",
+    "features_help_text": "تساعد المميزات العملاء على فهم مواصفات وتفاصيل المنتج."
 }
