@@ -5,11 +5,13 @@ import Link from 'next/link';
 import supabase from '@/lib/supabase';
 import { Alert } from '@/components/elements/alerts/elements-alerts-default';
 import { getTranslation } from '@/i18n';
+import CategoryImageUpload from '@/components/categories/category-image-upload';
 
 interface Category {
     id: number;
     title: string;
     desc: string;
+    image_url?: string;
     created_at: string;
 }
 
@@ -25,6 +27,7 @@ const EditCategory = () => {
         id: 0,
         title: '',
         desc: '',
+        image_url: '',
         created_at: '', // This will be populated by fetchCategoryData
     });
     const [alert, setAlert] = useState<{ visible: boolean; message: string; type: 'success' | 'danger' }>({
@@ -71,6 +74,7 @@ const EditCategory = () => {
             const updatePayload = {
                 title: form.title,
                 desc: form.desc,
+                image_url: form.image_url,
             };
 
             try {
@@ -158,6 +162,17 @@ const EditCategory = () => {
                                 {t('description')}
                             </label>
                             <textarea id="desc" name="desc" className="form-textarea min-h-[100px]" value={form.desc} onChange={handleInputChange} />
+                        </div>
+                        <div>
+                            <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-white">{t('category_image')}</label>
+                            <CategoryImageUpload
+                                categoryId={form.id}
+                                url={form.image_url || null}
+                                onUploadComplete={(url) => setForm((prev) => ({ ...prev, image_url: url }))}
+                                onError={(error) => setAlert({ visible: true, message: error, type: 'danger' })}
+                                onDelete={() => setForm((prev) => ({ ...prev, image_url: '' }))}
+                                disabled={loading}
+                            />
                         </div>{' '}
                         <div>
                             <button type="submit" className="btn btn-primary" disabled={loading}>

@@ -320,6 +320,7 @@
     "category_title_required": "כותרת הקטגוריה נדרשת",
     "enter_category_title": "הזן כותרת קטגוריה",
     "enter_category_description": "הזן תיאור קטגוריה",
+    "category_image": "תמונת קטגוריה",
     "category_added_successfully": "הקטגוריה נוספה בהצלחה!",
     "error_adding_category": "שגיאה בהוספת הקטגוריה",
     "add_category": "הוסף קטגוריה",

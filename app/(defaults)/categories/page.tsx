@@ -16,6 +16,7 @@ interface Category {
     id: number;
     title: string;
     desc: string;
+    image_url?: string;
     created_at: string;
 }
 
@@ -100,8 +101,19 @@ const CategoriesList = () => {
     const confirmDeletion = async () => {
         if (!categoryToDelete || !categoryToDelete.id) return;
         try {
+            // First, delete the category folder from storage
+            const folderPath = `${categoryToDelete.id}`;
+            const { data: files } = await supabase.storage.from('categories').list(folderPath);
+
+            if (files && files.length > 0) {
+                const filesToDelete = files.map((file) => `${folderPath}/${file.name}`);
+                await supabase.storage.from('categories').remove(filesToDelete);
+            }
+
+            // Then delete the category from database
             const { error } = await supabase.from('categories').delete().eq('id', categoryToDelete.id);
             if (error) throw error;
+
             const updatedItems = items.filter((c) => c.id !== categoryToDelete.id);
             setItems(updatedItems);
             setAlert({ visible: true, message: t('category_deleted_successfully'), type: 'success' });
@@ -156,6 +168,24 @@ const CategoriesList = () => {
                                 render: ({ id }) => <strong className="text-info">#{id}</strong>,
                             },
                             {
+                                accessor: 'image_url',
+                                title: t('image'),
+                                sortable: false,
+                                render: ({ image_url }) => (
+                                    <div className="flex justify-center">
+                                        {image_url ? (
+                                            <img src={image_url} alt="Category" className="w-12 h-12 object-cover rounded-lg border border-gray-200 dark:border-gray-700" />
+                                        ) : (
+                                            <img
+                                                src="/assets/images/img-placeholder-fallback.webp"
+                                                alt="Placeholder"
+                                                className="w-10 aspect-square object-cover rounded-lg border border-gray-200 dark:border-gray-700"
+                                            />
+                                        )}
+                                    </div>
+                                ),
+                            },
+                            {
                                 accessor: 'title',
                                 title: t('title'),
                                 sortable: true,
@@ -164,7 +194,7 @@ const CategoriesList = () => {
                                 accessor: 'desc',
                                 title: t('description'),
                                 sortable: true,
-                                render: ({ desc }) => <span>{desc || 'N/A'}</span>,
+                                render: ({ desc }) => <span>{desc.slice(0, 100) || 'N/A'}</span>,
                             },
                             {
                                 accessor: 'created_at',

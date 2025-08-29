@@ -366,6 +366,7 @@
     "category_title_required": "عنوان الفئة مطلوب",
     "enter_category_title": "أدخل عنوان الفئة",
     "enter_category_description": "أدخل وصف الفئة",
+    "category_image": "صورة الفئة",
     "category_added_successfully": "تمت إضافة الفئة بنجاح!",
     "error_adding_category": "خطأ في إضافة الفئة",
     "add_category": "إضافة فئة",
