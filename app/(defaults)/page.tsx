@@ -377,7 +377,7 @@ const HomePage = () => {
                                     </Link>
                                 </div>
 
-                                <div className="absolute bottom-6 left-2 flex flex-wrap justify-start items-center gap-4 pt-5 mt-5 border-t border-white-light dark:border-[#191e3a]">
+                                <div className="absolute bottom-6 left-2 ltr:left-auto rtl:right-2 flex flex-wrap justify-start items-center gap-4 pt-5 mt-5 border-t border-white-light dark:border-[#191e3a]">
                                     <div className="flex space-x-3">
                                         <div className="flex flex-col items-center justify-center px-4">
                                             <svg className="h-5 w-5 text-success mb-1" viewBox="0 0 24 24" fill="none" xmlns="http://www.w3.org/2000/svg">

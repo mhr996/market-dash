@@ -9,6 +9,7 @@ import IconEye from '@/components/icon/icon-eye';
 import IconStore from '@/components/icon/icon-store';
 import IconUsers from '@/components/icon/icon-users';
 import IconDollarSign from '@/components/icon/icon-dollar-sign';
+import StatisticsFilter from '@/components/statistics/statistics-filter';
 
 interface ShopStats {
     id: number;
@@ -48,6 +49,18 @@ interface OverallStats {
     totalOrders: number;
 }
 
+interface FilterState {
+    shops: number[];
+    users: number[];
+    timeRange: string;
+}
+
+interface FilterOption {
+    id: number;
+    name: string;
+    logo_url?: string;
+}
+
 const StatisticsPage = () => {
     const { t } = getTranslation();
     const [loading, setLoading] = useState(true);
@@ -64,39 +77,172 @@ const StatisticsPage = () => {
     const [mostCartedProducts, setMostCartedProducts] = useState<ProductStats[]>([]);
     const [activeTab, setActiveTab] = useState(0);
 
+    // Filter related state
+    const [filters, setFilters] = useState<FilterState>({
+        shops: [],
+        users: [],
+        timeRange: 'all',
+    });
+    const [allShops, setAllShops] = useState<FilterOption[]>([]);
+    const [allUsers, setAllUsers] = useState<FilterOption[]>([]);
+
     useEffect(() => {
+        fetchFilterOptions();
         fetchStatistics();
     }, []);
 
-    const fetchStatistics = async () => {
+    // Only fetch statistics when filters actually change
+    // Remove the automatic fetching on filter change
+
+    const fetchFilterOptions = async () => {
+        try {
+            // Fetch all shops for filter options
+            const { data: shopsData } = await supabase.from('shops').select('id, shop_name, logo_url').order('shop_name');
+
+            setAllShops(
+                (shopsData || []).map((shop) => ({
+                    id: shop.id,
+                    name: shop.shop_name,
+                    logo_url: shop.logo_url,
+                })),
+            );
+
+            // Fetch all users for filter options
+            const { data: usersData } = await supabase.from('profiles').select('id, full_name, avatar_url').order('full_name');
+
+            setAllUsers(
+                (usersData || []).map((user) => ({
+                    id: user.id,
+                    name: user.full_name || `User ${user.id}`,
+                    logo_url: user.avatar_url,
+                })),
+            );
+        } catch (error) {
+            console.error('Error fetching filter options:', error);
+        }
+    };
+
+    const getDateFilter = (timeRange: string) => {
+        const now = new Date();
+        let startDate = null;
+
+        switch (timeRange) {
+            case 'today':
+                startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate());
+                break;
+            case 'week':
+                startDate = new Date(now.getFullYear(), now.getMonth(), now.getDate() - 7);
+                break;
+            case 'month':
+                startDate = new Date(now.getFullYear(), now.getMonth(), 1);
+                break;
+            case 'quarter':
+                const quarter = Math.floor(now.getMonth() / 3);
+                startDate = new Date(now.getFullYear(), quarter * 3, 1);
+                break;
+            case 'year':
+                startDate = new Date(now.getFullYear(), 0, 1);
+                break;
+            default:
+                return null;
+        }
+
+        return startDate?.toISOString();
+    };
+
+    const fetchStatistics = async (filtersToApply: FilterState = filters) => {
         try {
             setLoading(true);
 
-            // Fetch overall statistics
-            const [shopsCount, productsCount, totalVisitsData, totalViewsData, totalCartAddsData, ordersCount] = await Promise.all([
-                supabase.from('shops').select('id', { count: 'exact', head: true }),
-                supabase.from('products').select('id', { count: 'exact', head: true }),
-                supabase.from('shops').select('visit_count'),
-                supabase.from('products').select('view_count'),
-                supabase.from('products').select('cart_count'),
-                supabase.from('orders').select('id', { count: 'exact', head: true }),
-            ]);
+            // Build base queries with filters
+            let baseShopsQuery = supabase.from('shops').select('id');
+            let baseProductsQuery = supabase.from('products').select('id');
+            let baseOrdersQuery = supabase.from('orders').select('id');
+
+            // Apply shop filters
+            if (filtersToApply.shops.length > 0) {
+                baseShopsQuery = baseShopsQuery.in('id', filtersToApply.shops);
+                baseProductsQuery = baseProductsQuery.in('shop', filtersToApply.shops);
+                baseOrdersQuery = baseOrdersQuery.in('shop', filtersToApply.shops);
+            }
+
+            // Apply user filters (shop owners)
+            if (filtersToApply.users.length > 0) {
+                baseShopsQuery = baseShopsQuery.in('owner', filtersToApply.users);
+
+                // For products and orders, we need to filter by shops owned by selected users
+                const { data: userShops } = await supabase.from('shops').select('id').in('owner', filtersToApply.users);
+
+                const userShopIds = userShops?.map((shop) => shop.id) || [];
+                if (userShopIds.length > 0) {
+                    baseProductsQuery = baseProductsQuery.in('shop', userShopIds);
+                    baseOrdersQuery = baseOrdersQuery.in('shop', userShopIds);
+                }
+            }
+
+            // Apply time range filter
+            const dateFilter = getDateFilter(filtersToApply.timeRange);
+            if (dateFilter) {
+                baseShopsQuery = baseShopsQuery.gte('created_at', dateFilter);
+                baseProductsQuery = baseProductsQuery.gte('created_at', dateFilter);
+                baseOrdersQuery = baseOrdersQuery.gte('created_at', dateFilter);
+            }
+
+            // Fetch overall statistics - simplified approach
+            const [shopsResult, productsResult, ordersResult] = await Promise.all([baseShopsQuery, baseProductsQuery, baseOrdersQuery]);
+
+            const shopsCount = shopsResult.data?.length || 0;
+            const productsCount = productsResult.data?.length || 0;
+            const ordersCount = ordersResult.data?.length || 0;
+
+            // Fetch aggregated stats for visits, views, and cart adds
+            let visitQuery = supabase.from('shops').select('visit_count');
+            let viewQuery = supabase.from('products').select('view_count');
+            let cartQuery = supabase.from('products').select('cart_count');
+
+            // Apply the same filters to aggregated queries
+            if (filtersToApply.shops.length > 0) {
+                visitQuery = visitQuery.in('id', filtersToApply.shops);
+                viewQuery = viewQuery.in('shop', filtersToApply.shops);
+                cartQuery = cartQuery.in('shop', filtersToApply.shops);
+            }
+
+            if (filtersToApply.users.length > 0) {
+                visitQuery = visitQuery.in('owner', filtersToApply.users);
+
+                const { data: userShops } = await supabase.from('shops').select('id').in('owner', filtersToApply.users);
+
+                const userShopIds = userShops?.map((shop) => shop.id) || [];
+                if (userShopIds.length > 0) {
+                    viewQuery = viewQuery.in('shop', userShopIds);
+                    cartQuery = cartQuery.in('shop', userShopIds);
+                }
+            }
+
+            // Apply time filter to aggregated statistics based on creation dates
+            if (dateFilter) {
+                visitQuery = visitQuery.gte('created_at', dateFilter);
+                viewQuery = viewQuery.gte('created_at', dateFilter);
+                cartQuery = cartQuery.gte('created_at', dateFilter);
+            }
+
+            const [totalVisitsData, totalViewsData, totalCartAddsData] = await Promise.all([visitQuery, viewQuery, cartQuery]);
 
             const totalVisits = totalVisitsData.data?.reduce((sum, shop) => sum + (shop.visit_count || 0), 0) || 0;
             const totalViews = totalViewsData.data?.reduce((sum, product) => sum + (product.view_count || 0), 0) || 0;
             const totalCartAdds = totalCartAddsData.data?.reduce((sum, product) => sum + (product.cart_count || 0), 0) || 0;
 
             setOverallStats({
-                totalShops: shopsCount.count || 0,
-                totalProducts: productsCount.count || 0,
+                totalShops: shopsCount || 0,
+                totalProducts: productsCount || 0,
                 totalVisits,
                 totalViews,
                 totalCartAdds,
-                totalOrders: ordersCount.count || 0,
+                totalOrders: ordersCount || 0,
             });
 
-            // Fetch top visited shops
-            const { data: topShopsData } = await supabase
+            // Fetch top visited shops with filters
+            let topShopsQuery = supabase
                 .from('shops')
                 .select(
                     `
@@ -112,6 +258,20 @@ const StatisticsPage = () => {
                 )
                 .order('visit_count', { ascending: false })
                 .limit(50);
+
+            // Apply filters to shops query
+            if (filtersToApply.shops.length > 0) {
+                topShopsQuery = topShopsQuery.in('id', filtersToApply.shops);
+            }
+            if (filtersToApply.users.length > 0) {
+                topShopsQuery = topShopsQuery.in('owner', filtersToApply.users);
+            }
+            // Apply time filter to top shops query
+            if (dateFilter) {
+                topShopsQuery = topShopsQuery.gte('created_at', dateFilter);
+            }
+
+            const { data: topShopsData } = await topShopsQuery;
 
             // Get product and order counts for each shop
             const shopsWithCounts = await Promise.all(
@@ -134,8 +294,8 @@ const StatisticsPage = () => {
 
             setTopShops(shopsWithCounts);
 
-            // Fetch most viewed products
-            const { data: topProductsData } = await supabase
+            // Fetch most viewed products with filters
+            let topProductsQuery = supabase
                 .from('products')
                 .select(
                     `
@@ -155,6 +315,25 @@ const StatisticsPage = () => {
                 .order('view_count', { ascending: false })
                 .limit(50);
 
+            // Apply filters to products query
+            if (filtersToApply.shops.length > 0) {
+                topProductsQuery = topProductsQuery.in('shop', filtersToApply.shops);
+            }
+            if (filtersToApply.users.length > 0) {
+                const { data: userShops } = await supabase.from('shops').select('id').in('owner', filtersToApply.users);
+
+                const userShopIds = userShops?.map((shop) => shop.id) || [];
+                if (userShopIds.length > 0) {
+                    topProductsQuery = topProductsQuery.in('shop', userShopIds);
+                }
+            }
+            // Apply time filter to top products query
+            if (dateFilter) {
+                topProductsQuery = topProductsQuery.gte('created_at', dateFilter);
+            }
+
+            const { data: topProductsData } = await topProductsQuery;
+
             setTopProducts(
                 (topProductsData || []).map((product) => ({
                     ...product,
@@ -162,8 +341,8 @@ const StatisticsPage = () => {
                 })),
             );
 
-            // Fetch most carted products
-            const { data: mostCartedData } = await supabase
+            // Fetch most carted products with filters
+            let mostCartedQuery = supabase
                 .from('products')
                 .select(
                     `
@@ -183,6 +362,25 @@ const StatisticsPage = () => {
                 .order('cart_count', { ascending: false })
                 .limit(50);
 
+            // Apply filters to carted products query
+            if (filtersToApply.shops.length > 0) {
+                mostCartedQuery = mostCartedQuery.in('shop', filtersToApply.shops);
+            }
+            if (filtersToApply.users.length > 0) {
+                const { data: userShops } = await supabase.from('shops').select('id').in('owner', filtersToApply.users);
+
+                const userShopIds = userShops?.map((shop) => shop.id) || [];
+                if (userShopIds.length > 0) {
+                    mostCartedQuery = mostCartedQuery.in('shop', userShopIds);
+                }
+            }
+            // Apply time filter to carted products query
+            if (dateFilter) {
+                mostCartedQuery = mostCartedQuery.gte('created_at', dateFilter);
+            }
+
+            const { data: mostCartedData } = await mostCartedQuery;
+
             setMostCartedProducts(
                 (mostCartedData || []).map((product) => ({
                     ...product,
@@ -194,6 +392,12 @@ const StatisticsPage = () => {
         } finally {
             setLoading(false);
         }
+    };
+
+    const handleFilterChange = (newFilters: FilterState) => {
+        setFilters(newFilters);
+        // Trigger statistics refresh with the new filters
+        fetchStatistics(newFilters);
     };
 
     const formatNumber = (num: number) => {
@@ -324,6 +528,9 @@ const StatisticsPage = () => {
                 <StatCard icon={<IconShoppingCart className="w-5 h-5 text-white" />} title={t('cart_additions')} value={overallStats.totalCartAdds} color="bg-secondary" />
                 <StatCard icon={<IconDollarSign className="w-5 h-5 text-white" />} title={t('total_orders')} value={overallStats.totalOrders} color="bg-danger" />
             </div>
+
+            {/* Filter Component */}
+            <StatisticsFilter shops={allShops} users={allUsers} onFilterChange={handleFilterChange} currentFilters={filters} isLoading={loading} />
 
             {/* Tabs */}
             <div className="mb-6">
