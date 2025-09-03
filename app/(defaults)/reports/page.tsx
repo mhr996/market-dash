@@ -23,6 +23,7 @@ import SafeApexChart from '@/components/charts/safe-apex-chart';
 import MultiSelect from '@/components/multi-select';
 import DateRangeSelector from '@/components/date-range-selector';
 import Tabs from '@/components/tabs';
+import { exportReport as exportReportUtil, type ExportData } from '@/utils/export-utils';
 
 interface ReportData {
     sales: {
@@ -135,7 +136,7 @@ const Reports = () => {
     const [activeTab, setActiveTab] = useState(0);
     const [selectedShops, setSelectedShops] = useState<number[]>([]);
     const [selectedCategories, setSelectedCategories] = useState<number[]>([]);
-    const [exportFormat, setExportFormat] = useState('pdf');
+    const [exportFormat, setExportFormat] = useState('csv');
     const [viewMode, setViewMode] = useState<'overview' | 'detailed'>('overview');
 
     // Comparison feature
@@ -377,56 +378,193 @@ const Reports = () => {
 
     const exportReport = async () => {
         try {
-            const reportContent = {
-                generated_at: new Date().toISOString(),
-                date_range:
-                    dateRange.length === 2
-                        ? {
-                              start: dateRange[0].toISOString(),
-                              end: dateRange[1].toISOString(),
-                          }
-                        : null,
-                filters: {
-                    shops: selectedShops,
-                    categories: selectedCategories,
+            if (!reportData) {
+                console.error('No data to export');
+                return;
+            }
+
+            // Transform the data to match the ExportData interface
+            const exportData: ExportData = {
+                data: {
+                    sales: {
+                        total_sales: reportData.sales.total_revenue,
+                        total_orders: reportData.sales.total_orders,
+                        average_order_value: reportData.sales.average_order_value,
+                        sales_trend: reportData.sales.monthly_revenue.map((item) => ({
+                            date: item.month,
+                            sales: item.revenue,
+                            orders: 0, // This field is not available in current data
+                        })),
+                    },
+                    revenue: {
+                        total_revenue: reportData.sales.total_revenue,
+                        monthly_revenue: reportData.sales.monthly_revenue.map((item) => ({
+                            month: item.month,
+                            revenue: item.revenue,
+                            growth_rate: 0, // This field is not available in current data
+                        })),
+                    },
+                    shops: {
+                        total_shops: reportData.shops.total_shops,
+                        active_shops: reportData.shops.active_shops,
+                        shops_list: reportData.shops.top_performing_shops.map((shop) => ({
+                            id: shop.id,
+                            shop_name: shop.shop_name,
+                            total_sales: shop.total_revenue,
+                            total_orders: shop.order_count,
+                            status: 'active',
+                        })),
+                    },
+                    products: {
+                        total_products: reportData.products.total_products,
+                        total_views: reportData.products.total_views,
+                        top_selling_products: reportData.products.top_selling_products.map((product) => ({
+                            id: product.id,
+                            title: product.title,
+                            price: product.revenue / (product.total_sales || 1),
+                            view_count: product.views,
+                            cart_count: 0,
+                            shops: { shop_name: product.shop_name },
+                            categories: { title: 'N/A' },
+                        })),
+                        categories_performance: reportData.products.categories_performance.map((category) => ({
+                            title: category.category_name,
+                            products_count: category.product_count,
+                            total_views: 0,
+                            total_cart_adds: 0,
+                        })),
+                    },
+                    users: {
+                        total_users: reportData.users.total_users,
+                        new_registrations: reportData.users.new_registrations,
+                        user_growth_trend: reportData.users.user_growth_trend.map((point) => ({
+                            date: point.date,
+                            new_users: point.count,
+                            total_users: point.count,
+                        })),
+                    },
                 },
-                data: reportData,
+                filters: {
+                    shops: selectedShops.map((id) => id.toString()),
+                    categories: selectedCategories.map((id) => id.toString()),
+                    dateRange: dateRange.length === 2 ? [dateRange[0].toISOString(), dateRange[1].toISOString()] : [],
+                },
             };
 
-            if (exportFormat === 'json') {
-                const blob = new Blob([JSON.stringify(reportContent, null, 2)], { type: 'application/json' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `reports-${new Date().toISOString().split('T')[0]}.json`;
-                a.click();
-                URL.revokeObjectURL(url);
-            } else if (exportFormat === 'csv') {
-                const csvContent = convertToCSV(reportContent);
-                const blob = new Blob([csvContent], { type: 'text/csv' });
-                const url = URL.createObjectURL(blob);
-                const a = document.createElement('a');
-                a.href = url;
-                a.download = `reports-${new Date().toISOString().split('T')[0]}.csv`;
-                a.click();
-                URL.revokeObjectURL(url);
-            }
+            exportReportUtil(exportData, exportFormat as 'csv' | 'json', t, 'market_dashboard_report');
         } catch (error) {
             console.error('Error exporting report:', error);
         }
     };
 
     const convertToCSV = (data: any) => {
-        let csv = 'Report Type,Value\n';
-        csv += `Total Revenue,$${data.data.sales.total_revenue.toFixed(2)}\n`;
-        csv += `Total Orders,${data.data.sales.total_orders}\n`;
-        csv += `Average Order Value,$${data.data.sales.average_order_value.toFixed(2)}\n`;
-        csv += `Total Shops,${data.data.shops.total_shops}\n`;
-        csv += `Active Shops,${data.data.shops.active_shops}\n`;
-        csv += `Total Products,${data.data.products.total_products}\n`;
-        csv += `Total Product Views,${data.data.products.total_views}\n`;
-        csv += `Total Users,${data.data.users.total_users}\n`;
-        csv += `New Registrations (30 days),${data.data.users.new_registrations}\n`;
+        const { t } = getTranslation();
+        let csv = '';
+
+        // Report Header
+        csv += `${t('reports')} - ${new Date().toLocaleDateString()}\n`;
+        csv += `Generated: ${new Date().toLocaleString()}\n`;
+
+        if (data.date_range) {
+            csv += `Date Range: ${new Date(data.date_range.start).toLocaleDateString()} - ${new Date(data.date_range.end).toLocaleDateString()}\n`;
+        }
+
+        csv += '\n';
+
+        // Sales Summary
+        csv += `=== ${t('sales_analytics').toUpperCase()} ===\n`;
+        csv += `${t('total_sales')},$${data.data.sales.total_revenue.toFixed(2)}\n`;
+        csv += `${t('total_orders')},${data.data.sales.total_orders}\n`;
+        csv += `${t('average_order_value')},$${data.data.sales.average_order_value.toFixed(2)}\n`;
+        csv += `${t('growth_rate')},${data.data.sales.growth_rate.toFixed(2)}%\n`;
+        csv += '\n';
+
+        // Monthly Revenue Detail
+        if (data.data.sales.monthly_revenue && data.data.sales.monthly_revenue.length > 0) {
+            csv += `=== ${t('monthly_revenue').toUpperCase()} ===\n`;
+            csv += `Month,Revenue\n`;
+            data.data.sales.monthly_revenue.forEach((item: any) => {
+                csv += `${item.month},$${item.revenue.toFixed(2)}\n`;
+            });
+            csv += '\n';
+        }
+
+        // Shops Summary
+        csv += `=== ${t('shops_overview').toUpperCase()} ===\n`;
+        csv += `${t('total_shops')},${data.data.shops.total_shops}\n`;
+        csv += `${t('active_shops')},${data.data.shops.active_shops}\n`;
+        csv += '\n';
+
+        // Top Performing Shops Detail
+        if (data.data.shops.top_performing_shops && data.data.shops.top_performing_shops.length > 0) {
+            csv += `=== ${t('top_performing_shops').toUpperCase()} ===\n`;
+            csv += `Shop Name,Owner,Revenue,Orders,Products,Visit Count\n`;
+            data.data.shops.top_performing_shops.forEach((shop: any) => {
+                const ownerName = shop.profiles?.full_name || 'N/A';
+                const revenue = shop.shop_earnings?.[0]?.total_earnings || 0;
+                const orders = shop._count?.orders || 0;
+                const products = shop._count?.products || 0;
+                const visits = shop.visit_count || 0;
+                csv += `"${shop.shop_name}","${ownerName}",$${revenue.toFixed(2)},${orders},${products},${visits}\n`;
+            });
+            csv += '\n';
+        }
+
+        // Products Summary
+        csv += `=== ${t('products_overview').toUpperCase()} ===\n`;
+        csv += `${t('total_products')},${data.data.products.total_products}\n`;
+        csv += `${t('total_views')},${data.data.products.total_views}\n`;
+        csv += '\n';
+
+        // Top Selling Products Detail
+        if (data.data.products.top_selling_products && data.data.products.top_selling_products.length > 0) {
+            csv += `=== ${t('top_selling_products').toUpperCase()} ===\n`;
+            csv += `Product Name,Shop,Price,Views,Cart Adds,Category\n`;
+            data.data.products.top_selling_products.forEach((product: any) => {
+                const shopName = product.shops?.shop_name || 'N/A';
+                const categoryName = product.categories?.title || 'N/A';
+                csv += `"${product.title}","${shopName}",$${product.price},${product.view_count || 0},${product.cart_count || 0},"${categoryName}"\n`;
+            });
+            csv += '\n';
+        }
+
+        // Categories Performance Detail
+        if (data.data.products.categories_performance && data.data.products.categories_performance.length > 0) {
+            csv += `=== ${t('category_performance').toUpperCase()} ===\n`;
+            csv += `Category,Products Count,Total Views,Total Cart Adds\n`;
+            data.data.products.categories_performance.forEach((category: any) => {
+                csv += `"${category.title}",${category.products_count},${category.total_views},${category.total_cart_adds}\n`;
+            });
+            csv += '\n';
+        }
+
+        // Users Summary
+        csv += `=== ${t('user_analytics').toUpperCase()} ===\n`;
+        csv += `${t('total_users')},${data.data.users.total_users}\n`;
+        csv += `${t('new_registrations')},${data.data.users.new_registrations}\n`;
+        csv += '\n';
+
+        // User Growth Trend Detail
+        if (data.data.users.user_growth_trend && data.data.users.user_growth_trend.length > 0) {
+            csv += `=== ${t('user_growth_trend').toUpperCase()} ===\n`;
+            csv += `Date,New Users,Total Users\n`;
+            data.data.users.user_growth_trend.forEach((point: any) => {
+                csv += `${point.date},${point.new_users},${point.total_users}\n`;
+            });
+            csv += '\n';
+        }
+
+        // Filter Information
+        if (data.filters.shops.length > 0 || data.filters.categories.length > 0) {
+            csv += `=== FILTERS APPLIED ===\n`;
+            if (data.filters.shops.length > 0) {
+                csv += `Filtered Shops: ${data.filters.shops.join(', ')}\n`;
+            }
+            if (data.filters.categories.length > 0) {
+                csv += `Filtered Categories: ${data.filters.categories.join(', ')}\n`;
+            }
+        }
+
         return csv;
     };
 
@@ -466,25 +604,6 @@ const Reports = () => {
                         <IconSettings className="h-5 w-5 text-primary" />
                         <h2 className="text-lg font-semibold text-black dark:text-white-light">{t('filters')}</h2>
                     </div>
-                    <div className="flex items-center gap-2">
-                        <label className="text-sm font-medium text-gray-700 dark:text-gray-300">{t('view_mode')}:</label>
-                        <div className="flex rounded-lg border border-white-light dark:border-white-dark">
-                            <button
-                                type="button"
-                                className={`px-3 py-1 text-xs rounded-l-lg ${viewMode === 'overview' ? 'bg-primary text-white' : 'bg-transparent hover:bg-primary/10'}`}
-                                onClick={() => setViewMode('overview')}
-                            >
-                                {t('overview')}
-                            </button>
-                            <button
-                                type="button"
-                                className={`px-3 py-1 text-xs rounded-r-lg ${viewMode === 'detailed' ? 'bg-primary text-white' : 'bg-transparent hover:bg-primary/10'}`}
-                                onClick={() => setViewMode('detailed')}
-                            >
-                                {t('detailed')}
-                            </button>
-                        </div>
-                    </div>
                 </div>
 
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
@@ -499,8 +618,7 @@ const Reports = () => {
                         <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">{t('export_format')}</label>
                         <div className="relative">
                             <select className="form-select appearance-none pr-10" value={exportFormat} onChange={(e) => setExportFormat(e.target.value)}>
-                                <option value="pdf">PDF</option>
-                                <option value="csv">CSV</option>
+                                <option value="csv">CSV (Detailed Report)</option>
                                 <option value="json">JSON</option>
                             </select>
                             <IconCaretDown className="absolute right-3 top-1/2 h-4 w-4 -translate-y-1/2 text-gray-400 pointer-events-none" />
@@ -510,7 +628,7 @@ const Reports = () => {
                     {/* Clear Filters */}
                     <div className="flex items-end">
                         <button type="button" className="btn btn-outline-danger w-full" onClick={clearFilters}>
-                            <IconRefresh className="h-4 w-4 mr-2" />
+                            <IconRefresh className="h-4 w-4 mx-2" />
                             {t('clear_filters')}
                         </button>
                     </div>

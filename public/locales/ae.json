@@ -600,6 +600,9 @@
     "commission_earned": "العمولة المكتسبة",
     "top_categories": "أفضل الفئات",
     "new_registrations": "التسجيلات الجديدة",
+    "revenue_analytics": "تحليلات الإيرادات",
+    "shops_details": "تفاصيل المتاجر",
+    "sales_trend": "اتجاه المبيعات",
     "product_features": "مميزات المنتج",
     "add_feature": "إضافة ميزة",
     "no_features_added": "لم يتم إضافة أي مميزات بعد",
@@ -629,5 +632,6 @@
     "metric_type": "نوع المقياس",
     "time_range": "النطاق الزمني",
     "close": "إغلاق",
-    "clear_all": "مسح الكل"
+    "clear_all": "مسح الكل",
+    "filters": "الفلاتر"
 }

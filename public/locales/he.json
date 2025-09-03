@@ -555,6 +555,9 @@
     "commission_earned": "עמלה שהורווחה",
     "top_categories": "קטגוריות מובילות",
     "new_registrations": "הרשמות חדשות",
+    "revenue_analytics": "ניתוחי הכנסות",
+    "shops_details": "פרטי חנויות",
+    "sales_trend": "מגמת מכירות",
     "product_features": "תכונות המוצר",
     "add_feature": "הוסף תכונה",
     "no_features_added": "לא נוספו תכונות עדיין",
@@ -588,5 +591,6 @@
     "metric_type": "סוג מדד",
     "time_range": "טווח זמן",
     "clear_all": "נקה הכל",
-    "close": "סגור"
+    "close": "סגור",
+    "filters": "פילטרים"
 }

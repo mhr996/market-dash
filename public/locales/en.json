@@ -601,6 +601,9 @@
     "commission_earned": "Commission Earned",
     "top_categories": "Top Categories",
     "new_registrations": "New Registrations",
+    "revenue_analytics": "Revenue Analytics",
+    "shops_details": "Shop Details",
+    "sales_trend": "Sales Trend",
     "product_features": "Product Features",
     "add_feature": "Add Feature",
     "no_features_added": "No features added yet",
@@ -613,5 +616,6 @@
     "features_help_text": "Features help customers understand product specifications and details.",
     "unsaved_changes": "Unsaved changes",
     "cancel_changes": "Cancel Changes",
-    "close": "Close"
+    "close": "Close",
+    "filters": "Filters"
 }

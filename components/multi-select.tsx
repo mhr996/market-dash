@@ -1,7 +1,8 @@
 'use client';
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, use } from 'react';
 import IconCaretDown from '@/components/icon/icon-caret-down';
 import IconX from '@/components/icon/icon-x';
+import { getTranslation } from '@/i18n';
 
 interface Option {
     id: number;
@@ -22,6 +23,8 @@ const MultiSelect: React.FC<MultiSelectProps> = ({ options, selectedValues, onCh
     const [isOpen, setIsOpen] = useState(false);
     const [searchTerm, setSearchTerm] = useState('');
     const dropdownRef = useRef<HTMLDivElement>(null);
+
+    const { t } = getTranslation();
 
     const filteredOptions = options.filter((option) => option.name.toLowerCase().includes(searchTerm.toLowerCase()));
 
@@ -93,7 +96,7 @@ const MultiSelect: React.FC<MultiSelectProps> = ({ options, selectedValues, onCh
                 <div className="absolute top-full z-50 mt-1 w-full rounded-md border border-white-light bg-white shadow-lg dark:border-white-dark dark:bg-black">
                     {/* Search */}
                     <div className="p-2">
-                        <input type="text" className="form-input" placeholder="Search..." value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} onClick={(e) => e.stopPropagation()} />
+                        <input type="text" className="form-input" placeholder={t('search')} value={searchTerm} onChange={(e) => setSearchTerm(e.target.value)} onClick={(e) => e.stopPropagation()} />
                     </div>
 
                     {/* Clear All Button */}

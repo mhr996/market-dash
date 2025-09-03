@@ -52,7 +52,13 @@ const DateRangeSelector: React.FC<DateRangeSelectorProps> = ({ value, onChange, 
     const handleSelect = (ranges: any) => {
         const range = ranges.selection;
         setSelection(range);
-        onChange([range.startDate, range.endDate]);
+        // Don't call onChange immediately - wait for Apply button
+    };
+
+    const handleApply = () => {
+        // Only call onChange when Apply is clicked
+        onChange([selection.startDate, selection.endDate]);
+        setIsOpen(false);
     };
 
     const formatDateRange = () => {
@@ -174,7 +180,6 @@ const DateRangeSelector: React.FC<DateRangeSelectorProps> = ({ value, onChange, 
                 .dark .date-range-picker-container .rdrDayPassive span {
                     color: #6b7280 !important;
                 }
-
             `}</style>
 
             <div className={`relative ${className}`} ref={dropdownRef}>
@@ -205,7 +210,7 @@ const DateRangeSelector: React.FC<DateRangeSelectorProps> = ({ value, onChange, 
 
                         {/* Apply Button */}
                         <div className="border-t border-gray-200 p-3 dark:border-gray-700">
-                            <button type="button" className="btn btn-primary w-full" onClick={() => setIsOpen(false)}>
+                            <button type="button" className="btn btn-primary w-full" onClick={handleApply}>
                                 Apply
                             </button>
                         </div>
