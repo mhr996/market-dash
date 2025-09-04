@@ -41,3 +41,4 @@ export const getTranslation = () => {
 
     return { t, i18n, initLocale };
 };
+

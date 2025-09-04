@@ -3,11 +3,51 @@ import Link from 'next/link';
 import { useParams } from 'next/navigation';
 import React, { useEffect, useState } from 'react';
 import { getTranslation } from '@/i18n';
-import { orders, Order as OrderData } from '../../data';
 import IconPrinter from '@/components/icon/icon-printer';
 import IconDownload from '@/components/icon/icon-download';
 import { generateOrderReceiptPDF } from '@/utils/pdf-generator';
 import { useRouter } from 'next/navigation';
+import supabase from '@/lib/supabase';
+
+// Interfaces for Supabase order data
+interface OrderData {
+    id: number;
+    created_at: string;
+    buyer_id: string;
+    status: string;
+    product_id: number;
+    shipping_method: any;
+    shipping_address: any;
+    payment_method: any;
+    // Joined data
+    products?: {
+        id: number;
+        title: string;
+        price: number;
+        images: any[];
+        shop: number;
+        shops?: {
+            shop_name: string;
+        };
+    };
+    profiles?: {
+        id: string;
+        full_name: string;
+        email: string;
+    };
+}
+
+// Helper functions to parse JSON fields
+const parseJsonField = (field: any) => {
+    if (typeof field === 'string') {
+        try {
+            return JSON.parse(field);
+        } catch {
+            return {};
+        }
+    }
+    return field || {};
+};
 
 interface Order {
     id: number;
@@ -23,22 +63,71 @@ interface Order {
 
 const PreviewOrder = () => {
     const { t } = getTranslation();
-    // Fix: Type assertion to access id from params
     const params = useParams();
     const id = params?.id as string;
 
-    const [order, setOrder] = useState<OrderData | null>(null);
+    const [order, setOrder] = useState<any | null>(null);
     const [loading, setLoading] = useState(true);
 
     const router = useRouter();
 
     useEffect(() => {
-        if (id) {
-            // Find order from dummy data
-            const foundOrder = orders.find((o) => o.id === parseInt(id));
-            setOrder(foundOrder || null);
-            setLoading(false);
-        }
+        const fetchOrder = async () => {
+            if (!id) return;
+
+            try {
+                const { data, error } = await supabase
+                    .from('orders')
+                    .select(
+                        `
+                        *,
+                        products(id, title, price, images, shop, shops(shop_name)),
+                        profiles(id, full_name, email)
+                    `,
+                    )
+                    .eq('id', parseInt(id))
+                    .single();
+
+                if (error) throw error;
+
+                // Format the order data for display
+                const shippingAddress = parseJsonField(data.shipping_address);
+                const paymentMethod = parseJsonField(data.payment_method);
+                const shippingMethod = parseJsonField(data.shipping_method);
+
+                const formattedOrder = {
+                    id: data.id,
+                    name: data.products?.title || 'Product',
+                    image: data.products?.images?.[0] || null,
+                    buyer: data.profiles?.full_name || shippingAddress.name || 'Unknown Customer',
+                    date: data.created_at,
+                    total: `$${(data.products?.price || 0).toFixed(2)}`,
+                    status: data.status,
+                    address: `${shippingAddress.address || ''}, ${shippingAddress.city || ''}, ${shippingAddress.zip || ''}`.trim(),
+                    items: [
+                        {
+                            name: data.products?.title || 'Product',
+                            quantity: 1,
+                            price: data.products?.price || 0,
+                        },
+                    ],
+                    shipping_method: shippingMethod,
+                    shipping_address: shippingAddress,
+                    payment_method: paymentMethod,
+                    product_id: data.product_id,
+                    buyer_id: data.buyer_id,
+                };
+
+                setOrder(formattedOrder);
+            } catch (error) {
+                console.error('Error fetching order:', error);
+                setOrder(null);
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchOrder();
     }, [id]);
     const handlePrint = async () => {
         if (!order) return;
@@ -68,7 +157,7 @@ const PreviewOrder = () => {
 
     const calculateSubtotal = () => {
         if (!order) return 0;
-        return order.items.reduce((sum, item) => sum + item.price * item.quantity, 0);
+        return order.items.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0);
     };
 
     const calculateTax = () => {
@@ -85,7 +174,7 @@ const PreviewOrder = () => {
     if (!order) {
         return <div className="flex items-center justify-center h-screen">{t('order_not_found')}</div>;
     }
-    return ( 
+    return (
         <div className="print:p-0">
             <div onClick={() => router.back()}>
                 <svg xmlns="http://www.w3.org/2000/svg" className="h-7 w-7 mb-4 cursor-pointer text-primary rtl:rotate-180" fill="none" viewBox="0 0 24 24" stroke="currentColor">
@@ -196,7 +285,7 @@ const PreviewOrder = () => {
                                     </tr>
                                 </thead>
                                 <tbody>
-                                    {order.items.map((item, index) => (
+                                    {order.items.map((item: any, index: number) => (
                                         <tr key={index}>
                                             <td>{item.name}</td>
                                             <td className="text-center">{item.quantity}</td>

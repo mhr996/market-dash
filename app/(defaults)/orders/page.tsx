@@ -12,8 +12,88 @@ import React, { useEffect, useState } from 'react';
 import { Alert } from '@/components/elements/alerts/elements-alerts-default';
 import ConfirmModal from '@/components/modals/confirm-modal';
 import { getTranslation } from '@/i18n';
-import { orders as dummyOrders, Order as OrderData } from './data';
 import { generateOrderReceiptPDF } from '@/utils/pdf-generator';
+import supabase from '@/lib/supabase';
+
+// Interfaces for Supabase order data
+interface OrderData {
+    id: number;
+    created_at: string;
+    buyer_id: string;
+    status: string;
+    product_id: number;
+    shipping_method: any;
+    shipping_address: any;
+    payment_method: any;
+    // Joined data
+    products?: {
+        id: number;
+        title: string;
+        price: number;
+        images: any[];
+        shop: number;
+        shops?: {
+            shop_name: string;
+        };
+    };
+    profiles?: {
+        id: string;
+        full_name: string;
+        email: string;
+    };
+}
+
+// Helper functions to parse JSON fields
+const parseJsonField = (field: any) => {
+    if (typeof field === 'string') {
+        try {
+            return JSON.parse(field);
+        } catch {
+            return {};
+        }
+    }
+    return field || {};
+};
+
+// Helper function to format order data for display
+const formatOrderForDisplay = (order: OrderData) => {
+    const shippingAddress = parseJsonField(order.shipping_address);
+    const paymentMethod = parseJsonField(order.payment_method);
+    const shippingMethod = parseJsonField(order.shipping_method);
+
+    // Map database status to display status
+    const statusMap: { [key: string]: 'completed' | 'processing' | 'cancelled' } = {
+        Active: 'processing',
+        Completed: 'completed',
+        Cancelled: 'cancelled',
+        Delivered: 'completed',
+        Pending: 'processing',
+        Shipped: 'processing',
+    };
+
+    return {
+        id: order.id,
+        name: order.products?.title || 'Product',
+        image: order.products?.images?.[0] || null,
+        buyer: order.profiles?.full_name || shippingAddress.name || 'Unknown Customer',
+        date: order.created_at,
+        total: `$${(order.products?.price || 0).toFixed(2)}`,
+        status: statusMap[order.status] || 'processing',
+        address: `${shippingAddress.address || ''}, ${shippingAddress.city || ''}, ${shippingAddress.zip || ''}`.trim(),
+        items: [
+            {
+                name: order.products?.title || 'Product',
+                quantity: 1,
+                price: order.products?.price || 0,
+            },
+        ],
+        shipping_method: shippingMethod,
+        shipping_address: shippingAddress,
+        payment_method: paymentMethod,
+        product_id: order.product_id,
+        buyer_id: order.buyer_id,
+    };
+};
 
 interface Order {
     id: number;
@@ -30,12 +110,13 @@ interface Order {
 const OrdersList = () => {
     const { t } = getTranslation();
     const [items, setItems] = useState<OrderData[]>([]);
+    const [displayItems, setDisplayItems] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
     const [page, setPage] = useState(1);
     const PAGE_SIZES = [10, 20, 30, 50, 100];
     const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
-    const [initialRecords, setInitialRecords] = useState<OrderData[]>([]);
-    const [records, setRecords] = useState<OrderData[]>([]);
+    const [initialRecords, setInitialRecords] = useState<any[]>([]);
+    const [records, setRecords] = useState<any[]>([]);
     const [selectedRecords, setSelectedRecords] = useState<any>([]);
 
     const [search, setSearch] = useState('');
@@ -52,7 +133,7 @@ const OrdersList = () => {
     });
 
     const handlePrintOrder = async (orderId: number) => {
-        const order = items.find((item) => item.id === orderId);
+        const order = displayItems.find((item) => item.id === orderId);
         if (!order) return;
 
         try {
@@ -70,7 +151,7 @@ const OrdersList = () => {
     };
 
     const handleDownloadOrderPDF = async (orderId: number) => {
-        const order = items.find((item) => item.id === orderId);
+        const order = displayItems.find((item) => item.id === orderId);
         if (!order) return;
 
         try {
@@ -88,9 +169,39 @@ const OrdersList = () => {
     };
 
     useEffect(() => {
-        // Use dummy data instead of Supabase
-        setItems(dummyOrders);
-        setLoading(false);
+        const fetchOrders = async () => {
+            try {
+                const { data, error } = await supabase
+                    .from('orders')
+                    .select(
+                        `
+                        *,
+                        products(id, title, price, images, shop, shops(shop_name)),
+                        profiles(id, full_name, email)
+                    `,
+                    )
+                    .order('created_at', { ascending: false });
+
+                if (error) throw error;
+
+                setItems(data as OrderData[]);
+
+                // Transform data for display
+                const transformed = data.map(formatOrderForDisplay);
+                setDisplayItems(transformed);
+            } catch (error) {
+                console.error('Error fetching orders:', error);
+                setAlert({
+                    visible: true,
+                    message: t('error_fetching_orders'),
+                    type: 'danger',
+                });
+            } finally {
+                setLoading(false);
+            }
+        };
+
+        fetchOrders();
     }, []);
 
     useEffect(() => {
@@ -104,29 +215,33 @@ const OrdersList = () => {
     }, [page, pageSize, initialRecords]);
     useEffect(() => {
         setInitialRecords(
-            items.filter((item) => {
+            displayItems.filter((item) => {
                 return item.name.toLowerCase().includes(search.toLowerCase()) || item.buyer.toLowerCase().includes(search.toLowerCase()) || item.total.toLowerCase().includes(search.toLowerCase());
             }),
         );
-    }, [search, items]);
+    }, [search, displayItems]);
 
     useEffect(() => {
         const data = sortBy(initialRecords, sortStatus.columnAccessor);
         setInitialRecords(sortStatus.direction === 'desc' ? data.reverse() : data);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [sortStatus]);
+
     const handleDelete = async (order: OrderData | null) => {
         if (!order) return;
 
         try {
-            // Remove from dummy data
+            // Delete from Supabase
+            const { error } = await supabase.from('orders').delete().eq('id', order.id);
+
+            if (error) throw error;
+
+            // Update local state
             const updatedItems = items.filter((item) => item.id !== order.id);
             setItems(updatedItems);
-            setInitialRecords(
-                updatedItems.filter((item) => {
-                    return item.name.toLowerCase().includes(search.toLowerCase()) || item.buyer.toLowerCase().includes(search.toLowerCase()) || item.total.toLowerCase().includes(search.toLowerCase());
-                }),
-            );
+
+            const updatedDisplayItems = displayItems.filter((item) => item.id !== order.id);
+            setDisplayItems(updatedDisplayItems);
 
             setAlert({ visible: true, message: t('order_deleted_successfully'), type: 'success' });
         } catch (error) {

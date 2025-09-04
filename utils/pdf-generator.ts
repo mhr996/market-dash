@@ -103,7 +103,7 @@ export const generateOrderReceiptPDF = async (orderData: any, options: PDFOption
             <div style="max-width: 800px; margin: 0 auto; padding: 20px; background: white;">
                 <!-- Header -->
                 <div style="text-align: center; margin-bottom: 30px; border-bottom: 2px solid #4f46e5; padding-bottom: 20px;">
-                    <h1 style="color: #4f46e5; margin: 0; font-size: 28px; font-weight: bold;">VRISTO</h1>
+                    <h1 style="color: #4f46e5; margin: 0; font-size: 28px; font-weight: bold;">PAZAR</h1>
                     <p style="margin: 5px 0 0 0; color: #666; font-size: 14px;">Order Receipt</p>
                 </div>
 

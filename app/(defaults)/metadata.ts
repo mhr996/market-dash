@@ -1,6 +1,6 @@
 import { Metadata } from 'next';
 
 export const metadata: Metadata = {
-    title: 'Vristo Dashboard',
-    description: 'Vristo Dashboard - Home Page',
+    title: 'PAZAR Dashboard',
+    description: 'PAZAR Dashboard - Home Page',
 };

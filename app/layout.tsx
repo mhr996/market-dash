@@ -6,8 +6,8 @@ import { Nunito, Almarai } from 'next/font/google';
 
 export const metadata: Metadata = {
     title: {
-        template: '%s | VRISTO',
-        default: 'VRISTO',
+        template: '%s | PAZAR',
+        default: 'PAZAR - Dashboard',
     },
 };
 const nunito = Nunito({

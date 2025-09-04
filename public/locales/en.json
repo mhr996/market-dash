@@ -458,6 +458,7 @@
     "delete_order_confirmation": "Are you sure you want to delete this order?",
     "order_deleted_successfully": "Order deleted successfully!",
     "error_deleting_order": "Error deleting order",
+    "error_fetching_orders": "Error fetching orders",
     "showing_entries": "Showing {{from}} to {{to}} of {{totalRecords}} entries",
     "order_details": "Order Details",
     "order_not_found": "Order not found",
