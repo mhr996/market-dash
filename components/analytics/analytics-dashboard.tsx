@@ -52,10 +52,23 @@ interface Product {
 
 interface Order {
     id: number;
-    total_amount: number;
+    buyer_id: string;
+    product_id: number;
     status: string;
     created_at: string;
-    user_id: string;
+    shipping_method: any;
+    shipping_address: any;
+    payment_method: any;
+    products?: {
+        id: number;
+        title: string;
+        price: number;
+        shop: number;
+        shops?: {
+            id: number;
+            shop_name: string;
+        };
+    };
 }
 
 interface AnalyticsState {
@@ -176,13 +189,15 @@ const AnalyticsDashboard = () => {
 
     // Process orders data to get revenue by date
     const processRevenueData = (orders: Order[]) => {
-        // Group orders by date and sum amounts
+        // Group orders by date and sum amounts (using product price)
         const revenueByDate = orders.reduce((acc: { [key: string]: number }, order) => {
             const date = order.created_at.split('T')[0];
             if (!acc[date]) {
                 acc[date] = 0;
             }
-            acc[date] += order.total_amount;
+            // Calculate revenue from product price
+            const orderTotal = order.products?.price || 0;
+            acc[date] += orderTotal;
             return acc;
         }, {});
 
@@ -215,25 +230,26 @@ const AnalyticsDashboard = () => {
     // Calculate top shops by orders and revenue
     const calculateTopShops = (orders: Order[], shops: Shop[]) => {
         // Group orders by shop
-        const ordersByShop: { [key: string]: { orders: number; revenue: number } } = {};
+        const ordersByShop: { [key: string]: { orders: number; revenue: number; shopName: string } } = {};
 
         orders.forEach((order) => {
-            const product = analytics.products.find((p) => p.id === order.id);
-            if (product) {
-                if (!ordersByShop[product.shop]) {
-                    ordersByShop[product.shop] = { orders: 0, revenue: 0 };
+            if (order.products && order.products.shops) {
+                const shopId = order.products.shop.toString();
+                const shopName = order.products.shops.shop_name || t('unknown_shop');
+
+                if (!ordersByShop[shopId]) {
+                    ordersByShop[shopId] = { orders: 0, revenue: 0, shopName };
                 }
-                ordersByShop[product.shop].orders++;
-                ordersByShop[product.shop].revenue += order.total_amount;
+                ordersByShop[shopId].orders++;
+                ordersByShop[shopId].revenue += order.products.price || 0;
             }
         });
 
         // Convert to array and add shop names
         return Object.entries(ordersByShop)
             .map(([shopId, data]) => {
-                const shop = shops.find((s) => s.id === shopId);
                 return {
-                    name: shop ? shop.shop_name : 'Unknown Shop',
+                    name: data.shopName,
                     orders: data.orders,
                     revenue: data.revenue,
                 };
@@ -265,7 +281,15 @@ const AnalyticsDashboard = () => {
                     supabase.from('shops').select('*').gte('created_at', startDate),
                     supabase.from('profiles').select('*').gte('registration_date', startDate),
                     supabase.from('products').select('*').gte('created_at', startDate),
-                    supabase.from('orders').select('*').gte('created_at', startDate),
+                    supabase
+                        .from('orders')
+                        .select(
+                            `
+                        *,
+                        products(id, title, price, shop, shops(id, shop_name))
+                    `,
+                        )
+                        .gte('created_at', startDate),
                 ]);
 
                 // Fetch previous period data for growth calculation
@@ -273,7 +297,16 @@ const AnalyticsDashboard = () => {
                     supabase.from('shops').select('*').gte('created_at', previousStartDate).lt('created_at', startDate),
                     supabase.from('profiles').select('*').gte('registration_date', previousStartDate).lt('registration_date', startDate),
                     supabase.from('products').select('*').gte('created_at', previousStartDate).lt('created_at', startDate),
-                    supabase.from('orders').select('*').gte('created_at', previousStartDate).lt('created_at', startDate),
+                    supabase
+                        .from('orders')
+                        .select(
+                            `
+                        *,
+                        products(id, title, price, shop, shops(id, shop_name))
+                    `,
+                        )
+                        .gte('created_at', previousStartDate)
+                        .lt('created_at', startDate),
                 ]);
 
                 // Process user data for normalized date handling
@@ -281,8 +314,8 @@ const AnalyticsDashboard = () => {
                 const processedPreviousUsers = processUserData(previousUsers || []);
 
                 // Calculate revenue totals
-                const currentRevenue = currentOrders ? currentOrders.reduce((sum, order) => sum + order.total_amount, 0) : 0;
-                const previousRevenue = previousOrders ? previousOrders.reduce((sum, order) => sum + order.total_amount, 0) : 0;
+                const currentRevenue = currentOrders ? currentOrders.reduce((sum, order) => sum + (order.products?.price || 0), 0) : 0;
+                const previousRevenue = previousOrders ? previousOrders.reduce((sum, order) => sum + (order.products?.price || 0), 0) : 0;
 
                 // Fetch all shops for reference (needed for shop names)
                 const { data: allShops } = await supabase.from('shops').select('*');
@@ -1118,7 +1151,7 @@ const AnalyticsDashboard = () => {
                                                 <div className="px-4 w-full">
                                                     <h6 className="font-semibold dark:text-white-light">{shop.name}</h6>
                                                     <p className="text-xs text-white-dark">
-                                                        {shop.orders} orders • ${shop.revenue.toFixed(2)} revenue
+                                                        {shop.orders} {t('orders')} • ${shop.revenue.toFixed(2)} {t('revenue')}
                                                     </p>
                                                     <div className="mt-2 h-1.5 rounded-full bg-dark-light/30 dark:bg-dark-light/10">
                                                         <div
@@ -1213,7 +1246,7 @@ const AnalyticsDashboard = () => {
                                                     </div>
                                                     <div>
                                                         <h5 className="font-semibold dark:text-white-light">
-                                                            {t('new_order_placed')}: <span className="text-success">${order.total_amount.toFixed(2)}</span>
+                                                            {t('new_order_placed')}: <span className="text-success">${(order.products?.price || 0).toFixed(2)}</span>
                                                         </h5>
                                                         <p className="text-xs text-white-dark">
                                                             {new Date(order.created_at).toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' })}

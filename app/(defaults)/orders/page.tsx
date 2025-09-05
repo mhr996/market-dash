@@ -8,6 +8,7 @@ import IconDownload from '@/components/icon/icon-download';
 import { sortBy } from 'lodash';
 import { DataTableSortStatus, DataTable } from 'mantine-datatable';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import React, { useEffect, useState } from 'react';
 import { Alert } from '@/components/elements/alerts/elements-alerts-default';
 import ConfirmModal from '@/components/modals/confirm-modal';
@@ -71,11 +72,24 @@ const formatOrderForDisplay = (order: OrderData) => {
         Shipped: 'processing',
     };
 
+    // Map status to delivery status
+    const deliveryStatusMap: { [key: string]: string } = {
+        Active: 'preparing',
+        Completed: 'delivered',
+        Cancelled: 'cancelled',
+        Delivered: 'delivered',
+        Pending: 'pending',
+        Shipped: 'shipped',
+    };
+
     return {
         id: order.id,
         name: order.products?.title || 'Product',
         image: order.products?.images?.[0] || null,
         buyer: order.profiles?.full_name || shippingAddress.name || 'Unknown Customer',
+        shop_name: order.products?.shops?.shop_name || 'Unknown Shop',
+        delivery_status: deliveryStatusMap[order.status] || 'pending',
+        city: shippingAddress.city || 'Unknown City',
         date: order.created_at,
         total: `$${(order.products?.price || 0).toFixed(2)}`,
         status: statusMap[order.status] || 'processing',
@@ -109,6 +123,7 @@ interface Order {
 
 const OrdersList = () => {
     const { t } = getTranslation();
+    const router = useRouter();
     const [items, setItems] = useState<OrderData[]>([]);
     const [displayItems, setDisplayItems] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
@@ -121,7 +136,7 @@ const OrdersList = () => {
 
     const [search, setSearch] = useState('');
     const [sortStatus, setSortStatus] = useState<DataTableSortStatus>({
-        columnAccessor: 'id',
+        columnAccessor: 'date',
         direction: 'desc',
     });
     const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -216,7 +231,14 @@ const OrdersList = () => {
     useEffect(() => {
         setInitialRecords(
             displayItems.filter((item) => {
-                return item.name.toLowerCase().includes(search.toLowerCase()) || item.buyer.toLowerCase().includes(search.toLowerCase()) || item.total.toLowerCase().includes(search.toLowerCase());
+                return (
+                    item.name.toLowerCase().includes(search.toLowerCase()) ||
+                    item.buyer.toLowerCase().includes(search.toLowerCase()) ||
+                    item.total.toLowerCase().includes(search.toLowerCase()) ||
+                    item.shop_name.toLowerCase().includes(search.toLowerCase()) ||
+                    item.delivery_status.toLowerCase().includes(search.toLowerCase()) ||
+                    item.city.toLowerCase().includes(search.toLowerCase())
+                );
             }),
         );
     }, [search, displayItems]);
@@ -299,8 +321,11 @@ const OrdersList = () => {
 
                     <div className="datatables">
                         <DataTable
-                            className={loading ? 'pointer-events-none' : ''}
+                            className={loading ? 'pointer-events-none' : 'cursor-pointer'}
                             records={records}
+                            onRowClick={(record) => {
+                                router.push(`/orders/preview/${record.id}`);
+                            }}
                             columns={[
                                 {
                                     accessor: 'id',
@@ -331,10 +356,38 @@ const OrdersList = () => {
                                     sortable: true,
                                 },
                                 {
+                                    accessor: 'shop_name',
+                                    title: t('shop_name'),
+                                    sortable: true,
+                                    render: ({ shop_name }) => <span className="font-medium">{shop_name}</span>,
+                                },
+                                {
+                                    accessor: 'city',
+                                    title: t('city'),
+                                    sortable: true,
+                                    render: ({ city }) => <span className="">{city}</span>,
+                                },
+                                {
                                     accessor: 'date',
                                     title: t('date'),
                                     sortable: true,
                                     render: ({ date }) => new Date(date).toLocaleDateString(),
+                                },
+                                {
+                                    accessor: 'delivery_status',
+                                    title: t('delivery_status'),
+                                    sortable: true,
+                                    render: ({ delivery_status }) => {
+                                        const statusColors = {
+                                            pending: 'warning',
+                                            preparing: 'info',
+                                            shipped: 'primary',
+                                            delivered: 'success',
+                                            cancelled: 'danger',
+                                        };
+                                        const color = statusColors[delivery_status as keyof typeof statusColors] || 'secondary';
+                                        return <span className={`badge badge-outline-${color}`}>{t(delivery_status)}</span>;
+                                    },
                                 },
                                 {
                                     accessor: 'total',
@@ -358,13 +411,21 @@ const OrdersList = () => {
                                     titleClassName: '!text-center',
                                     render: ({ id }) => (
                                         <div className="flex items-center justify-center gap-2">
-                                            <Link href={`/orders/preview/${id}`} className="hover:text-info" title={t('view_order')}>
+                                            <Link href={`/orders/preview/${id}`} className="hover:text-info" title={t('view_order')} onClick={(e) => e.stopPropagation()}>
                                                 <IconEye className="h-5 w-5" />
                                             </Link>{' '}
                                             {/* <button type="button" className="hover:text-primary" title={t('print_order')} onClick={() => handlePrintOrder(id)}>
                                                 <IconPrinter className="h-5 w-5" />
                                             </button>{' '} */}
-                                            <button type="button" className="hover:text-success" title={t('download_pdf')} onClick={() => handleDownloadOrderPDF(id)}>
+                                            <button
+                                                type="button"
+                                                className="hover:text-success"
+                                                title={t('download_pdf')}
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    handleDownloadOrderPDF(id);
+                                                }}
+                                            >
                                                 <IconDownload className="h-5 w-5" />
                                             </button>
                                             <button

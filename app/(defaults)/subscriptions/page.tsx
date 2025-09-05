@@ -4,6 +4,7 @@ import IconEdit from '@/components/icon/icon-edit';
 import { sortBy } from 'lodash';
 import { DataTableSortStatus, DataTable } from 'mantine-datatable';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import React, { useEffect, useState } from 'react';
 import supabase from '@/lib/supabase';
 import { Alert } from '@/components/elements/alerts/elements-alerts-default';
@@ -29,6 +30,7 @@ const SubscriptionsList = () => {
     const [items, setItems] = useState<Subscription[]>([]);
     const [loading, setLoading] = useState(true);
     const { t } = getTranslation();
+    const router = useRouter();
 
     const [page, setPage] = useState(1);
     const PAGE_SIZES = [10, 20, 30, 50, 100];
@@ -39,7 +41,7 @@ const SubscriptionsList = () => {
 
     const [search, setSearch] = useState('');
     const [sortStatus, setSortStatus] = useState<DataTableSortStatus>({
-        columnAccessor: 'id',
+        columnAccessor: 'created_at',
         direction: 'desc',
     });
 
@@ -54,7 +56,7 @@ const SubscriptionsList = () => {
         const fetchSubscriptions = async () => {
             try {
                 // Join with licenses and profiles tables to get additional information
-                const { data, error } = await supabase.from('subscriptions').select('*, license:license_id(title), profiles:profile_id(full_name, email)');
+                const { data, error } = await supabase.from('subscriptions').select('*, license:license_id(title), profiles:profile_id(full_name, email)').order('created_at', { ascending: false });
 
                 if (error) throw error;
                 setItems(data as Subscription[]);
@@ -132,8 +134,11 @@ const SubscriptionsList = () => {
 
                 <div className="datatables pagination-padding relative">
                     <DataTable
-                        className={`${loading ? 'filter blur-sm pointer-events-none' : 'table-hover whitespace-nowrap'}`}
+                        className={`${loading ? 'filter blur-sm pointer-events-none' : 'table-hover whitespace-nowrap cursor-pointer'}`}
                         records={records}
+                        onRowClick={(record) => {
+                            router.push(`/subscriptions/preview/${record.id}`);
+                        }}
                         columns={[
                             {
                                 accessor: 'id',
@@ -177,10 +182,10 @@ const SubscriptionsList = () => {
                                 textAlignment: 'center',
                                 render: ({ id }) => (
                                     <div className="mx-auto flex w-max items-center gap-4">
-                                        <Link href={`/subscriptions/preview/${id}`} className="flex hover:text-primary">
+                                        <Link href={`/subscriptions/preview/${id}`} className="flex hover:text-primary" onClick={(e) => e.stopPropagation()}>
                                             <IconEye />
                                         </Link>
-                                        <Link href={`/subscriptions/edit/${id}`} className="flex hover:text-info">
+                                        <Link href={`/subscriptions/edit/${id}`} className="flex hover:text-info" onClick={(e) => e.stopPropagation()}>
                                             <IconEdit />
                                         </Link>
                                     </div>

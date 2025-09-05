@@ -173,8 +173,18 @@ const ShopPreview = () => {
 
                 const isAdmin = profileData?.role === 1;
 
-                // Updated query to fetch category details as well
-                const { data, error } = await supabase.from('shops').select('*, profiles(id, full_name, avatar_url, email, phone), categories(*)').eq('id', id).single();
+                // Updated query to fetch category details and commission info from licenses
+                const { data, error } = await supabase
+                    .from('shops')
+                    .select(
+                        `
+                        *, 
+                        profiles(id, full_name, avatar_url, email, phone), 
+                        categories(*)
+                    `,
+                    )
+                    .eq('id', id)
+                    .single();
 
                 if (error) throw error;
 
@@ -184,7 +194,39 @@ const ShopPreview = () => {
                     setLoading(false);
                     return;
                 }
-                setShop(data);
+
+                // Fetch commission rate from shop owner's active subscription
+                let commissionRate = 10; // Default commission rate
+                try {
+                    const { data: subscriptionData, error: subError } = await supabase
+                        .from('subscriptions')
+                        .select(
+                            `
+                            licenses(commission_type, commission_value)
+                        `,
+                        )
+                        .eq('profile_id', data.owner)
+                        .eq('status', 'Active')
+                        .single();
+
+                    if (!subError && subscriptionData?.licenses) {
+                        const license = Array.isArray(subscriptionData.licenses) ? subscriptionData.licenses[0] : subscriptionData.licenses;
+
+                        if (license && license.commission_value) {
+                            commissionRate = license.commission_value;
+                        }
+                    }
+                } catch (error) {
+                    console.log('No active subscription found, using default commission rate');
+                }
+
+                // Add commission rate to shop data
+                const shopWithCommission = {
+                    ...data,
+                    commission_rate: commissionRate,
+                };
+
+                setShop(shopWithCommission);
 
                 // Also fetch all categories for reference
                 const { data: categoriesData, error: categoriesError } = await supabase.from('categories').select('*').order('title', { ascending: true });
@@ -211,14 +253,18 @@ const ShopPreview = () => {
                 if (newProductsError) throw newProductsError;
                 setNewProductsCount(newProducts || 0);
 
-                // Fetch orders count
-                const { count: ordersCount, error: ordersError } = await supabase.from('orders').select('id', { count: 'exact' }).eq('shop', data.id);
+                // Fetch orders count for this shop (using join with products)
+                const { count: ordersCount, error: ordersError } = await supabase.from('orders').select('id, products!inner(shop)', { count: 'exact' }).eq('products.shop', data.id);
 
                 if (ordersError) throw ordersError;
                 setOrdersCount(ordersCount || 0);
 
-                // Calculate new orders in the last 7 days
-                const { count: newOrders, error: newOrdersError } = await supabase.from('orders').select('id', { count: 'exact' }).eq('shop', data.id).gte('created_at', lastWeekDate.toISOString());
+                // Calculate new orders in the last 7 days for this shop
+                const { count: newOrders, error: newOrdersError } = await supabase
+                    .from('orders')
+                    .select('id, products!inner(shop)', { count: 'exact' })
+                    .eq('products.shop', data.id)
+                    .gte('created_at', lastWeekDate.toISOString());
 
                 if (newOrdersError) throw newOrdersError;
                 setNewOrdersCount(newOrders || 0);
@@ -235,73 +281,83 @@ const ShopPreview = () => {
         }
     }, [id]);
 
-    // Generate dummy shop sales data when shop data is loaded and revenue tab is active
+    // Fetch real shop sales data when shop data is loaded and revenue tab is active
     useEffect(() => {
         if (shop && activeTab === 'revenue') {
-            // Generate dummy sales data for this specific shop
-            const today = new Date();
-            const generateSalesData = () => {
-                // Generate dummy sales data for demonstration
-                const dummyData: ShopSale[] = [];
-                const statusOptions = ['Completed', 'Processing', 'Shipped', 'Delivered', 'Refunded'];
-                const productNames = [
-                    'Premium T-Shirt',
-                    'Designer Jeans',
-                    'Wireless Headphones',
-                    'Smart Watch',
-                    'Leather Wallet',
-                    'Desk Lamp',
-                    'Coffee Mug',
-                    'Yoga Mat',
-                    'Phone Case',
-                    'Water Bottle',
-                    'Sunglasses',
-                    'Backpack',
-                    'Running Shoes',
-                    'Wall Art',
-                ];
+            fetchShopSalesData();
+        }
+    }, [shop, activeTab, timeFilter]);
 
-                // Generate 50 random sales entries
-                for (let i = 1; i <= 50; i++) {
-                    const randomDate = new Date(today);
-                    // Random date within the last 3 months
-                    randomDate.setDate(today.getDate() - Math.floor(Math.random() * 90));
+    // Function to fetch real sales data from Supabase
+    const fetchShopSalesData = async () => {
+        if (!shop) return;
 
-                    const quantity = Math.floor(Math.random() * 5) + 1;
-                    const price = parseFloat((Math.random() * 100 + 10).toFixed(2));
-                    const total = quantity * price;
-                    const commission_rate = shop.commission_rate || 10; // Default 10% if not specified
+        try {
+            // Fetch orders with product details for this specific shop
+            const { data: ordersData, error } = await supabase
+                .from('orders')
+                .select(
+                    `
+                    id,
+                    created_at,
+                    status,
+                    product_id,
+                    products!inner (
+                        id,
+                        title,
+                        price,
+                        sale_price,
+                        shop
+                    )
+                `,
+                )
+                .eq('products.shop', shop.id)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+
+            // Transform the data to match our ShopSale interface
+            const transformedSales: ShopSale[] =
+                ordersData?.map((order) => {
+                    const product = Array.isArray(order.products) ? order.products[0] : order.products;
+                    const finalPrice = product?.sale_price || product?.price || 0;
+                    const quantity = 1; // Orders table doesn't have quantity, defaulting to 1
+                    const total = finalPrice * quantity;
+                    const commission_rate = shop?.commission_rate || 10; // Use shop's commission rate or default 10%
                     const commission = parseFloat(((total * commission_rate) / 100).toFixed(2));
 
-                    dummyData.push({
-                        id: i,
-                        order_id: `ORD-${Math.floor(10000 + Math.random() * 90000)}`,
-                        product_name: productNames[Math.floor(Math.random() * productNames.length)],
+                    return {
+                        id: order.id,
+                        order_id: `ORD-${order.id}`,
+                        product_name: product?.title || 'Unknown Product',
                         quantity,
-                        price,
+                        price: finalPrice,
                         total,
                         commission,
                         commission_rate,
-                        date: randomDate.toISOString(),
-                        status: statusOptions[Math.floor(Math.random() * statusOptions.length)],
-                    });
-                }
+                        date: order.created_at,
+                        status: order.status || 'Unknown',
+                    };
+                }) || [];
 
-                // Sort by date, newest first
-                return dummyData.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-            };
-
-            const salesData = generateSalesData();
-            setShopSales(salesData);
-            setInitialRecords(salesData);
+            setShopSales(transformedSales);
+            setInitialRecords(transformedSales);
 
             // Filter data based on timeFilter
-            filterDataByTime(salesData);
-
-            // Calculate summary metrics
-            calculateRevenueSummary(salesData);
+            filterDataByTime(transformedSales);
+        } catch (error) {
+            console.error('Error fetching shop sales data:', error);
+            setAlert({
+                visible: true,
+                message: 'Error fetching sales data',
+                type: 'danger',
+            });
+            // Fallback to empty array
+            setShopSales([]);
+            setInitialRecords([]);
+            calculateRevenueSummary([]);
         }
-    }, [shop, activeTab, timeFilter]);
+    };
 
     // Function to filter data by selected time period
     const filterDataByTime = (data: ShopSale[]) => {
@@ -343,41 +399,26 @@ const ShopPreview = () => {
         });
     };
 
-    // Generate dummy shop transaction data when transactions tab is active
+    // Handle shop transaction data when transactions tab is active
     useEffect(() => {
         if (shop && activeTab === 'transactions') {
-            const generateTransactionData = () => {
-                const today = new Date();
-                const dummyTransactions: ShopTransaction[] = [];
-                const statusOptions: ('pending' | 'completed' | 'failed')[] = ['completed', 'pending', 'failed'];
-                const paymentMethods = ['Bank Transfer', 'PayPal', 'Stripe', 'Wire Transfer'];
-                const descriptions = ['Monthly commission payout', 'Weekly revenue transfer', 'Bonus payment', 'Performance incentive', 'Platform fee refund', 'Sale commission'];
+            // For now, we'll show a simple message since there's no transactions table
+            // In a real-world scenario, you would have a transactions table to track payouts
+            const basicTransactions: ShopTransaction[] = [
+                {
+                    id: 1,
+                    transaction_id: `TXN-INITIAL`,
+                    amount: shop.balance || 0,
+                    date: shop.created_at || new Date().toISOString(),
+                    status: 'completed',
+                    description: 'Initial shop balance',
+                    payment_method: 'Platform Credit',
+                },
+            ];
 
-                // Generate 25 transaction entries
-                for (let i = 1; i <= 25; i++) {
-                    const randomDate = new Date(today);
-                    randomDate.setDate(today.getDate() - Math.floor(Math.random() * 60)); // Last 2 months
-
-                    const amount = parseFloat((Math.random() * 500 + 50).toFixed(2));
-                    const status = statusOptions[Math.floor(Math.random() * statusOptions.length)];
-
-                    dummyTransactions.push({
-                        id: i,
-                        transaction_id: `TXN-${Math.floor(100000 + Math.random() * 900000)}`,
-                        amount,
-                        date: randomDate.toISOString(),
-                        status,
-                        description: descriptions[Math.floor(Math.random() * descriptions.length)],
-                        payment_method: paymentMethods[Math.floor(Math.random() * paymentMethods.length)],
-                    });
-                }
-
-                return dummyTransactions.sort((a, b) => new Date(b.date).getTime() - new Date(a.date).getTime());
-            };
-
-            const transactionData = generateTransactionData();
-            setShopTransactions(transactionData);
-            setTransactionRecords(transactionData);
+            setShopTransactions(basicTransactions);
+            setTransactionRecords(basicTransactions);
+            setPlatformBalance(shop.balance || 0); // Use actual shop balance
         }
     }, [shop, activeTab]);
 

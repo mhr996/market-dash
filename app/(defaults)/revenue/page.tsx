@@ -57,42 +57,27 @@ const RevenuePage = () => {
     const isRtl = useSelector((state: IRootState) => state.themeConfig.rtlClass) === 'rtl';
     const { t } = getTranslation();
     const [isMounted, setIsMounted] = useState(false);
-    const [isLoading, setIsLoading] = useState(true); // Use dummy data for demonstration
+    const [isLoading, setIsLoading] = useState(true);
     const [stats, setStats] = useState<RevenueStats>({
-        totalRevenue: 471464.7,
-        totalCommissions: 46604.97,
-        combinedRevenue: 518069.67,
-        revenueGrowth: 12.5,
-        commissionGrowth: 8.7,
-        combinedGrowth: 11.9,
+        totalRevenue: 0,
+        totalCommissions: 0,
+        combinedRevenue: 0,
+        revenueGrowth: 0,
+        commissionGrowth: 0,
+        combinedGrowth: 0,
         monthlyData: {
             months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
-            revenue: [28500, 32700, 36900, 39800, 42500, 45600, 52300, 58700, 62100, 67800, 72600, 78900],
-            commissions: [2850, 3270, 3690, 3980, 4250, 4560, 5230, 5870, 6210, 6780, 7260, 7890],
+            revenue: [],
+            commissions: [],
         },
-        loading: false,
-    }); // Dummy data for demonstration
-    const dummyShopRevenue: ShopRevenue[] = [
-        { id: 1, shop_name: 'Fashion Boutique', owner_name: 'John Smith', revenue: 42500.75, commission: 4250.07, commission_rate: 10, balance: 38250.68, last_payment_date: '2025-05-15' },
-        { id: 2, shop_name: 'Tech Galaxy', owner_name: 'Sarah Johnson', revenue: 78900.5, commission: 7890.05, commission_rate: 10, balance: 71010.45, last_payment_date: '2025-05-10' },
-        { id: 3, shop_name: 'Home Decor Plus', owner_name: 'Michael Brown', revenue: 31250.25, commission: 1562.51, commission_rate: 5, balance: 29687.74, last_payment_date: '2025-05-12' },
-        { id: 4, shop_name: 'Gourmet Delights', owner_name: 'Emily Davis', revenue: 52780.6, commission: 5278.06, commission_rate: 10, balance: 47502.54, last_payment_date: '2025-05-18' },
-        { id: 5, shop_name: 'Sports Universe', owner_name: 'David Wilson', revenue: 64320.3, commission: 6432.03, commission_rate: 10, balance: 57888.27, last_payment_date: '2025-05-05' },
-        { id: 6, shop_name: 'Beauty Haven', owner_name: 'Jessica Lee', revenue: 28750.45, commission: 2875.05, commission_rate: 10, balance: 25875.41, last_payment_date: '2025-05-20' },
-        { id: 7, shop_name: 'Pet Paradise', owner_name: 'Robert Taylor', revenue: 19680.15, commission: 984.01, commission_rate: 5, balance: 18696.14, last_payment_date: '2025-05-08' },
-        { id: 8, shop_name: 'Book Corner', owner_name: 'Jennifer Miller', revenue: 22450.8, commission: 1122.54, commission_rate: 5, balance: 21328.26, last_payment_date: '2025-05-14' },
-        { id: 9, shop_name: 'Toy Wonderland', owner_name: 'Daniel Anderson', revenue: 35680.9, commission: 3568.09, commission_rate: 10, balance: 32112.81, last_payment_date: '2025-05-17' },
-        { id: 10, shop_name: 'Kitchen Essentials', owner_name: 'Laura Martin', revenue: 48920.7, commission: 4892.07, commission_rate: 10, balance: 44028.63, last_payment_date: '2025-05-09' },
-        { id: 11, shop_name: 'Fitness First', owner_name: 'Kevin Thompson', revenue: 56780.25, commission: 5678.03, commission_rate: 10, balance: 51102.23, last_payment_date: '2025-05-11' },
-        { id: 12, shop_name: 'Garden Center', owner_name: 'Amanda Garcia', revenue: 39450.6, commission: 1972.53, commission_rate: 5, balance: 37478.07, last_payment_date: '2025-05-19' },
-    ];
-
+        loading: true,
+    });
     // Shop revenue table state
-    const [shopRevenue, setShopRevenue] = useState<ShopRevenue[]>(dummyShopRevenue);
+    const [shopRevenue, setShopRevenue] = useState<ShopRevenue[]>([]);
     const [page, setPage] = useState(1);
     const PAGE_SIZES = [10, 20, 30, 50, 100];
     const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
-    const [initialRecords, setInitialRecords] = useState<ShopRevenue[]>(dummyShopRevenue);
+    const [initialRecords, setInitialRecords] = useState<ShopRevenue[]>([]);
     const [records, setRecords] = useState<ShopRevenue[]>([]);
     const [search, setSearch] = useState('');
     const [sortStatus, setSortStatus] = useState<DataTableSortStatus>({
@@ -123,19 +108,136 @@ const RevenuePage = () => {
         return ((current - previous) / previous) * 100;
     };
 
-    // Fetch revenue data (using dummy data for demonstration)
+    // Fetch revenue data from Supabase
     useEffect(() => {
-        // Simulate loading for a brief moment to demonstrate the loading state
-        setIsLoading(true);
+        const fetchRevenueData = async () => {
+            setIsLoading(true);
 
-        // Using setTimeout to simulate a network request
-        const timer = setTimeout(() => {
-            // In a real application, you would fetch and process data from the database here
-            // For now, we're using the dummy data that's already set in the state
-            setIsLoading(false);
-        }, 1000);
+            try {
+                // Get all orders with product and shop information
+                const { data: orders, error: ordersError } = await supabase.from('orders').select(`
+                        *,
+                        products(id, title, price, shop, shops(id, shop_name, balance, owner, profiles(full_name)))
+                    `);
 
-        return () => clearTimeout(timer);
+                if (ordersError) throw ordersError;
+
+                // Get all licenses for commission rates
+                const { data: licenses, error: licensesError } = await supabase.from('licenses').select('*');
+
+                if (licensesError) throw licensesError;
+
+                // Calculate revenue statistics
+                const now = new Date();
+                const currentYear = now.getFullYear();
+                const lastYear = currentYear - 1;
+
+                // Filter orders for current and previous year
+                const currentYearOrders = orders?.filter((order) => new Date(order.created_at).getFullYear() === currentYear) || [];
+
+                const lastYearOrders = orders?.filter((order) => new Date(order.created_at).getFullYear() === lastYear) || [];
+
+                // Calculate total revenue and commissions
+                const currentRevenue = currentYearOrders.reduce((sum, order) => sum + (order.products?.price || 0), 0);
+                const lastRevenue = lastYearOrders.reduce((sum, order) => sum + (order.products?.price || 0), 0);
+
+                // Assume 10% commission rate as default (can be made dynamic based on license)
+                const defaultCommissionRate = 0.1;
+                const currentCommissions = currentRevenue * defaultCommissionRate;
+                const lastCommissions = lastRevenue * defaultCommissionRate;
+
+                // Calculate growth rates
+                const revenueGrowth = lastRevenue > 0 ? ((currentRevenue - lastRevenue) / lastRevenue) * 100 : 0;
+                const commissionGrowth = lastCommissions > 0 ? ((currentCommissions - lastCommissions) / lastCommissions) * 100 : 0;
+                const combinedGrowth = (revenueGrowth + commissionGrowth) / 2;
+
+                // Calculate monthly data for the current year
+                const monthlyRevenue = Array(12).fill(0);
+                const monthlyCommissions = Array(12).fill(0);
+
+                currentYearOrders.forEach((order) => {
+                    const month = new Date(order.created_at).getMonth();
+                    const revenue = order.products?.price || 0;
+                    monthlyRevenue[month] += revenue;
+                    monthlyCommissions[month] += revenue * defaultCommissionRate;
+                });
+
+                // Update stats
+                setStats({
+                    totalRevenue: currentRevenue,
+                    totalCommissions: currentCommissions,
+                    combinedRevenue: currentRevenue + currentCommissions,
+                    revenueGrowth,
+                    commissionGrowth,
+                    combinedGrowth,
+                    monthlyData: {
+                        months: ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'],
+                        revenue: monthlyRevenue,
+                        commissions: monthlyCommissions,
+                    },
+                    loading: false,
+                });
+
+                // Calculate shop revenue data
+                const shopRevenueMap = new Map<
+                    number,
+                    {
+                        shop_name: string;
+                        owner_name: string;
+                        revenue: number;
+                        commission: number;
+                        balance: number;
+                        orders_count: number;
+                    }
+                >();
+
+                currentYearOrders.forEach((order) => {
+                    if (order.products?.shops) {
+                        const shopId = order.products.shop;
+                        const shop = order.products.shops;
+                        const revenue = order.products.price || 0;
+                        const commission = revenue * defaultCommissionRate;
+
+                        if (shopRevenueMap.has(shopId)) {
+                            const existing = shopRevenueMap.get(shopId)!;
+                            existing.revenue += revenue;
+                            existing.commission += commission;
+                            existing.orders_count += 1;
+                        } else {
+                            shopRevenueMap.set(shopId, {
+                                shop_name: shop.shop_name || 'Unknown Shop',
+                                owner_name: shop.profiles?.full_name || 'Unknown Owner',
+                                revenue,
+                                commission,
+                                balance: shop.balance || 0,
+                                orders_count: 1,
+                            });
+                        }
+                    }
+                });
+
+                // Convert map to array
+                const shopRevenueArray: ShopRevenue[] = Array.from(shopRevenueMap.entries()).map(([id, data]) => ({
+                    id,
+                    shop_name: data.shop_name,
+                    owner_name: data.owner_name,
+                    revenue: data.revenue,
+                    commission: data.commission,
+                    commission_rate: defaultCommissionRate * 100, // Convert to percentage
+                    balance: data.balance,
+                    last_payment_date: null, // This would need to be tracked separately
+                }));
+
+                setShopRevenue(shopRevenueArray);
+                setInitialRecords(shopRevenueArray);
+            } catch (error) {
+                console.error('Error fetching revenue data:', error);
+            } finally {
+                setIsLoading(false);
+            }
+        };
+
+        fetchRevenueData();
     }, []);
 
     // Table pagination and search effects

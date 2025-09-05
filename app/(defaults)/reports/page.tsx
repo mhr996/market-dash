@@ -187,11 +187,13 @@ const Reports = () => {
             const shopFilter = selectedShops.length > 0 ? selectedShops : null;
             const categoryFilter = selectedCategories.length > 0 ? selectedCategories : null;
 
-            // Fetch orders data
-            let ordersQuery = supabase.from('orders').select('*');
+            // Fetch orders data with product information for revenue calculation
+            let ordersQuery = supabase.from('orders').select(`
+                    *,
+                    products(id, title, price, shop, shops(id, shop_name))
+                `);
             if (startDate) ordersQuery = ordersQuery.gte('created_at', startDate);
             if (endDate) ordersQuery = ordersQuery.lte('created_at', endDate);
-            if (shopFilter) ordersQuery = ordersQuery.in('shop', shopFilter);
 
             const { data: orders } = await ordersQuery;
 
@@ -229,10 +231,23 @@ const Reports = () => {
     };
 
     const processReportData = (orders: any[], shops: any[], products: any[], users: any[], categories: any[]): ReportData => {
-        // Calculate sales metrics
-        const totalRevenue = orders.reduce((sum, order) => sum + (order.total_amount || 0), 0);
+        // Calculate sales metrics using product prices
+        const totalRevenue = orders.reduce((sum, order) => sum + (order.products?.price || 0), 0);
         const totalOrders = orders.length;
         const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
+
+        // Calculate growth rate by comparing with previous period
+        const currentDate = new Date();
+        const previousPeriodStart = new Date(currentDate);
+        previousPeriodStart.setMonth(currentDate.getMonth() - 1);
+
+        const previousPeriodOrders = orders.filter((order) => {
+            const orderDate = new Date(order.created_at);
+            return orderDate >= previousPeriodStart && orderDate < currentDate;
+        });
+
+        const previousRevenue = previousPeriodOrders.reduce((sum, order) => sum + (order.products?.price || 0), 0);
+        const growthRate = previousRevenue > 0 ? ((totalRevenue - previousRevenue) / previousRevenue) * 100 : 0;
 
         // Calculate monthly revenue trend
         const monthlyRevenue = Array.from({ length: 12 }, (_, i) => {
@@ -246,17 +261,21 @@ const Reports = () => {
                 return orderDate.getMonth() === month.getMonth() && orderDate.getFullYear() === month.getFullYear();
             });
 
-            const revenue = monthlyOrders.reduce((sum, order) => sum + (order.total_amount || 0), 0);
+            const revenue = monthlyOrders.reduce((sum, order) => sum + (order.products?.price || 0), 0);
             return { month: monthName, revenue };
         });
 
         // Calculate shop earnings with growth rates
         const shopEarnings: ShopEarning[] = shops
             .map((shop) => {
-                const shopOrders = orders.filter((order) => order.shop === shop.id);
-                const revenue = shopOrders.reduce((sum, order) => sum + (order.total_amount || 0), 0);
+                const shopOrders = orders.filter((order) => order.products?.shop === shop.id);
+                const revenue = shopOrders.reduce((sum, order) => sum + (order.products?.price || 0), 0);
                 const commission = revenue * 0.1; // Assuming 10% commission
-                const growthRate = Math.random() * 40 - 20; // Random growth between -20% and +20%
+
+                // Calculate growth for this shop
+                const previousShopOrders = previousPeriodOrders.filter((order) => order.products?.shop === shop.id);
+                const previousShopRevenue = previousShopOrders.reduce((sum, order) => sum + (order.products?.price || 0), 0);
+                const shopGrowthRate = previousShopRevenue > 0 ? ((revenue - previousShopRevenue) / previousShopRevenue) * 100 : 0;
 
                 return {
                     shop_id: shop.id,
@@ -265,7 +284,7 @@ const Reports = () => {
                     total_orders: shopOrders.length,
                     commission_earned: commission,
                     logo_url: shop.logo_url,
-                    growth_rate: growthRate,
+                    growth_rate: shopGrowthRate,
                 };
             })
             .sort((a, b) => b.total_revenue - a.total_revenue);
@@ -284,22 +303,34 @@ const Reports = () => {
             };
         });
 
-        // Calculate top selling products
-        const topSellingProducts: TopProduct[] = products
-            .map((product) => {
-                const productOrders = orders.filter((order) => {
-                    // Assuming orders have product information
-                    return true; // Simplified for now
-                });
-                const sales = Math.floor(Math.random() * 100); // Mock data
-                const revenue = sales * (product.price || 0);
+        // Calculate top selling products based on actual orders
+        const productSalesMap = new Map();
+        orders.forEach((order) => {
+            if (order.products) {
+                const productId = order.products.id;
+                if (productSalesMap.has(productId)) {
+                    const existing = productSalesMap.get(productId);
+                    existing.sales += 1;
+                    existing.revenue += order.products.price || 0;
+                } else {
+                    productSalesMap.set(productId, {
+                        product: order.products,
+                        sales: 1,
+                        revenue: order.products.price || 0,
+                    });
+                }
+            }
+        });
 
+        const topSellingProducts: TopProduct[] = Array.from(productSalesMap.values())
+            .map((item) => {
+                const product = products.find((p) => p.id === item.product.id) || item.product;
                 return {
-                    id: product.id,
-                    title: product.title || 'Unknown Product',
-                    shop_name: product.shops?.shop_name || 'Unknown Shop',
-                    total_sales: sales,
-                    revenue: revenue,
+                    id: item.product.id,
+                    title: item.product.title || 'Unknown Product',
+                    shop_name: item.product.shops?.shop_name || 'Unknown Shop',
+                    total_sales: item.sales,
+                    revenue: item.revenue,
                     views: product.view_count || 0,
                     image_url: Array.isArray(product.images) && product.images.length > 0 ? product.images[0] : null,
                 };
@@ -307,12 +338,20 @@ const Reports = () => {
             .sort((a, b) => b.revenue - a.revenue)
             .slice(0, 10);
 
-        // Calculate category performance
+        // Calculate category performance based on actual orders
         const categoriesPerformance: CategoryPerformance[] = categories
             .map((category) => {
                 const categoryProducts = products.filter((product) => product.category === category.id);
-                const totalSales = categoryProducts.reduce((sum, product) => sum + Math.floor(Math.random() * 50), 0);
-                const revenue = categoryProducts.reduce((sum, product) => sum + (product.price || 0) * Math.floor(Math.random() * 10), 0);
+
+                // Calculate actual sales and revenue for this category
+                let totalSales = 0;
+                let revenue = 0;
+
+                categoryProducts.forEach((product) => {
+                    const productOrders = orders.filter((order) => order.products?.id === product.id);
+                    totalSales += productOrders.length;
+                    revenue += productOrders.reduce((sum, order) => sum + (order.products?.price || 0), 0);
+                });
 
                 return {
                     category_name: category.title || 'Unknown Category',
@@ -347,7 +386,7 @@ const Reports = () => {
                 total_revenue: totalRevenue,
                 total_orders: totalOrders,
                 average_order_value: averageOrderValue,
-                growth_rate: 12.5,
+                growth_rate: growthRate,
                 monthly_revenue: monthlyRevenue,
             },
             shops: {

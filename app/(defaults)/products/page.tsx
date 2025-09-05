@@ -6,6 +6,7 @@ import IconTrashLines from '@/components/icon/icon-trash-lines';
 import { sortBy } from 'lodash';
 import { DataTableSortStatus, DataTable } from 'mantine-datatable';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import React, { useEffect, useState } from 'react';
 import supabase from '@/lib/supabase';
 import StorageManager from '@/utils/storage-manager';
@@ -43,6 +44,7 @@ interface Product {
 
 const ProductsList = () => {
     const { t } = getTranslation();
+    const router = useRouter();
     const [items, setItems] = useState<Product[]>([]);
     const [loading, setLoading] = useState(true);
 
@@ -55,7 +57,7 @@ const ProductsList = () => {
 
     const [search, setSearch] = useState('');
     const [sortStatus, setSortStatus] = useState<DataTableSortStatus>({
-        columnAccessor: 'id',
+        columnAccessor: 'created_at',
         direction: 'desc',
     });
 
@@ -71,7 +73,7 @@ const ProductsList = () => {
     useEffect(() => {
         const fetchProducts = async () => {
             try {
-                const { data, error } = await supabase.from('products').select('*, shops(shop_name), categories(*)');
+                const { data, error } = await supabase.from('products').select('*, shops(shop_name), categories(*)').order('created_at', { ascending: false });
                 if (error) throw error;
 
                 setItems(data as Product[]);
@@ -190,8 +192,11 @@ const ProductsList = () => {
 
                 <div className="datatables pagination-padding relative">
                     <DataTable
-                        className={`${loading ? 'filter blur-sm pointer-events-none' : 'table-hover whitespace-nowrap'}`}
+                        className={`${loading ? 'filter blur-sm pointer-events-none' : 'table-hover whitespace-nowrap cursor-pointer'}`}
                         records={records}
+                        onRowClick={(record) => {
+                            router.push(`/products/preview/${record.id}`);
+                        }}
                         columns={[
                             {
                                 accessor: 'id',
@@ -271,7 +276,10 @@ const ProductsList = () => {
                                             className={`cursor-pointer inline-block w-[60px] text-center px-1 py-1 text-xs rounded-full ${
                                                 active ? 'bg-success/20 text-success hover:bg-success/30' : 'bg-danger/20 text-danger hover:bg-danger/30'
                                             } transition-all duration-300`}
-                                            onClick={() => toggleProductStatus(id, !active)}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                toggleProductStatus(id, !active);
+                                            }}
                                         >
                                             {active ? t('active') : t('inactive')}
                                         </span>
@@ -285,13 +293,20 @@ const ProductsList = () => {
                                 textAlignment: 'center',
                                 render: ({ id }) => (
                                     <div className="mx-auto flex w-max items-center gap-4">
-                                        <Link href={`/products/edit/${id}`} className="flex hover:text-info">
+                                        <Link href={`/products/edit/${id}`} className="flex hover:text-info" onClick={(e) => e.stopPropagation()}>
                                             <IconEdit className="h-4.5 w-4.5" />
                                         </Link>
-                                        <Link href={`/products/preview/${id}`} className="flex hover:text-primary">
+                                        <Link href={`/products/preview/${id}`} className="flex hover:text-primary" onClick={(e) => e.stopPropagation()}>
                                             <IconEye />
                                         </Link>
-                                        <button type="button" className="flex hover:text-danger" onClick={() => deleteRow(id)}>
+                                        <button
+                                            type="button"
+                                            className="flex hover:text-danger"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                deleteRow(id);
+                                            }}
+                                        >
                                             <IconTrashLines />
                                         </button>
                                     </div>

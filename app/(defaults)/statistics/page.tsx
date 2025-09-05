@@ -40,6 +40,63 @@ interface ProductStats {
     } | null;
 }
 
+interface CategoryStats {
+    id: number;
+    title: string;
+    desc: string | null;
+    image_url: string | null;
+    view_count: number;
+    created_at: string;
+    _count?: {
+        products: number;
+        shops: number;
+    };
+}
+
+interface SalesShopStats {
+    id: number;
+    shop_name: string;
+    logo_url: string | null;
+    total_orders: number;
+    total_revenue: number;
+    owner: string;
+    profiles?: {
+        full_name: string;
+    } | null;
+    _count?: {
+        products: number;
+        orders: number;
+    };
+}
+
+interface SalesProductStats {
+    id: number;
+    title: string;
+    images: string[] | null;
+    total_orders: number;
+    total_revenue: number;
+    price: number;
+    shop: number;
+    shops?: {
+        shop_name: string;
+        logo_url: string | null;
+    } | null;
+}
+
+interface SalesCategoryStats {
+    id: number;
+    title: string;
+    desc: string | null;
+    image_url: string | null;
+    total_orders: number;
+    total_revenue: number;
+    created_at: string;
+    _count?: {
+        products: number;
+        shops: number;
+    };
+}
+
 interface OverallStats {
     totalShops: number;
     totalProducts: number;
@@ -75,6 +132,14 @@ const StatisticsPage = () => {
     const [topShops, setTopShops] = useState<ShopStats[]>([]);
     const [topProducts, setTopProducts] = useState<ProductStats[]>([]);
     const [mostCartedProducts, setMostCartedProducts] = useState<ProductStats[]>([]);
+    const [topCategories, setTopCategories] = useState<CategoryStats[]>([]);
+
+    // Sales data state
+    const [bestSellingShops, setBestSellingShops] = useState<SalesShopStats[]>([]);
+    const [bestSellingProducts, setBestSellingProducts] = useState<SalesProductStats[]>([]);
+    const [bestSellingCategories, setBestSellingCategories] = useState<SalesCategoryStats[]>([]);
+
+    const [activeMainTab, setActiveMainTab] = useState(0); // 0 = Views, 1 = Sales
     const [activeTab, setActiveTab] = useState(0);
 
     // Filter related state
@@ -387,6 +452,343 @@ const StatisticsPage = () => {
                     shops: Array.isArray(product.shops) ? product.shops[0] : product.shops,
                 })),
             );
+
+            // Fetch most viewed categories with filters
+            let topCategoriesQuery = supabase
+                .from('categories')
+                .select(
+                    `
+                    id,
+                    title,
+                    desc,
+                    image_url,
+                    view_count,
+                    created_at
+                `,
+                )
+                .order('view_count', { ascending: false })
+                .limit(50);
+
+            // Apply time filter to categories query
+            if (dateFilter) {
+                topCategoriesQuery = topCategoriesQuery.gte('created_at', dateFilter);
+            }
+
+            const { data: topCategoriesData } = await topCategoriesQuery;
+
+            // Get product and shop counts for each category
+            const categoriesWithCounts = await Promise.all(
+                (topCategoriesData || []).map(async (category) => {
+                    let productsCountQuery = supabase.from('products').select('id', { count: 'exact', head: true }).eq('category', category.id);
+
+                    // Apply shop filter to products in this category
+                    if (filtersToApply.shops.length > 0) {
+                        productsCountQuery = productsCountQuery.in('shop', filtersToApply.shops);
+                    }
+
+                    // Apply user filter to products in this category
+                    if (filtersToApply.users.length > 0) {
+                        const { data: userShops } = await supabase.from('shops').select('id').in('owner', filtersToApply.users);
+                        const userShopIds = userShops?.map((shop) => shop.id) || [];
+                        if (userShopIds.length > 0) {
+                            productsCountQuery = productsCountQuery.in('shop', userShopIds);
+                        }
+                    }
+
+                    const [productsCount] = await Promise.all([productsCountQuery]);
+
+                    // Get unique shops count for this category
+                    let shopsCountQuery = supabase.from('products').select('shop', { count: 'exact', head: true }).eq('category', category.id);
+
+                    // Apply filters to shops count
+                    if (filtersToApply.shops.length > 0) {
+                        shopsCountQuery = shopsCountQuery.in('shop', filtersToApply.shops);
+                    }
+
+                    if (filtersToApply.users.length > 0) {
+                        const { data: userShops } = await supabase.from('shops').select('id').in('owner', filtersToApply.users);
+                        const userShopIds = userShops?.map((shop) => shop.id) || [];
+                        if (userShopIds.length > 0) {
+                            shopsCountQuery = shopsCountQuery.in('shop', userShopIds);
+                        }
+                    }
+
+                    const [shopsCount] = await Promise.all([shopsCountQuery]);
+
+                    return {
+                        ...category,
+                        _count: {
+                            products: productsCount.count || 0,
+                            shops: shopsCount.count || 0,
+                        },
+                    };
+                }),
+            );
+
+            setTopCategories(categoriesWithCounts);
+
+            // Fetch sales data - best selling shops (based on order count) with filters
+            let salesShopsQuery = supabase.from('shops').select(`
+                    id,
+                    shop_name,
+                    logo_url,
+                    owner,
+                    profiles!shops_owner_fkey (
+                        full_name
+                    )
+                `);
+
+            // Apply filters to sales shops query
+            if (filtersToApply.shops.length > 0) {
+                salesShopsQuery = salesShopsQuery.in('id', filtersToApply.shops);
+            }
+            if (filtersToApply.users.length > 0) {
+                salesShopsQuery = salesShopsQuery.in('owner', filtersToApply.users);
+            }
+            if (dateFilter) {
+                salesShopsQuery = salesShopsQuery.gte('created_at', dateFilter);
+            }
+
+            const { data: salesShopsData } = await salesShopsQuery;
+
+            // Get order counts for each shop with filters
+            const shopsWithSalesData = await Promise.all(
+                (salesShopsData || []).map(async (shop) => {
+                    let shopOrdersQuery = supabase
+                        .from('orders')
+                        .select(
+                            `
+                            id,
+                            products!orders_product_id_fkey (
+                                price
+                            )
+                        `,
+                        )
+                        .eq('products.shop', shop.id);
+
+                    // Apply time filter to orders
+                    if (dateFilter) {
+                        shopOrdersQuery = shopOrdersQuery.gte('created_at', dateFilter);
+                    }
+
+                    const { data: shopOrders } = await shopOrdersQuery;
+
+                    const totalOrders = shopOrders?.length || 0;
+                    const totalRevenue =
+                        shopOrders?.reduce((sum, order) => {
+                            const product = Array.isArray(order.products) ? order.products[0] : order.products;
+                            return sum + (product?.price || 0);
+                        }, 0) || 0;
+
+                    let productsCountQuery = supabase.from('products').select('id', { count: 'exact', head: true }).eq('shop', shop.id);
+                    let ordersCountQuery = supabase.from('orders').select('id', { count: 'exact', head: true }).eq('products.shop', shop.id);
+
+                    // Apply time filter to counts
+                    if (dateFilter) {
+                        productsCountQuery = productsCountQuery.gte('created_at', dateFilter);
+                        ordersCountQuery = ordersCountQuery.gte('created_at', dateFilter);
+                    }
+
+                    const [productsCount, ordersCount] = await Promise.all([productsCountQuery, ordersCountQuery]);
+
+                    return {
+                        ...shop,
+                        total_orders: totalOrders,
+                        total_revenue: totalRevenue,
+                        profiles: Array.isArray(shop.profiles) ? shop.profiles[0] : shop.profiles,
+                        _count: {
+                            products: productsCount.count || 0,
+                            orders: ordersCount.count || 0,
+                        },
+                    };
+                }),
+            );
+
+            const sortedSalesShops = shopsWithSalesData
+                .filter((shop) => shop.total_orders > 0)
+                .sort((a, b) => b.total_orders - a.total_orders)
+                .slice(0, 50);
+
+            setBestSellingShops(sortedSalesShops);
+
+            // Fetch sales data - best selling products with filters
+            let salesProductsQuery = supabase.from('products').select(`
+                    id,
+                    title,
+                    images,
+                    price,
+                    shop,
+                    shops!products_shop_fkey (
+                        shop_name,
+                        logo_url
+                    )
+                `);
+
+            // Apply filters to sales products query
+            if (filtersToApply.shops.length > 0) {
+                salesProductsQuery = salesProductsQuery.in('shop', filtersToApply.shops);
+            }
+            if (filtersToApply.users.length > 0) {
+                const { data: userShops } = await supabase.from('shops').select('id').in('owner', filtersToApply.users);
+                const userShopIds = userShops?.map((shop) => shop.id) || [];
+                if (userShopIds.length > 0) {
+                    salesProductsQuery = salesProductsQuery.in('shop', userShopIds);
+                }
+            }
+            if (dateFilter) {
+                salesProductsQuery = salesProductsQuery.gte('created_at', dateFilter);
+            }
+
+            const { data: salesProductsData } = await salesProductsQuery;
+
+            const productsWithSalesData = await Promise.all(
+                (salesProductsData || []).map(async (product) => {
+                    let ordersCountQuery = supabase.from('orders').select('id', { count: 'exact', head: true }).eq('product_id', product.id);
+
+                    // Apply time filter to orders
+                    if (dateFilter) {
+                        ordersCountQuery = ordersCountQuery.gte('created_at', dateFilter);
+                    }
+
+                    const { count: totalOrders } = await ordersCountQuery;
+                    const totalRevenue = (totalOrders || 0) * (product.price || 0);
+
+                    return {
+                        ...product,
+                        total_orders: totalOrders || 0,
+                        total_revenue: totalRevenue,
+                        shops: Array.isArray(product.shops) ? product.shops[0] : product.shops,
+                    };
+                }),
+            );
+
+            const sortedSalesProducts = productsWithSalesData
+                .filter((product) => product.total_orders > 0)
+                .sort((a, b) => b.total_orders - a.total_orders)
+                .slice(0, 50);
+
+            setBestSellingProducts(sortedSalesProducts);
+
+            // Fetch sales data - best selling categories with filters
+            let salesCategoriesQuery = supabase.from('categories').select(`
+                    id,
+                    title,
+                    desc,
+                    image_url,
+                    created_at
+                `);
+
+            // Apply time filter to categories
+            if (dateFilter) {
+                salesCategoriesQuery = salesCategoriesQuery.gte('created_at', dateFilter);
+            }
+
+            const { data: salesCategoriesData } = await salesCategoriesQuery;
+
+            const categoriesWithSalesData = await Promise.all(
+                (salesCategoriesData || []).map(async (category) => {
+                    // Get all products in this category with filters
+                    let categoryProductsQuery = supabase.from('products').select('id, price').eq('category', category.id);
+
+                    // Apply shop filter
+                    if (filtersToApply.shops.length > 0) {
+                        categoryProductsQuery = categoryProductsQuery.in('shop', filtersToApply.shops);
+                    }
+
+                    // Apply user filter
+                    if (filtersToApply.users.length > 0) {
+                        const { data: userShops } = await supabase.from('shops').select('id').in('owner', filtersToApply.users);
+                        const userShopIds = userShops?.map((shop) => shop.id) || [];
+                        if (userShopIds.length > 0) {
+                            categoryProductsQuery = categoryProductsQuery.in('shop', userShopIds);
+                        }
+                    }
+
+                    // Apply time filter
+                    if (dateFilter) {
+                        categoryProductsQuery = categoryProductsQuery.gte('created_at', dateFilter);
+                    }
+
+                    const { data: categoryProducts } = await categoryProductsQuery;
+                    const productIds = categoryProducts?.map((p) => p.id) || [];
+
+                    let totalOrders = 0;
+                    let totalRevenue = 0;
+
+                    if (productIds.length > 0) {
+                        let categoryOrdersQuery = supabase
+                            .from('orders')
+                            .select(
+                                `
+                                id,
+                                products!orders_product_id_fkey (
+                                    price
+                                )
+                            `,
+                            )
+                            .in('product_id', productIds);
+
+                        // Apply time filter to orders
+                        if (dateFilter) {
+                            categoryOrdersQuery = categoryOrdersQuery.gte('created_at', dateFilter);
+                        }
+
+                        const { data: categoryOrders } = await categoryOrdersQuery;
+
+                        totalOrders = categoryOrders?.length || 0;
+                        totalRevenue =
+                            categoryOrders?.reduce((sum, order) => {
+                                const product = Array.isArray(order.products) ? order.products[0] : order.products;
+                                return sum + (product?.price || 0);
+                            }, 0) || 0;
+                    }
+
+                    // Get counts with filters applied
+                    let productsCountQuery = supabase.from('products').select('id', { count: 'exact', head: true }).eq('category', category.id);
+                    let shopsCountQuery = supabase.from('products').select('shop', { count: 'exact', head: true }).eq('category', category.id);
+
+                    // Apply shop filter to counts
+                    if (filtersToApply.shops.length > 0) {
+                        productsCountQuery = productsCountQuery.in('shop', filtersToApply.shops);
+                        shopsCountQuery = shopsCountQuery.in('shop', filtersToApply.shops);
+                    }
+
+                    // Apply user filter to counts
+                    if (filtersToApply.users.length > 0) {
+                        const { data: userShops } = await supabase.from('shops').select('id').in('owner', filtersToApply.users);
+                        const userShopIds = userShops?.map((shop) => shop.id) || [];
+                        if (userShopIds.length > 0) {
+                            productsCountQuery = productsCountQuery.in('shop', userShopIds);
+                            shopsCountQuery = shopsCountQuery.in('shop', userShopIds);
+                        }
+                    }
+
+                    // Apply time filter to counts
+                    if (dateFilter) {
+                        productsCountQuery = productsCountQuery.gte('created_at', dateFilter);
+                        shopsCountQuery = shopsCountQuery.gte('created_at', dateFilter);
+                    }
+
+                    const [productsCount, shopsCount] = await Promise.all([productsCountQuery, shopsCountQuery]);
+
+                    return {
+                        ...category,
+                        total_orders: totalOrders,
+                        total_revenue: totalRevenue,
+                        _count: {
+                            products: productsCount.count || 0,
+                            shops: shopsCount.count || 0,
+                        },
+                    };
+                }),
+            );
+
+            const sortedSalesCategories = categoriesWithSalesData
+                .filter((category) => category.total_orders > 0)
+                .sort((a, b) => b.total_orders - a.total_orders)
+                .slice(0, 50);
+
+            setBestSellingCategories(sortedSalesCategories);
         } catch (error) {
             console.error('Error fetching statistics:', error);
         } finally {
@@ -425,7 +827,7 @@ const StatisticsPage = () => {
     );
 
     const ShopCard = ({ shop, rank }: { shop: ShopStats; rank: number }) => (
-        <Link href={`/shops/edit/${shop.id}`} className="block">
+        <Link href={`/shops/preview/${shop.id}`} className="block">
             <div className="panel hover:shadow-lg transition-shadow duration-200 cursor-pointer">
                 <div className="flex items-center gap-4">
                     <div className="flex-shrink-0">
@@ -458,14 +860,14 @@ const StatisticsPage = () => {
     );
 
     const ProductCard = ({ product, rank, metric }: { product: ProductStats; rank: number; metric: 'views' | 'cart' }) => (
-        <Link href={`/products/edit/${product.id}`} className="block">
+        <Link href={`/products/preview/${product.id}`} className="block">
             <div className="panel hover:shadow-lg transition-shadow duration-200 cursor-pointer">
                 <div className="flex items-center gap-4">
                     <div className="flex-shrink-0">
                         <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-white font-bold text-sm">{rank}</div>
                     </div>
                     <div className="flex-shrink-0">
-                        <img src={product.images?.[0] || '/assets/images/product-placeholder.jpg'} alt={product.title} className="w-12 h-12 rounded-lg object-cover" />
+                        <img src={product.images?.[0] || '/assets/images/placeholder.webp'} alt={product.title} className="w-12 h-12 rounded-lg object-cover" />
                     </div>
                     <div className="flex-1 min-w-0">
                         <h4 className="font-semibold text-dark dark:text-white truncate">{product.title}</h4>
@@ -475,6 +877,126 @@ const StatisticsPage = () => {
                     <div className="text-right">
                         <div className="text-lg font-bold text-primary">{formatNumber(metric === 'views' ? product.view_count || 0 : product.cart_count || 0)}</div>
                         <div className="text-xs text-gray-500 dark:text-gray-400">{metric === 'views' ? t('views') : t('cart_adds')}</div>
+                    </div>
+                </div>
+            </div>
+        </Link>
+    );
+
+    const CategoryCard = ({ category, rank }: { category: CategoryStats; rank: number }) => (
+        <Link href={`/categories/preview/${category.id}`} className="block">
+            <div className="panel hover:shadow-lg transition-shadow duration-200 cursor-pointer">
+                <div className="flex items-center gap-4">
+                    <div className="flex-shrink-0">
+                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-primary text-white font-bold text-sm">{rank}</div>
+                    </div>
+                    <div className="flex-shrink-0">
+                        <img src={category.image_url || '/assets/images/placeholder.webp'} alt={category.title} className="w-12 h-12 rounded-lg object-cover" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold text-dark dark:text-white truncate">{category.title}</h4>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{category.desc?.slice(0, 100) + '...' || t('no_description_available')}</p>
+                        <div className="flex items-center gap-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
+                            <span>
+                                {category._count?.products || 0} {t('products')}
+                            </span>
+                        </div>
+                    </div>
+                    <div className="text-right">
+                        <div className="text-lg font-bold text-primary">{formatNumber(category.view_count || 0)}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">{t('views')}</div>
+                    </div>
+                </div>
+            </div>
+        </Link>
+    );
+
+    // Sales Cards Components
+    const SalesShopCard = ({ shop, rank }: { shop: SalesShopStats; rank: number }) => (
+        <Link href={`/shops/preview/${shop.id}`} className="block">
+            <div className="panel hover:shadow-lg transition-shadow duration-200 cursor-pointer">
+                <div className="flex items-center gap-4">
+                    <div className="flex-shrink-0">
+                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-success text-white font-bold text-sm">{rank}</div>
+                    </div>
+                    <div className="flex-shrink-0">
+                        <img src={shop.logo_url || '/assets/images/shop-placeholder.jpg'} alt={shop.shop_name} className="w-12 h-12 rounded-lg object-cover" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold text-dark dark:text-white truncate">{shop.shop_name}</h4>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 truncate">
+                            {t('owner')}: {shop.profiles?.full_name || shop.owner}
+                        </p>
+                        <div className="flex items-center gap-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
+                            <span>
+                                {shop._count?.products || 0} {t('products')}
+                            </span>
+                            <span>
+                                ${formatNumber(shop.total_revenue || 0)} {t('revenue')}
+                            </span>
+                        </div>
+                    </div>
+                    <div className="text-right">
+                        <div className="text-lg font-bold text-success">{formatNumber(shop.total_orders || 0)}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">{t('orders')}</div>
+                    </div>
+                </div>
+            </div>
+        </Link>
+    );
+
+    const SalesProductCard = ({ product, rank }: { product: SalesProductStats; rank: number }) => (
+        <Link href={`/products/preview/${product.id}`} className="block">
+            <div className="panel hover:shadow-lg transition-shadow duration-200 cursor-pointer">
+                <div className="flex items-center gap-4">
+                    <div className="flex-shrink-0">
+                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-success text-white font-bold text-sm">{rank}</div>
+                    </div>
+                    <div className="flex-shrink-0">
+                        <img src={product.images?.[0] || '/assets/images/placeholder.webp'} alt={product.title} className="w-12 h-12 rounded-lg object-cover" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold text-dark dark:text-white truncate">{product.title}</h4>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{product.shops?.shop_name}</p>
+                        <div className="text-sm font-medium text-primary mt-1">${product.price}</div>
+                    </div>
+                    <div className="text-right">
+                        <div className="text-lg font-bold text-success">{formatNumber(product.total_orders || 0)}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">{t('orders')}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">
+                            ${formatNumber(product.total_revenue || 0)} {t('revenue')}
+                        </div>
+                    </div>
+                </div>
+            </div>
+        </Link>
+    );
+
+    const SalesCategoryCard = ({ category, rank }: { category: SalesCategoryStats; rank: number }) => (
+        <Link href={`/categories/preview/${category.id}`} className="block">
+            <div className="panel hover:shadow-lg transition-shadow duration-200 cursor-pointer">
+                <div className="flex items-center gap-4">
+                    <div className="flex-shrink-0">
+                        <div className="flex items-center justify-center w-8 h-8 rounded-full bg-success text-white font-bold text-sm">{rank}</div>
+                    </div>
+                    <div className="flex-shrink-0">
+                        <img src={category.image_url || '/assets/images/placeholder.webp'} alt={category.title} className="w-12 h-12 rounded-lg object-cover" />
+                    </div>
+                    <div className="flex-1 min-w-0">
+                        <h4 className="font-semibold text-dark dark:text-white truncate">{category.title}</h4>
+                        <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{category.desc?.slice(0, 100) + '...' || t('no_description_available')}</p>
+                        <div className="flex items-center gap-4 mt-2 text-xs text-gray-500 dark:text-gray-400">
+                            <span>
+                                {category._count?.products || 0} {t('products')}
+                            </span>
+                            <span>
+                                ${formatNumber(category.total_revenue || 0)} {t('revenue')}
+                            </span>
+                        </div>
+                    </div>
+                    <div className="text-right">
+                        <div className="text-lg font-bold text-success">{formatNumber(category.total_orders || 0)}</div>
+                        <div className="text-xs text-gray-500 dark:text-gray-400">{t('orders')}</div>
                     </div>
                 </div>
             </div>
@@ -519,6 +1041,9 @@ const StatisticsPage = () => {
                 <p className="text-gray-500 dark:text-gray-400 mt-1">{t('comprehensive_analytics_overview')}</p>
             </div>
 
+            {/* Filter Component */}
+            <StatisticsFilter shops={allShops} users={allUsers} onFilterChange={handleFilterChange} currentFilters={filters} isLoading={loading} />
+
             {/* Overview Stats */}
             <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
                 <StatCard icon={<IconStore className="w-5 h-5 text-white" />} title={t('total_shops')} value={overallStats.totalShops} color="bg-primary" />
@@ -529,88 +1054,234 @@ const StatisticsPage = () => {
                 <StatCard icon={<IconDollarSign className="w-5 h-5 text-white" />} title={t('total_orders')} value={overallStats.totalOrders} color="bg-danger" />
             </div>
 
-            {/* Filter Component */}
-            <StatisticsFilter shops={allShops} users={allUsers} onFilterChange={handleFilterChange} currentFilters={filters} isLoading={loading} />
-
-            {/* Tabs */}
+            {/* Main Tabs */}
             <div className="mb-6">
                 <div className="border-b border-[#ebedf2] dark:border-[#191e3a]">
-                    <ul className="flex flex-wrap -mb-px text-sm font-medium text-center">
-                        <li className="mr-2">
+                    <ul className="flex flex-wrap -mb-px text-lg font-medium text-center">
+                        <li className="mr-8">
                             <button
                                 className={`inline-block p-4 border-b-2 rounded-t-lg ${
-                                    activeTab === 0 ? 'text-primary border-primary' : 'border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300'
+                                    activeMainTab === 0 ? 'text-primary border-primary' : 'border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300'
                                 }`}
-                                onClick={() => setActiveTab(0)}
+                                onClick={() => {
+                                    setActiveMainTab(0);
+                                    setActiveTab(0);
+                                }}
                             >
-                                <IconTrendingUp className="w-4 h-4 inline mx-2" />
-                                {t('top_shops')}
+                                <IconEye className="w-5 h-5 inline mr-2" />
+                                {t('views_analytics')}
                             </button>
                         </li>
-                        <li className="mr-2">
+                        <li className="mr-8">
                             <button
                                 className={`inline-block p-4 border-b-2 rounded-t-lg ${
-                                    activeTab === 1 ? 'text-primary border-primary' : 'border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300'
+                                    activeMainTab === 1 ? 'text-success border-success' : 'border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300'
                                 }`}
-                                onClick={() => setActiveTab(1)}
+                                onClick={() => {
+                                    setActiveMainTab(1);
+                                    setActiveTab(0);
+                                }}
                             >
-                                <IconEye className="w-4 h-4 inline mx-2" />
-                                {t('most_viewed_products')}
-                            </button>
-                        </li>
-                        <li className="mr-2">
-                            <button
-                                className={`inline-block p-4 border-b-2 rounded-t-lg ${
-                                    activeTab === 2 ? 'text-primary border-primary' : 'border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300'
-                                }`}
-                                onClick={() => setActiveTab(2)}
-                            >
-                                <IconShoppingCart className="w-4 h-4 inline mx-2" />
-                                {t('most_carted_products')}
+                                <IconDollarSign className="w-5 h-5 inline mr-2" />
+                                {t('sales_analytics')}
                             </button>
                         </li>
                     </ul>
                 </div>
             </div>
 
+            {/* Secondary Tabs */}
+            <div className="mb-6">
+                <div className="border-b border-[#ebedf2] dark:border-[#191e3a]">
+                    <ul className="flex flex-wrap -mb-px text-sm font-medium text-center">
+                        {activeMainTab === 0 ? (
+                            // Views tabs
+                            <>
+                                <li className="mr-2">
+                                    <button
+                                        className={`inline-block p-4 border-b-2 rounded-t-lg ${
+                                            activeTab === 0 ? 'text-primary border-primary' : 'border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300'
+                                        }`}
+                                        onClick={() => setActiveTab(0)}
+                                    >
+                                        <IconTrendingUp className="w-4 h-4 inline mx-2" />
+                                        {t('top_visited_shops')}
+                                    </button>
+                                </li>
+                                <li className="mr-2">
+                                    <button
+                                        className={`inline-block p-4 border-b-2 rounded-t-lg ${
+                                            activeTab === 1 ? 'text-primary border-primary' : 'border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300'
+                                        }`}
+                                        onClick={() => setActiveTab(1)}
+                                    >
+                                        <IconEye className="w-4 h-4 inline mx-2" />
+                                        {t('most_viewed_products')}
+                                    </button>
+                                </li>
+                                <li className="mr-2">
+                                    <button
+                                        className={`inline-block p-4 border-b-2 rounded-t-lg ${
+                                            activeTab === 2 ? 'text-primary border-primary' : 'border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300'
+                                        }`}
+                                        onClick={() => setActiveTab(2)}
+                                    >
+                                        <IconShoppingCart className="w-4 h-4 inline mx-2" />
+                                        {t('most_carted_products')}
+                                    </button>
+                                </li>
+                                <li className="mr-2">
+                                    <button
+                                        className={`inline-block p-4 border-b-2 rounded-t-lg ${
+                                            activeTab === 3 ? 'text-primary border-primary' : 'border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300'
+                                        }`}
+                                        onClick={() => setActiveTab(3)}
+                                    >
+                                        <IconStore className="w-4 h-4 inline mx-2" />
+                                        {t('most_viewed_categories')}
+                                    </button>
+                                </li>
+                            </>
+                        ) : (
+                            // Sales tabs
+                            <>
+                                <li className="mr-2">
+                                    <button
+                                        className={`inline-block p-4 border-b-2 rounded-t-lg ${
+                                            activeTab === 0 ? 'text-success border-success' : 'border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300'
+                                        }`}
+                                        onClick={() => setActiveTab(0)}
+                                    >
+                                        <IconStore className="w-4 h-4 inline mx-2" />
+                                        {t('best_selling_shops')}
+                                    </button>
+                                </li>
+                                <li className="mr-2">
+                                    <button
+                                        className={`inline-block p-4 border-b-2 rounded-t-lg ${
+                                            activeTab === 1 ? 'text-success border-success' : 'border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300'
+                                        }`}
+                                        onClick={() => setActiveTab(1)}
+                                    >
+                                        <IconShoppingCart className="w-4 h-4 inline mx-2" />
+                                        {t('best_selling_products')}
+                                    </button>
+                                </li>
+                                <li className="mr-2">
+                                    <button
+                                        className={`inline-block p-4 border-b-2 rounded-t-lg ${
+                                            activeTab === 2 ? 'text-success border-success' : 'border-transparent hover:text-gray-600 hover:border-gray-300 dark:hover:text-gray-300'
+                                        }`}
+                                        onClick={() => setActiveTab(2)}
+                                    >
+                                        <IconTrendingUp className="w-4 h-4 inline mx-2" />
+                                        {t('best_selling_categories')}
+                                    </button>
+                                </li>
+                            </>
+                        )}
+                    </ul>
+                </div>
+            </div>
+
             {/* Tab Content */}
-            {activeTab === 0 && (
-                <div className="space-y-4">
-                    <h2 className="text-xl font-semibold text-dark dark:text-white mb-4">{t('top_visited_shops')}</h2>
-                    {topShops.length > 0 ? (
-                        topShops.map((shop, index) => <ShopCard key={shop.id} shop={shop} rank={index + 1} />)
-                    ) : (
-                        <div className="panel text-center py-8">
-                            <p className="text-gray-500 dark:text-gray-400">{t('no_shops_found')}</p>
+            {activeMainTab === 0 ? (
+                // Views Analytics Content
+                <>
+                    {activeTab === 0 && (
+                        <div className="space-y-4">
+                            <h2 className="text-xl font-semibold text-dark dark:text-white mb-4">{t('top_visited_shops')}</h2>
+                            {topShops.length > 0 ? (
+                                topShops.map((shop, index) => <ShopCard key={shop.id} shop={shop} rank={index + 1} />)
+                            ) : (
+                                <div className="panel text-center py-8">
+                                    <p className="text-gray-500 dark:text-gray-400">{t('no_shops_found')}</p>
+                                </div>
+                            )}
                         </div>
                     )}
-                </div>
-            )}
 
-            {activeTab === 1 && (
-                <div className="space-y-4">
-                    <h2 className="text-xl font-semibold text-dark dark:text-white mb-4">{t('most_viewed_products')}</h2>
-                    {topProducts.length > 0 ? (
-                        topProducts.map((product, index) => <ProductCard key={product.id} product={product} rank={index + 1} metric="views" />)
-                    ) : (
-                        <div className="panel text-center py-8">
-                            <p className="text-gray-500 dark:text-gray-400">{t('no_products_found')}</p>
+                    {activeTab === 1 && (
+                        <div className="space-y-4">
+                            <h2 className="text-xl font-semibold text-dark dark:text-white mb-4">{t('most_viewed_products')}</h2>
+                            {topProducts.length > 0 ? (
+                                topProducts.map((product, index) => <ProductCard key={product.id} product={product} rank={index + 1} metric="views" />)
+                            ) : (
+                                <div className="panel text-center py-8">
+                                    <p className="text-gray-500 dark:text-gray-400">{t('no_products_found')}</p>
+                                </div>
+                            )}
                         </div>
                     )}
-                </div>
-            )}
 
-            {activeTab === 2 && (
-                <div className="space-y-4">
-                    <h2 className="text-xl font-semibold text-dark dark:text-white mb-4">{t('most_carted_products')}</h2>
-                    {mostCartedProducts.length > 0 ? (
-                        mostCartedProducts.map((product, index) => <ProductCard key={product.id} product={product} rank={index + 1} metric="cart" />)
-                    ) : (
-                        <div className="panel text-center py-8">
-                            <p className="text-gray-500 dark:text-gray-400">{t('no_products_found')}</p>
+                    {activeTab === 2 && (
+                        <div className="space-y-4">
+                            <h2 className="text-xl font-semibold text-dark dark:text-white mb-4">{t('most_carted_products')}</h2>
+                            {mostCartedProducts.length > 0 ? (
+                                mostCartedProducts.map((product, index) => <ProductCard key={product.id} product={product} rank={index + 1} metric="cart" />)
+                            ) : (
+                                <div className="panel text-center py-8">
+                                    <p className="text-gray-500 dark:text-gray-400">{t('no_products_found')}</p>
+                                </div>
+                            )}
                         </div>
                     )}
-                </div>
+
+                    {activeTab === 3 && (
+                        <div className="space-y-4">
+                            <h2 className="text-xl font-semibold text-dark dark:text-white mb-4">{t('most_viewed_categories')}</h2>
+                            {topCategories.length > 0 ? (
+                                topCategories.map((category, index) => <CategoryCard key={category.id} category={category} rank={index + 1} />)
+                            ) : (
+                                <div className="panel text-center py-8">
+                                    <p className="text-gray-500 dark:text-gray-400">{t('no_categories_found')}</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </>
+            ) : (
+                // Sales Analytics Content
+                <>
+                    {activeTab === 0 && (
+                        <div className="space-y-4">
+                            <h2 className="text-xl font-semibold text-dark dark:text-white mb-4">{t('best_selling_shops')}</h2>
+                            {bestSellingShops.length > 0 ? (
+                                bestSellingShops.map((shop, index) => <SalesShopCard key={shop.id} shop={shop} rank={index + 1} />)
+                            ) : (
+                                <div className="panel text-center py-8">
+                                    <p className="text-gray-500 dark:text-gray-400">{t('no_shops_found')}</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {activeTab === 1 && (
+                        <div className="space-y-4">
+                            <h2 className="text-xl font-semibold text-dark dark:text-white mb-4">{t('best_selling_products')}</h2>
+                            {bestSellingProducts.length > 0 ? (
+                                bestSellingProducts.map((product, index) => <SalesProductCard key={product.id} product={product} rank={index + 1} />)
+                            ) : (
+                                <div className="panel text-center py-8">
+                                    <p className="text-gray-500 dark:text-gray-400">{t('no_products_found')}</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+
+                    {activeTab === 2 && (
+                        <div className="space-y-4">
+                            <h2 className="text-xl font-semibold text-dark dark:text-white mb-4">{t('best_selling_categories')}</h2>
+                            {bestSellingCategories.length > 0 ? (
+                                bestSellingCategories.map((category, index) => <SalesCategoryCard key={category.id} category={category} rank={index + 1} />)
+                            ) : (
+                                <div className="panel text-center py-8">
+                                    <p className="text-gray-500 dark:text-gray-400">{t('no_categories_found')}</p>
+                                </div>
+                            )}
+                        </div>
+                    )}
+                </>
             )}
         </div>
     );

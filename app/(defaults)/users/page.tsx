@@ -6,6 +6,7 @@ import IconTrashLines from '@/components/icon/icon-trash-lines';
 import { sortBy } from 'lodash';
 import { DataTableSortStatus, DataTable } from 'mantine-datatable';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import React, { useEffect, useState } from 'react';
 import supabase from '@/lib/supabase';
 import { Alert } from '@/components/elements/alerts/elements-alerts-default';
@@ -14,6 +15,7 @@ import { getTranslation } from '@/i18n';
 
 const UsersList = () => {
     const { t } = getTranslation();
+    const router = useRouter();
     const [items, setItems] = useState<
         Array<{
             id: number;
@@ -36,7 +38,7 @@ const UsersList = () => {
 
     const [search, setSearch] = useState('');
     const [sortStatus, setSortStatus] = useState<DataTableSortStatus>({
-        columnAccessor: 'id',
+        columnAccessor: 'registration_date',
         direction: 'desc',
     });
 
@@ -52,7 +54,7 @@ const UsersList = () => {
     useEffect(() => {
         const fetchUsers = async () => {
             try {
-                const { data, error } = await supabase.from('profiles').select('*');
+                const { data, error } = await supabase.from('profiles').select('*').order('registration_date', { ascending: false });
                 if (error) throw error;
                 setItems(data);
             } catch (error) {
@@ -177,8 +179,11 @@ const UsersList = () => {
 
                 <div className="datatables pagination-padding relative">
                     <DataTable
-                        className={`${loading ? 'filter blur-sm pointer-events-none' : 'table-hover whitespace-nowrap'}`}
+                        className={`${loading ? 'filter blur-sm pointer-events-none' : 'table-hover whitespace-nowrap cursor-pointer'}`}
                         records={records}
+                        onRowClick={(record) => {
+                            router.push(`/users/preview/${record.id}`);
+                        }}
                         columns={[
                             {
                                 accessor: 'id',
@@ -238,17 +243,25 @@ const UsersList = () => {
                                 render: ({ id }) => (
                                     <div className="mx-auto flex w-max items-center gap-4">
                                         <div
-                                            onClick={() => {
+                                            onClick={(e) => {
+                                                e.stopPropagation();
                                                 setAlert({ visible: true, message: t('cannot_edit_admin_user'), type: 'danger' });
                                             }}
                                             className="flex hover:text-info"
                                         >
                                             <IconEdit className="h-4.5 w-4.5" />
                                         </div>
-                                        <Link href={`/users/preview/${id}`} className="flex hover:text-primary">
+                                        <Link href={`/users/preview/${id}`} className="flex hover:text-primary" onClick={(e) => e.stopPropagation()}>
                                             <IconEye />
                                         </Link>
-                                        <button type="button" className="flex hover:text-danger" onClick={() => deleteRow(id)}>
+                                        <button
+                                            type="button"
+                                            className="flex hover:text-danger"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                deleteRow(id);
+                                            }}
+                                        >
                                             <IconTrashLines />
                                         </button>
                                     </div>

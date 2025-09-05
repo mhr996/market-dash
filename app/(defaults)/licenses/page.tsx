@@ -6,6 +6,7 @@ import IconTrashLines from '@/components/icon/icon-trash-lines';
 import { sortBy } from 'lodash';
 import { DataTableSortStatus, DataTable } from 'mantine-datatable';
 import Link from 'next/link';
+import { useRouter } from 'next/navigation';
 import React, { useEffect, useState } from 'react';
 import supabase from '@/lib/supabase';
 import { Alert } from '@/components/elements/alerts/elements-alerts-default';
@@ -27,6 +28,7 @@ const LicensesList = () => {
     const [items, setItems] = useState<License[]>([]);
     const [loading, setLoading] = useState(true);
     const { t } = getTranslation();
+    const router = useRouter();
 
     const [page, setPage] = useState(1);
     const PAGE_SIZES = [10, 20, 30, 50, 100];
@@ -37,7 +39,7 @@ const LicensesList = () => {
 
     const [search, setSearch] = useState('');
     const [sortStatus, setSortStatus] = useState<DataTableSortStatus>({
-        columnAccessor: 'id',
+        columnAccessor: 'created_at',
         direction: 'desc',
     });
 
@@ -53,7 +55,7 @@ const LicensesList = () => {
     useEffect(() => {
         const fetchLicenses = async () => {
             try {
-                const { data, error } = await supabase.from('licenses').select('*');
+                const { data, error } = await supabase.from('licenses').select('*').order('created_at', { ascending: false });
                 if (error) throw error;
                 setItems(data as License[]);
             } catch (error) {
@@ -171,8 +173,11 @@ const LicensesList = () => {
                 <div className="datatables pagination-padding relative">
                     {' '}
                     <DataTable
-                        className={`${loading ? 'filter blur-sm pointer-events-none' : 'table-hover whitespace-nowrap'}`}
+                        className={`${loading ? 'filter blur-sm pointer-events-none' : 'table-hover whitespace-nowrap cursor-pointer'}`}
                         records={records}
+                        onRowClick={(record) => {
+                            router.push(`/licenses/preview/${record.id}`);
+                        }}
                         columns={[
                             {
                                 accessor: 'id',
@@ -221,13 +226,20 @@ const LicensesList = () => {
                                 textAlignment: 'center',
                                 render: ({ id }) => (
                                     <div className="mx-auto flex w-max items-center gap-4">
-                                        <Link href={`/licenses/edit/${id}`} className="flex hover:text-info">
+                                        <Link href={`/licenses/edit/${id}`} className="flex hover:text-info" onClick={(e) => e.stopPropagation()}>
                                             <IconEdit className="h-4.5 w-4.5" />
                                         </Link>
-                                        <Link href={`/licenses/preview/${id}`} className="flex hover:text-primary">
+                                        <Link href={`/licenses/preview/${id}`} className="flex hover:text-primary" onClick={(e) => e.stopPropagation()}>
                                             <IconEye />
                                         </Link>
-                                        <button type="button" className="flex hover:text-danger" onClick={() => deleteRow(id)}>
+                                        <button
+                                            type="button"
+                                            className="flex hover:text-danger"
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                deleteRow(id);
+                                            }}
+                                        >
                                             <IconTrashLines />
                                         </button>
                                     </div>
