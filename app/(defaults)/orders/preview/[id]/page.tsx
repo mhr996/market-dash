@@ -81,8 +81,17 @@ const PreviewOrder = () => {
                     .select(
                         `
                         *,
-                        products(id, title, price, images, shop, shops(shop_name)),
-                        profiles(id, full_name, email)
+                        products(
+                            id, title, price, images, shop,
+                            shops(
+                                id, shop_name, logo_url, address, 
+                                phone_numbers
+                            )
+                        ),
+                        profiles(
+                            id, full_name, email, username, profession, 
+                            country, location, phone, website, avatar_url
+                        )
                     `,
                     )
                     .eq('id', parseInt(id))
@@ -111,11 +120,40 @@ const PreviewOrder = () => {
                             price: data.products?.price || 0,
                         },
                     ],
+                    // Comprehensive order data
                     shipping_method: shippingMethod,
                     shipping_address: shippingAddress,
                     payment_method: paymentMethod,
                     product_id: data.product_id,
                     buyer_id: data.buyer_id,
+                    // User data
+                    user: {
+                        id: data.profiles?.id,
+                        full_name: data.profiles?.full_name,
+                        email: data.profiles?.email,
+                        username: data.profiles?.username,
+                        profession: data.profiles?.profession,
+                        country: data.profiles?.country,
+                        location: data.profiles?.location,
+                        phone: data.profiles?.phone,
+                        website: data.profiles?.website,
+                        avatar_url: data.profiles?.avatar_url,
+                    },
+                    // Shop data
+                    shop: {
+                        id: data.products?.shops?.id,
+                        shop_name: data.products?.shops?.shop_name,
+                        logo_url: data.products?.shops?.logo_url,
+                        address: data.products?.shops?.address,
+                        phone_numbers: data.products?.shops?.phone_numbers,
+                    },
+                    // Product data
+                    product: {
+                        id: data.products?.id,
+                        title: data.products?.title,
+                        price: data.products?.price,
+                        images: data.products?.images,
+                    },
                 };
 
                 setOrder(formattedOrder);
@@ -203,7 +241,7 @@ const PreviewOrder = () => {
                 <div className="mb-6 flex items-center justify-between print:hidden">
                     <h5 className="text-xl font-semibold dark:text-white-light">{t('order_details')}</h5>
                     <div className="flex gap-2">
-                        <button className="btn btn-primary gap-2">
+                        <button onClick={handlePrint} className="btn btn-primary gap-2">
                             <IconPrinter className="h-5 w-5" />
                             {t('print')}
                         </button>
@@ -229,43 +267,255 @@ const PreviewOrder = () => {
                                 </div>
                                 <div>
                                     <strong>{t('status')}:</strong>
-                                    <span className={`badge badge-outline-${order.status === 'completed' ? 'success' : order.status === 'processing' ? 'warning' : 'danger'} ml-2`}>
-                                        {t(`order_status_${order.status}`)}
+                                    <span className={`badge badge-outline-${order.status === 'completed' ? 'success' : order.status === 'processing' ? 'warning' : 'danger'} mx-2`}>
+                                        {t(`${order.status}`)}
                                     </span>
                                 </div>
                             </div>
                         </div>
 
                         <div className="shrink-0">
-                            <img src={order.image || '/assets/images/product-placeholder.jpg'} alt={order.name} className="h-20 w-20 rounded-lg object-cover" />
+                            <img src={order.image || '/assets/images/product-placeholder.jpg'} alt={order.name} className="h-32 w-32 rounded-lg object-cover" />
                         </div>
                     </div>
 
-                    {/* Customer Information */}
-                    <div className="grid grid-cols-1 gap-6 px-4 py-6 lg:grid-cols-2">
-                        <div>
-                            <h6 className="mb-3 text-lg font-semibold">{t('customer_information')}</h6>
-                            <div className="space-y-2 text-white-dark">
+                    {/* Comprehensive Information Grid */}
+                    <div className="grid grid-cols-1 gap-6 px-4 py-6 lg:grid-cols-3">
+                        {/* Customer Information */}
+                        <div className="panel border border-gray-200 dark:border-gray-700">
+                            <div className="mb-4 flex items-center gap-3">
+                                {order.user?.avatar_url ? (
+                                    <img src={order.user.avatar_url} alt={order.user.full_name} className="h-12 w-12 rounded-full object-cover" />
+                                ) : (
+                                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-primary text-white font-semibold">{order.user?.full_name?.charAt(0) || 'U'}</div>
+                                )}
+                                <h6 className="text-lg font-semibold">{t('customer_information')}</h6>
+                            </div>
+                            <div className="space-y-3 text-white-dark">
                                 <div>
-                                    <strong>{t('name')}:</strong> {order.buyer}
+                                    <strong>{t('full_name')}:</strong>
+                                    <p className="mt-1">{order.user?.full_name || 'N/A'}</p>
                                 </div>
+                                {order.user?.username && (
+                                    <div>
+                                        <strong>{t('username')}:</strong>
+                                        <p className="mt-1">@{order.user.username}</p>
+                                    </div>
+                                )}
                                 <div>
-                                    <strong>{t('address')}:</strong> {order.address}
+                                    <strong>{t('email')}:</strong>
+                                    <p className="mt-1">{order.user?.email || 'N/A'}</p>
                                 </div>
+                                {order.user?.phone && (
+                                    <div>
+                                        <strong>{t('phone')}:</strong>
+                                        <p className="mt-1">{order.user.phone}</p>
+                                    </div>
+                                )}
+                                {order.user?.profession && (
+                                    <div>
+                                        <strong>{t('profession')}:</strong>
+                                        <p className="mt-1">{order.user.profession}</p>
+                                    </div>
+                                )}
+                                {order.user?.country && (
+                                    <div>
+                                        <strong>{t('country')}:</strong>
+                                        <p className="mt-1">{order.user.country}</p>
+                                    </div>
+                                )}
+                                {order.user?.location && (
+                                    <div>
+                                        <strong>{t('location')}:</strong>
+                                        <p className="mt-1">{order.user.location}</p>
+                                    </div>
+                                )}
+                                {order.user?.website && (
+                                    <div>
+                                        <strong>{t('website')}:</strong>
+                                        <p className="mt-1">
+                                            <a href={order.user.website} target="_blank" rel="noopener noreferrer" className="text-primary hover:underline">
+                                                {order.user.website}
+                                            </a>
+                                        </p>
+                                    </div>
+                                )}
                             </div>
                         </div>
 
-                        <div>
-                            <h6 className="mb-3 text-lg font-semibold">{t('order_summary')}</h6>
-                            <div className="space-y-2 text-white-dark">
+                        {/* Shop Information */}
+                        <div className="panel border border-gray-200 dark:border-gray-700">
+                            <div className="mb-4 flex items-center gap-3">
+                                {order.shop?.logo_url ? (
+                                    <img src={order.shop.logo_url} alt={order.shop.shop_name} className="h-12 w-12 rounded-full object-cover" />
+                                ) : (
+                                    <div className="flex h-12 w-12 items-center justify-center rounded-full bg-secondary text-white font-semibold">{order.shop?.shop_name?.charAt(0) || 'S'}</div>
+                                )}
+                                <h6 className="text-lg font-semibold">{t('shop_information')}</h6>
+                            </div>
+                            <div className="space-y-3 text-white-dark">
                                 <div>
-                                    <strong>{t('order_name')}:</strong> {order.name}
+                                    <strong>{t('shop_name')}:</strong>
+                                    <p className="mt-1">{order.shop?.shop_name || 'N/A'}</p>
                                 </div>
+                              
+                                {order.shop?.address && (
+                                    <div>
+                                        <strong>{t('shop_address')}:</strong>
+                                        <p className="mt-1">{order.shop.address}</p>
+                                    </div>
+                                )}
+                                {order.shop?.phone_numbers && order.shop.phone_numbers.length > 0 && (
+                                    <div>
+                                        <strong>{t('shop_phone')}:</strong>
+                                        <div className="mt-1">
+                                            {order.shop.phone_numbers.map((phone: string, index: number) => (
+                                                <p key={index}>{phone}</p>
+                                            ))}
+                                        </div>
+                                    </div>
+                                )}
+                              
+                            </div>
+                        </div>
+
+                        {/* Payment & Shipping Information */}
+                        <div className="panel border border-gray-200 dark:border-gray-700">
+                            <h6 className="mb-4 text-lg font-semibold">{t('payment_information')}</h6>
+                            <div className="space-y-4 text-white-dark">
+                                {/* Payment Method */}
                                 <div>
-                                    <strong>{t('total_items')}:</strong> {order.items.length}
+                                    <strong>{t('payment_method')}:</strong>
+                                    <div className="mt-2 rounded-lg bg-gray-50 dark:bg-gray-800 p-3">
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between">
+                                                <span>{t('payment_type')}:</span>
+                                                <span className="font-medium">{order.payment_method?.type || 'N/A'}</span>
+                                            </div>
+                                            {order.payment_method?.provider && (
+                                                <div className="flex justify-between">
+                                                    <span>{t('provider')}:</span>
+                                                    <span className="font-medium">{order.payment_method.provider}</span>
+                                                </div>
+                                            )}
+                                            {order.payment_method?.card_number && (
+                                                <div className="flex justify-between">
+                                                    <span>{t('card_number')}:</span>
+                                                    <span className="font-medium font-mono">{order.payment_method.card_number}</span>
+                                                </div>
+                                            )}
+                                            {order.payment_method?.name_on_card && (
+                                                <div className="flex justify-between">
+                                                    <span>{t('name_on_card')}:</span>
+                                                    <span className="font-medium">{order.payment_method.name_on_card}</span>
+                                                </div>
+                                            )}
+                                            {order.payment_method?.expiration_date && (
+                                                <div className="flex justify-between">
+                                                    <span>{t('expiration_date')}:</span>
+                                                    <span className="font-medium">{order.payment_method.expiration_date}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
                                 </div>
+
+                                {/* Shipping Information */}
                                 <div>
-                                    <strong>{t('order_total')}:</strong> <span className="text-success font-semibold">{order.total}</span>
+                                    <strong>{t('shipping_information')}:</strong>
+                                    <div className="mt-2 rounded-lg bg-gray-50 dark:bg-gray-800 p-3">
+                                        <div className="space-y-2">
+                                            <div className="flex justify-between">
+                                                <span>{t('shipping_method')}:</span>
+                                                <span className="font-medium">{order.shipping_method?.type || 'N/A'}</span>
+                                            </div>
+                                            {order.shipping_method?.cost && (
+                                                <div className="flex justify-between">
+                                                    <span>{t('shipping_cost')}:</span>
+                                                    <span className="font-medium">${order.shipping_method.cost}</span>
+                                                </div>
+                                            )}
+                                            {order.shipping_method?.duration && (
+                                                <div className="flex justify-between">
+                                                    <span>{t('shipping_duration')}:</span>
+                                                    <span className="font-medium">{order.shipping_method.duration}</span>
+                                                </div>
+                                            )}
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+
+                    {/* Shipping Address */}
+                    <div className="px-4 py-6">
+                        <h6 className="mb-4 text-lg font-semibold">{t('delivery_info')}</h6>
+                        <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                            <div className="panel border border-gray-200 dark:border-gray-700">
+                                <h6 className="mb-3 text-md font-semibold">{t('shipping_address')}</h6>
+                                <div className="space-y-2 text-white-dark">
+                                    {order.shipping_address?.name && (
+                                        <div>
+                                            <strong>{t('full_name')}:</strong> {order.shipping_address.name}
+                                        </div>
+                                    )}
+                                    {order.shipping_address?.email && (
+                                        <div>
+                                            <strong>{t('email')}:</strong> {order.shipping_address.email}
+                                        </div>
+                                    )}
+                                    {order.shipping_address?.phone && (
+                                        <div>
+                                            <strong>{t('phone')}:</strong> {order.shipping_address.phone}
+                                        </div>
+                                    )}
+                                    {order.shipping_address?.address && (
+                                        <div>
+                                            <strong>{t('address')}:</strong> {order.shipping_address.address}
+                                        </div>
+                                    )}
+                                    <div className="grid grid-cols-2 gap-4">
+                                        {order.shipping_address?.district && (
+                                            <div>
+                                                <strong>{t('district')}:</strong> {order.shipping_address.district}
+                                            </div>
+                                        )}
+                                        {order.shipping_address?.city && (
+                                            <div>
+                                                <strong>{t('city')}:</strong> {order.shipping_address.city}
+                                            </div>
+                                        )}
+                                    </div>
+                                    {order.shipping_address?.zip && (
+                                        <div>
+                                            <strong>{t('zip_code')}:</strong> {order.shipping_address.zip}
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            <div className="panel border border-gray-200 dark:border-gray-700">
+                                <h6 className="mb-3 text-md font-semibold">{t('order_summary')}</h6>
+                                <div className="space-y-2 text-white-dark">
+                                    <div>
+                                        <strong>{t('order_name')}:</strong> {order.name}
+                                    </div>
+                                    <div>
+                                        <strong>{t('total_items')}:</strong> {order.items.length}
+                                    </div>
+                                    <div>
+                                        <strong>{t('order_total')}:</strong> <span className="text-success font-semibold">{order.total}</span>
+                                    </div>
+                                    <div>
+                                        <strong>{t('order_date')}:</strong> {new Date(order.date).toLocaleDateString()}
+                                    </div>
+                                    <div>
+                                        <strong>{t('status')}:</strong>
+                                        <span className={`badge badge-outline-${order.status === 'completed' ? 'success' : order.status === 'processing' ? 'warning' : 'danger'} mx-2`}>
+                                            {t(`${order.status}`)}
+                                        </span>
+                                    </div>
                                 </div>
                             </div>
                         </div>
