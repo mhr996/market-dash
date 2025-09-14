@@ -56,7 +56,7 @@ const CategoriesList = () => {
                 if (error) throw error;
                 setItems(data as Category[]);
             } catch (error) {
-                console.error('Error fetching categories:', error);
+                // Error fetching categories
             } finally {
                 setLoading(false);
             }
@@ -120,7 +120,6 @@ const CategoriesList = () => {
             setItems(updatedItems);
             setAlert({ visible: true, message: t('category_deleted_successfully'), type: 'success' });
         } catch (error) {
-            console.error('Deletion error:', error);
             setAlert({ visible: true, message: t('error_deleting_category'), type: 'danger' });
         } finally {
             setShowConfirmModal(false);
@@ -129,7 +128,7 @@ const CategoriesList = () => {
     };
 
     return (
-        <div className="panel border-white-light px-0 dark:border-[#1b2e4b]">
+        <div className="panel border-white-light px-0 dark:border-[#1b2e4b] w-full max-w-none">
             {/* Alert */}
             {alert.visible && (
                 <div className="mb-4 ml-4 max-w-96">
@@ -141,7 +140,7 @@ const CategoriesList = () => {
                     />
                 </div>
             )}
-            <div className="invoice-table">
+            <div className="invoice-table w-full max-w-none">
                 <div className="mb-4.5 flex flex-col gap-5 px-5 md:flex-row md:items-center">
                     <div className="flex items-center gap-2">
                         <button type="button" className="btn btn-danger gap-2">
@@ -158,7 +157,7 @@ const CategoriesList = () => {
                     </div>
                 </div>
 
-                <div className="datatables pagination-padding relative">
+                <div className="datatables pagination-padding relative w-full max-w-none">
                     <DataTable
                         className={`${loading ? 'filter blur-sm pointer-events-none' : 'table-hover whitespace-nowrap cursor-pointer'}`}
                         records={records}

@@ -5,6 +5,7 @@ import IconPlus from '@/components/icon/icon-plus';
 import IconTrashLines from '@/components/icon/icon-trash-lines';
 import IconPrinter from '@/components/icon/icon-printer';
 import IconDownload from '@/components/icon/icon-download';
+import IconUser from '@/components/icon/icon-user';
 import { sortBy } from 'lodash';
 import { DataTableSortStatus, DataTable } from 'mantine-datatable';
 import Link from 'next/link';
@@ -16,6 +17,81 @@ import { getTranslation } from '@/i18n';
 import { generateOrderReceiptPDF } from '@/utils/pdf-generator';
 import supabase from '@/lib/supabase';
 
+// Assignment Modal Component
+const AssignmentModal = ({ order, isOpen, onClose, onAssign }: { order: any; isOpen: boolean; onClose: () => void; onAssign: (driverId: number) => void }) => {
+    const [selectedDriver, setSelectedDriver] = useState<number | null>(null);
+    const [drivers, setDrivers] = useState<any[]>([]);
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (order && isOpen) {
+            fetchDrivers();
+        }
+    }, [order, isOpen]);
+
+    const fetchDrivers = async () => {
+        try {
+            setLoading(true);
+            // Get the shop's delivery company from the product
+            const { data: productData } = await supabase.from('products').select('shop, shops(delivery_companies_id)').eq('id', order.product_id).single();
+
+            if (productData?.shops?.[0]?.delivery_companies_id) {
+                // Fetch drivers for this delivery company
+                const { data: driversData } = await supabase.from('delivery_drivers').select('id, name, phone, avatar_url').eq('delivery_companies_id', productData.shops[0].delivery_companies_id);
+
+                setDrivers(driversData || []);
+            }
+        } catch (error) {
+            // Error fetching drivers
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleAssign = () => {
+        if (selectedDriver) {
+            onAssign(selectedDriver);
+        }
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg w-96">
+                <h3 className="text-lg font-semibold mb-4">Assign Driver</h3>
+
+                {loading ? (
+                    <div>Loading drivers...</div>
+                ) : (
+                    <div className="space-y-4">
+                        <div>
+                            <label className="block text-sm font-medium mb-2">Select Driver:</label>
+                            <select value={selectedDriver || ''} onChange={(e) => setSelectedDriver(Number(e.target.value))} className="form-select w-full">
+                                <option value="">Choose Driver</option>
+                                {drivers.map((driver) => (
+                                    <option key={driver.id} value={driver.id}>
+                                        {driver.name} - {driver.phone}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+
+                        <div className="flex gap-2 justify-end">
+                            <button onClick={onClose} className="btn btn-outline">
+                                Cancel
+                            </button>
+                            <button onClick={handleAssign} disabled={!selectedDriver} className="btn btn-primary">
+                                Assign Driver
+                            </button>
+                        </div>
+                    </div>
+                )}
+            </div>
+        </div>
+    );
+};
+
 // Interfaces for Supabase order data
 interface OrderData {
     id: number;
@@ -26,6 +102,7 @@ interface OrderData {
     shipping_method: any;
     shipping_address: any;
     payment_method: any;
+    assigned_driver_id?: number;
     // Joined data
     products?: {
         id: number;
@@ -35,12 +112,19 @@ interface OrderData {
         shop: number;
         shops?: {
             shop_name: string;
-        };
+            delivery_companies_id?: number;
+        }[];
     };
     profiles?: {
         id: string;
         full_name: string;
         email: string;
+    };
+    assigned_driver?: {
+        id: number;
+        name: string;
+        phone: string;
+        avatar_url?: string;
     };
 }
 
@@ -61,6 +145,9 @@ const formatOrderForDisplay = (order: OrderData) => {
     const shippingAddress = parseJsonField(order.shipping_address);
     const paymentMethod = parseJsonField(order.payment_method);
     const shippingMethod = parseJsonField(order.shipping_method);
+
+    // Get delivery type from shipping_method - handle JSON string format
+    const deliveryType = order.shipping_method === '"delivery"' || order.shipping_method === 'delivery' ? 'delivery' : 'pickup';
 
     // Map database status to display status
     const statusMap: { [key: string]: 'completed' | 'processing' | 'cancelled' } = {
@@ -87,7 +174,7 @@ const formatOrderForDisplay = (order: OrderData) => {
         name: order.products?.title || 'Product',
         image: order.products?.images?.[0] || null,
         buyer: order.profiles?.full_name || shippingAddress.name || 'Unknown Customer',
-        shop_name: order.products?.shops?.shop_name || 'Unknown Shop',
+        shop_name: order.products?.shops?.[0]?.shop_name || 'Unknown Shop',
         delivery_status: deliveryStatusMap[order.status] || 'pending',
         city: shippingAddress.city || 'Unknown City',
         date: order.created_at,
@@ -106,6 +193,10 @@ const formatOrderForDisplay = (order: OrderData) => {
         payment_method: paymentMethod,
         product_id: order.product_id,
         buyer_id: order.buyer_id,
+        delivery_type: deliveryType,
+        assigned_driver_id: order.assigned_driver_id,
+        assigned_driver: order.assigned_driver,
+        delivery_company_id: order.products?.shops?.[0]?.delivery_companies_id,
     };
 };
 
@@ -135,12 +226,15 @@ const OrdersList = () => {
     const [selectedRecords, setSelectedRecords] = useState<any>([]);
 
     const [search, setSearch] = useState('');
+    const [deliveryFilter, setDeliveryFilter] = useState('all'); // 'all', 'delivery', 'pickup'
     const [sortStatus, setSortStatus] = useState<DataTableSortStatus>({
         columnAccessor: 'date',
         direction: 'desc',
     });
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [orderToDelete, setOrderToDelete] = useState<OrderData | null>(null);
+    const [showAssignModal, setShowAssignModal] = useState(false);
+    const [selectedOrder, setSelectedOrder] = useState<any>(null);
     const [alert, setAlert] = useState<{ visible: boolean; message: string; type: 'success' | 'danger' }>({
         visible: false,
         message: '',
@@ -156,7 +250,6 @@ const OrdersList = () => {
                 filename: `order-${orderId}-receipt.pdf`,
             });
         } catch (error) {
-            console.error('Error printing order:', error);
             setAlert({
                 visible: true,
                 message: t('error_printing_order'),
@@ -174,7 +267,6 @@ const OrdersList = () => {
                 filename: `order-${orderId}-receipt.pdf`,
             });
         } catch (error) {
-            console.error('Error downloading order PDF:', error);
             setAlert({
                 visible: true,
                 message: t('error_downloading_pdf'),
@@ -184,38 +276,6 @@ const OrdersList = () => {
     };
 
     useEffect(() => {
-        const fetchOrders = async () => {
-            try {
-                const { data, error } = await supabase
-                    .from('orders')
-                    .select(
-                        `
-                        *,
-                        products(id, title, price, images, shop, shops(shop_name)),
-                        profiles(id, full_name, email)
-                    `,
-                    )
-                    .order('created_at', { ascending: false });
-
-                if (error) throw error;
-
-                setItems(data as OrderData[]);
-
-                // Transform data for display
-                const transformed = data.map(formatOrderForDisplay);
-                setDisplayItems(transformed);
-            } catch (error) {
-                console.error('Error fetching orders:', error);
-                setAlert({
-                    visible: true,
-                    message: t('error_fetching_orders'),
-                    type: 'danger',
-                });
-            } finally {
-                setLoading(false);
-            }
-        };
-
         fetchOrders();
     }, []);
 
@@ -229,19 +289,21 @@ const OrdersList = () => {
         setRecords([...initialRecords.slice(from, to)]);
     }, [page, pageSize, initialRecords]);
     useEffect(() => {
-        setInitialRecords(
-            displayItems.filter((item) => {
-                return (
-                    item.name.toLowerCase().includes(search.toLowerCase()) ||
-                    item.buyer.toLowerCase().includes(search.toLowerCase()) ||
-                    item.total.toLowerCase().includes(search.toLowerCase()) ||
-                    item.shop_name.toLowerCase().includes(search.toLowerCase()) ||
-                    item.delivery_status.toLowerCase().includes(search.toLowerCase()) ||
-                    item.city.toLowerCase().includes(search.toLowerCase())
-                );
-            }),
-        );
-    }, [search, displayItems]);
+        const filtered = displayItems.filter((item) => {
+            const matchesSearch =
+                item.name.toLowerCase().includes(search.toLowerCase()) ||
+                item.buyer.toLowerCase().includes(search.toLowerCase()) ||
+                item.total.toLowerCase().includes(search.toLowerCase()) ||
+                item.shop_name.toLowerCase().includes(search.toLowerCase()) ||
+                item.delivery_status.toLowerCase().includes(search.toLowerCase()) ||
+                item.city.toLowerCase().includes(search.toLowerCase());
+
+            const matchesFilter = deliveryFilter === 'all' || item.delivery_type === deliveryFilter;
+
+            return matchesSearch && matchesFilter;
+        });
+        setInitialRecords(filtered);
+    }, [search, displayItems, deliveryFilter]);
 
     useEffect(() => {
         const data = sortBy(initialRecords, sortStatus.columnAccessor);
@@ -267,16 +329,74 @@ const OrdersList = () => {
 
             setAlert({ visible: true, message: t('order_deleted_successfully'), type: 'success' });
         } catch (error) {
-            console.error('Error deleting order:', error);
             setAlert({ visible: true, message: t('error_deleting_order'), type: 'danger' });
         }
         setShowConfirmModal(false);
         setOrderToDelete(null);
     };
 
+    const handleAssignDriver = async (orderId: number, driverId: number) => {
+        try {
+            const { error } = await supabase.from('orders').update({ assigned_driver_id: driverId }).eq('id', orderId);
+
+            if (error) throw error;
+
+            // Refresh the data to get the assigned driver info
+            await fetchOrders();
+            setAlert({ visible: true, message: 'Driver assigned successfully', type: 'success' });
+        } catch (error) {
+            setAlert({ visible: true, message: 'Error assigning driver', type: 'danger' });
+        }
+    };
+
+    const handleRemoveDriver = async (orderId: number) => {
+        try {
+            const { error } = await supabase.from('orders').update({ assigned_driver_id: null }).eq('id', orderId);
+
+            if (error) throw error;
+
+            // Refresh the data
+            await fetchOrders();
+            setAlert({ visible: true, message: 'Driver assignment removed', type: 'success' });
+        } catch (error) {
+            setAlert({ visible: true, message: 'Error removing driver', type: 'danger' });
+        }
+    };
+
+    const fetchOrders = async () => {
+        try {
+            const { data, error } = await supabase
+                .from('orders')
+                .select(
+                    `
+                    *,
+                    products(id, title, price, images, shop, shops(shop_name, delivery_companies_id)),
+                    profiles(id, full_name, email),
+                    assigned_driver:delivery_drivers(id, name, phone, avatar_url)
+                `,
+                )
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+
+            setItems(data as OrderData[]);
+
+            // Transform data for display
+            const transformed = data.map(formatOrderForDisplay);
+            setDisplayItems(transformed);
+        } catch (error) {
+            setAlert({
+                visible: true,
+                message: t('error_fetching_orders'),
+                type: 'danger',
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
+
     return (
-        <div>
-            {' '}
+        <div className="w-full max-w-none">
             <ul className="flex space-x-2 rtl:space-x-reverse">
                 <li>
                     <Link href="/" className="text-primary hover:underline">
@@ -287,7 +407,7 @@ const OrdersList = () => {
                     <span>{t('orders')}</span>
                 </li>
             </ul>
-            <div className="panel mt-6">
+            <div className="panel mt-6 w-full max-w-none">
                 {/* Confirmation Modal */}{' '}
                 <ConfirmModal
                     isOpen={showConfirmModal}
@@ -299,6 +419,20 @@ const OrdersList = () => {
                         setOrderToDelete(null);
                     }}
                     confirmLabel={t('delete')}
+                />
+                {/* Assignment Modal */}
+                <AssignmentModal
+                    order={selectedOrder}
+                    isOpen={showAssignModal}
+                    onClose={() => {
+                        setShowAssignModal(false);
+                        setSelectedOrder(null);
+                    }}
+                    onAssign={(driverId) => {
+                        if (selectedOrder) {
+                            handleAssignDriver(selectedOrder.id, driverId);
+                        }
+                    }}
                 />
                 {/* Alert */}
                 {alert.visible && (
@@ -312,17 +446,29 @@ const OrdersList = () => {
                         />
                     </div>
                 )}
-                <div className="invoice-table">
+                <div className="invoice-table overflow-x-auto w-full max-w-none">
                     <div className="mb-4.5 flex flex-col gap-5 px-5 md:flex-row md:items-center">
+                        <div className="flex gap-4">
+                            <select value={deliveryFilter} onChange={(e) => setDeliveryFilter(e.target.value)} className="form-select">
+                                <option value="all">All Orders</option>
+                                <option value="delivery">Delivery Orders</option>
+                                <option value="pickup">Pickup Orders</option>
+                            </select>
+                        </div>
                         <div className="ltr:ml-auto rtl:mr-auto">
                             <input type="text" className="form-input w-auto" placeholder={t('search')} value={search} onChange={(e) => setSearch(e.target.value)} />
                         </div>
                     </div>
 
-                    <div className="datatables">
+                    <div className="datatables w-full max-w-none">
                         <DataTable
-                            className={loading ? 'pointer-events-none' : 'cursor-pointer'}
+                            className={`${loading ? 'pointer-events-none' : 'cursor-pointer'} w-full max-w-none`}
                             records={records}
+                            minHeight={200}
+                            withBorder={false}
+                            withColumnBorders={false}
+                            striped
+                            highlightOnHover
                             onRowClick={(record) => {
                                 router.push(`/orders/preview/${record.id}`);
                             }}
@@ -406,6 +552,62 @@ const OrdersList = () => {
                                     ),
                                 },
                                 {
+                                    accessor: 'assigned_driver',
+                                    title: 'Driver',
+                                    sortable: false,
+                                    render: ({ assigned_driver, delivery_type, id }) => {
+                                        if (delivery_type === 'pickup') {
+                                            return <span className="text-gray-500">Pickup</span>;
+                                        }
+                                        if (assigned_driver) {
+                                            return (
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                                            <IconUser className="h-4 w-4 text-primary" />
+                                                        </div>
+                                                        <div>
+                                                            <div className="text-sm font-medium">{assigned_driver.name}</div>
+                                                            <div className="text-xs text-gray-500">{assigned_driver.phone}</div>
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-outline-warning btn-xs w-full"
+                                                        title="Remove Driver Assignment"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleRemoveDriver(id);
+                                                        }}
+                                                    >
+                                                        <IconUser className="h-3 w-3" />
+                                                        <span className="ml-1">Remove</span>
+                                                    </button>
+                                                </div>
+                                            );
+                                        }
+                                        return (
+                                            <div className="space-y-2">
+                                                <span className="text-orange-500">Unassigned</span>
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-outline-success btn-xs w-full"
+                                                    title="Assign Driver"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        const order = displayItems.find((d) => d.id === id);
+                                                        setSelectedOrder(order);
+                                                        setShowAssignModal(true);
+                                                    }}
+                                                >
+                                                    <IconUser className="h-3 w-3" />
+                                                    <span className="ml-1">Assign</span>
+                                                </button>
+                                            </div>
+                                        );
+                                    },
+                                },
+                                {
                                     accessor: 'action',
                                     title: t('actions'),
                                     titleClassName: '!text-center',
@@ -413,10 +615,7 @@ const OrdersList = () => {
                                         <div className="flex items-center justify-center gap-2">
                                             <Link href={`/orders/preview/${id}`} className="hover:text-info" title={t('view_order')} onClick={(e) => e.stopPropagation()}>
                                                 <IconEye className="h-5 w-5" />
-                                            </Link>{' '}
-                                            {/* <button type="button" className="hover:text-primary" title={t('print_order')} onClick={() => handlePrintOrder(id)}>
-                                                <IconPrinter className="h-5 w-5" />
-                                            </button>{' '} */}
+                                            </Link>
                                             <button
                                                 type="button"
                                                 className="hover:text-success"
@@ -445,7 +644,6 @@ const OrdersList = () => {
                                     ),
                                 },
                             ]}
-                            highlightOnHover
                             totalRecords={initialRecords.length}
                             recordsPerPage={pageSize}
                             page={page}
@@ -456,7 +654,6 @@ const OrdersList = () => {
                             onSortStatusChange={setSortStatus}
                             selectedRecords={selectedRecords}
                             onSelectedRecordsChange={setSelectedRecords}
-                            minHeight={200}
                             paginationText={({ from, to, totalRecords }) => `${t('showing')} ${from} ${t('to')} ${to} ${t('of')} ${totalRecords} ${t('entries')}`}
                         />
                     </div>

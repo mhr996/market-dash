@@ -77,9 +77,8 @@ const ProductsList = () => {
                 if (error) throw error;
 
                 setItems(data as Product[]);
-                console.log('Fetched products:', data);
             } catch (error) {
-                console.error('Error fetching products:', error);
+                // Error fetching products
             } finally {
                 setLoading(false);
             }
@@ -140,7 +139,6 @@ const ProductsList = () => {
             setItems(updatedItems);
             setAlert({ visible: true, message: t('product_deleted'), type: 'success' });
         } catch (error) {
-            console.error('Deletion error:', error);
             setAlert({ visible: true, message: t('error_deleting_product'), type: 'danger' });
         } finally {
             setShowConfirmModal(false);
@@ -156,12 +154,12 @@ const ProductsList = () => {
             const updatedItems = items.map((item) => (item.id === id ? { ...item, active: status } : item));
             setItems(updatedItems);
         } catch (error) {
-            console.error('Error updating product status:', error);
+            // Error updating product status
         }
     };
 
     return (
-        <div className="panel border-white-light px-0 dark:border-[#1b2e4b]">
+        <div className="panel border-white-light px-0 dark:border-[#1b2e4b] w-full max-w-none">
             {' '}
             {alert.visible && (
                 <div className="mb-4 ml-4 max-w-96">
@@ -173,7 +171,7 @@ const ProductsList = () => {
                     />
                 </div>
             )}
-            <div className="invoice-table">
+            <div className="invoice-table w-full max-w-none">
                 <div className="mb-4.5 flex flex-col gap-5 px-5 md:flex-row md:items-center">
                     <div className="flex items-center gap-2">
                         <button type="button" className="btn btn-danger gap-2">
@@ -190,7 +188,7 @@ const ProductsList = () => {
                     </div>
                 </div>
 
-                <div className="datatables pagination-padding relative">
+                <div className="datatables pagination-padding relative w-full max-w-none">
                     <DataTable
                         className={`${loading ? 'filter blur-sm pointer-events-none' : 'table-hover whitespace-nowrap cursor-pointer'}`}
                         records={records}
@@ -209,7 +207,7 @@ const ProductsList = () => {
                                 title: t('products'),
                                 sortable: true,
                                 render: ({ title, images }) => {
-                                    let imageList = [];
+                                    let imageList: any[] = [];
 
                                     imageList = typeof images === 'string' ? JSON.parse(images || '[]') : images;
 

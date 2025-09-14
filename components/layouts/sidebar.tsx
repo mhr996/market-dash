@@ -30,6 +30,10 @@ import IconMenuForms from '@/components/icon/menu/icon-menu-forms';
 import IconMenuUsers from '@/components/icon/menu/icon-menu-users';
 import IconUser from '@/components/icon/icon-user';
 import IconSettings from '@/components/icon/icon-settings';
+import IconTruck from '@/components/icon/icon-truck';
+import IconBuilding from '@/components/icon/icon-building';
+import IconCar from '@/components/icon/icon-car';
+import IconUsers from '@/components/icon/icon-users';
 
 import IconMenuPages from '@/components/icon/menu/icon-menu-pages';
 import IconMenuAuthentication from '@/components/icon/menu/icon-menu-authentication';
@@ -58,12 +62,16 @@ const Sidebar = () => {
             selector.classList.add('active');
             const ul: any = selector.closest('ul.sub-menu');
             if (ul) {
-                let ele: any = ul.closest('li.menu').querySelectorAll('.nav-link') || [];
-                if (ele.length) {
-                    ele = ele[0];
-                    setTimeout(() => {
-                        ele.click();
-                    });
+                // Find the parent li element (could be li.menu or li.nav-item)
+                const parentLi = ul.closest('li.menu') || ul.closest('li.nav-item');
+                if (parentLi) {
+                    let ele: any = parentLi.querySelectorAll('.nav-link') || [];
+                    if (ele.length) {
+                        ele = ele[0];
+                        setTimeout(() => {
+                            ele.click();
+                        });
+                    }
                 }
             }
         }
@@ -162,6 +170,45 @@ const Sidebar = () => {
                                                 <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">{t('orders')}</span>
                                             </div>
                                         </Link>
+                                    </li>
+                                    <li className="nav-item">
+                                        <button type="button" className={`${currentMenu === 'delivery' ? 'active' : ''} nav-link group w-full`} onClick={() => toggleMenu('delivery')}>
+                                            <div className="flex items-center">
+                                                <IconTruck className="shrink-0 group-hover:!text-primary" />
+                                                <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Delivery</span>
+                                            </div>
+                                            <div className={`${currentMenu !== 'delivery' ? 'rotate-90' : ''} ltr:ml-auto rtl:mr-auto`}>
+                                                <IconCaretDown className="w-4 h-4" />
+                                            </div>
+                                        </button>
+                                        <AnimateHeight duration={300} height={currentMenu === 'delivery' ? 'auto' : 0}>
+                                            <ul className="sub-menu [&>li>a]:before:content-none [&>li>button]:before:content-none">
+                                                <li>
+                                                    <Link href="/delivery/companies" className="group nav-link">
+                                                        <div className="flex items-center">
+                                                            <IconBuilding className="shrink-0 group-hover:!text-primary" />
+                                                            <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Companies</span>
+                                                        </div>
+                                                    </Link>
+                                                </li>
+                                                <li>
+                                                    <Link href="/delivery/cars" className="group nav-link">
+                                                        <div className="flex items-center">
+                                                            <IconCar className="shrink-0 group-hover:!text-primary" />
+                                                            <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Cars</span>
+                                                        </div>
+                                                    </Link>
+                                                </li>
+                                                <li>
+                                                    <Link href="/delivery/drivers" className="group nav-link">
+                                                        <div className="flex items-center">
+                                                            <IconUsers className="shrink-0 group-hover:!text-primary" />
+                                                            <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Drivers</span>
+                                                        </div>
+                                                    </Link>
+                                                </li>
+                                            </ul>
+                                        </AnimateHeight>
                                     </li>
                                     <li className="nav-item">
                                         <Link href="/revenue" className="group">

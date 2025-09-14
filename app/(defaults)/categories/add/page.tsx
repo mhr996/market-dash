@@ -90,7 +90,6 @@ const AddCategoryPage = () => {
             setAlert({ visible: true, message: t('category_added_successfully'), type: 'success' });
             router.push('/categories');
         } catch (error: any) {
-            console.error(error);
             setAlert({ visible: true, message: error.message || t('error_adding_category'), type: 'danger' });
         } finally {
             setLoading(false);
@@ -98,7 +97,7 @@ const AddCategoryPage = () => {
     };
 
     return (
-        <div className="container mx-auto p-6">
+        <div className="container mx-auto p-6 w-full max-w-none">
             <div className="flex items-center gap-5 mb-6">
                 {' '}
                 <div onClick={() => router.back()}>

@@ -37,6 +37,11 @@ interface Category {
     desc: string;
 }
 
+interface DeliveryCompany {
+    id: number;
+    company_name: string;
+}
+
 interface WorkHours {
     day: string;
     open: boolean;
@@ -60,6 +65,7 @@ const AddShopPage = () => {
         work_hours: null as WorkHours[] | null,
         phone_numbers: [''],
         category_id: null as number | null,
+        delivery_companies_id: null as number | null,
         gallery: [] as string[],
         latitude: null as number | null, // Shop location coordinates
         longitude: null as number | null, // Shop location coordinates
@@ -86,7 +92,27 @@ const AddShopPage = () => {
     const statusRef = useRef<HTMLDivElement>(null);
     const [activeTab, setActiveTab] = useState(0);
     const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
-    const [searchCategoryTerm, setSearchCategoryTerm] = useState(''); // Define default work hours in a useEffect to make it reactive to language changes
+    const [searchCategoryTerm, setSearchCategoryTerm] = useState('');
+
+    // Delivery company states
+    const [deliveryCompanies, setDeliveryCompanies] = useState<DeliveryCompany[]>([]);
+    const [isDeliveryCompanyDropdownOpen, setIsDeliveryCompanyDropdownOpen] = useState(false);
+    const [searchDeliveryCompanyTerm, setSearchDeliveryCompanyTerm] = useState('');
+    const deliveryCompanyRef = useRef<HTMLDivElement>(null);
+
+    // Pricing states
+    const [deliveryPrices, setDeliveryPrices] = useState<{
+        express_price: number;
+        fast_price: number;
+        standard_price: number;
+    } | null>(null);
+    const [locationPrices, setLocationPrices] = useState<any[]>([]);
+    const [newLocationPrice, setNewLocationPrice] = useState({
+        location: '',
+        express_price: '',
+        fast_price: '',
+        standard_price: '',
+    }); // Define default work hours in a useEffect to make it reactive to language changes
     useEffect(() => {
         // Create default work hours with current language translations
         const defaultWorkHours: WorkHours[] = [
@@ -155,8 +181,14 @@ const AddShopPage = () => {
 
                 if (categoriesError) throw categoriesError;
                 setCategories(categoriesData || []);
+
+                // Fetch delivery companies
+                const { data: deliveryCompaniesData, error: deliveryCompaniesError } = await supabase.from('delivery_companies').select('id, company_name').order('company_name', { ascending: true });
+
+                if (deliveryCompaniesError) throw deliveryCompaniesError;
+                setDeliveryCompanies(deliveryCompaniesData || []);
             } catch (error) {
-                console.error('Error fetching data:', error);
+                // Error fetching data
             }
         };
         fetchData();
@@ -164,7 +196,7 @@ const AddShopPage = () => {
 
     // Filter users based on search term
     useEffect(() => {
-        const filtered = users.filter((user) => user.full_name.toLowerCase().includes(searchTerm.toLowerCase()));
+        const filtered = users.filter((user) => user.full_name?.toLowerCase().includes(searchTerm.toLowerCase()));
         setFilteredUsers(filtered);
     }, [searchTerm, users]); // Handle click outside for user dropdown
     useEffect(() => {
@@ -178,6 +210,9 @@ const AddShopPage = () => {
             if (statusRef.current && !statusRef.current.contains(event.target as Node)) {
                 setForm((prev) => ({ ...prev, statusDropdownOpen: false }));
             }
+            if (deliveryCompanyRef.current && !deliveryCompanyRef.current.contains(event.target as Node)) {
+                setIsDeliveryCompanyDropdownOpen(false);
+            }
         };
 
         document.addEventListener('mousedown', handleClickOutside);
@@ -190,6 +225,79 @@ const AddShopPage = () => {
             ...prev,
             [name]: type === 'checkbox' ? (e.target as HTMLInputElement).checked : value,
         }));
+    };
+
+    // Pricing handlers
+    const handlePricingChange = (field: string, value: string) => {
+        setDeliveryPrices((prev) => ({
+            express_price: prev?.express_price || 0,
+            fast_price: prev?.fast_price || 0,
+            standard_price: prev?.standard_price || 0,
+            [field]: parseFloat(value) || 0,
+        }));
+    };
+
+    const handleLocationPriceChange = (id: number, field: string, value: string) => {
+        setLocationPrices((prev) => prev.map((price) => (price.id === id ? { ...price, [field]: value } : price)));
+    };
+
+    const addLocationPrice = () => {
+        if (newLocationPrice.location.trim()) {
+            const newPrice = {
+                id: Date.now(), // Temporary ID
+                delivery_location: newLocationPrice.location,
+                express_price: parseFloat(newLocationPrice.express_price) || 0,
+                fast_price: parseFloat(newLocationPrice.fast_price) || 0,
+                standard_price: parseFloat(newLocationPrice.standard_price) || 0,
+            };
+            setLocationPrices((prev) => [...prev, newPrice]);
+            setNewLocationPrice({
+                location: '',
+                express_price: '',
+                fast_price: '',
+                standard_price: '',
+            });
+        }
+    };
+
+    const removeLocationPrice = (id: number) => {
+        setLocationPrices((prev) => prev.filter((price) => price.id !== id));
+    };
+
+    // Fetch pricing data when delivery company is selected
+    const fetchPricingData = async (deliveryCompanyId: number) => {
+        try {
+            // Fetch delivery pricing data
+            const { data: pricingData, error: pricingError } = await supabase
+                .from('delivery_prices')
+                .select('express_price, fast_price, standard_price')
+                .eq('delivery_companies_id', deliveryCompanyId)
+                .single();
+
+            if (!pricingError && pricingData) {
+                setDeliveryPrices(pricingData);
+            } else {
+                // Set default values if no pricing exists
+                setDeliveryPrices({
+                    express_price: 0,
+                    fast_price: 0,
+                    standard_price: 0,
+                });
+            }
+
+            // Fetch location-based pricing
+            const { data: locationPricesData, error: locationPricesError } = await supabase
+                .from('delivery_location_prices')
+                .select('id, delivery_location, express_price, fast_price, standard_price')
+                .eq('delivery_companies_id', deliveryCompanyId)
+                .order('delivery_location', { ascending: true });
+
+            if (!locationPricesError) {
+                setLocationPrices(locationPricesData || []);
+            }
+        } catch (error) {
+            // Error fetching pricing data
+        }
     };
 
     // Handle temporary file storage for logo and cover
@@ -305,6 +413,7 @@ const AddShopPage = () => {
                 work_hours: form.work_hours,
                 phone_numbers: form.phone_numbers.filter((phone) => phone.trim() !== ''),
                 category_id: form.category_id,
+                delivery_companies_id: form.delivery_companies_id,
                 gallery: form.gallery,
                 latitude: form.latitude,
                 longitude: form.longitude,
@@ -351,7 +460,6 @@ const AddShopPage = () => {
             // Redirect back to the shops list page after successful insertion
             router.push('/shops');
         } catch (error: any) {
-            console.error(error);
             setAlert({ visible: true, message: error.message || t('error_adding_shop'), type: 'danger' });
             // Scroll to top to show error
             window.scrollTo({ top: 0, behavior: 'smooth' });
@@ -360,7 +468,7 @@ const AddShopPage = () => {
     };
 
     return (
-        <div className="container mx-auto p-6">
+        <div className="container mx-auto p-6 w-full max-w-none">
             <div className="flex items-center gap-5 mb-6">
                 {' '}
                 <div onClick={() => router.back()}>
@@ -431,6 +539,7 @@ const AddShopPage = () => {
                             { name: t('shop_details'), icon: 'map-pin' },
                             { name: t('working_hours'), icon: 'clock' },
                             { name: t('gallery'), icon: 'image' },
+                            { name: t('delivery'), icon: 'truck' },
                         ]}
                         onTabClick={(tab) => setActiveTab(tab)}
                         activeTab={activeTab}
@@ -774,7 +883,275 @@ const AddShopPage = () => {
                             </div>
                         </div>
                     </div>
-                )}{' '}
+                )}
+                {activeTab === 4 && (
+                    <div className="panel mb-5">
+                        <div className="mb-5">
+                            <h5 className="text-lg font-semibold dark:text-white-light">{t('delivery_settings')}</h5>
+                            <p className="text-gray-500 dark:text-gray-400 mt-1">{t('select_delivery_company_for_shop')}</p>
+                        </div>
+
+                        <div className="grid grid-cols-1 gap-6">
+                            {/* Delivery Company Selection */}
+                            <div ref={deliveryCompanyRef} className="relative">
+                                <label htmlFor="delivery_companies_id" className="block text-sm font-bold text-gray-700 dark:text-white">
+                                    {t('delivery_company')}
+                                </label>
+                                <div className="relative">
+                                    <div
+                                        className="cursor-pointer rounded border border-[#e0e6ed] bg-white p-2.5 text-dark dark:border-[#191e3a] dark:bg-black dark:text-white-dark flex items-center justify-between"
+                                        onClick={() => setIsDeliveryCompanyDropdownOpen(!isDeliveryCompanyDropdownOpen)}
+                                    >
+                                        <span>{form.delivery_companies_id ? deliveryCompanies.find((c) => c.id === form.delivery_companies_id)?.company_name : t('select_delivery_company')}</span>
+                                        <IconCaretDown className={`h-4 w-4 transition-transform duration-300 ${isDeliveryCompanyDropdownOpen ? 'rotate-180' : ''}`} />
+                                    </div>
+
+                                    {isDeliveryCompanyDropdownOpen && (
+                                        <div className="absolute z-50 mt-1 w-full rounded-md border border-[#e0e6ed] bg-white shadow-lg dark:border-[#191e3a] dark:bg-black">
+                                            <div className="p-2">
+                                                <input
+                                                    type="text"
+                                                    className="w-full rounded border border-[#e0e6ed] p-2 focus:border-primary focus:outline-none dark:border-[#191e3a] dark:bg-black dark:text-white-dark"
+                                                    placeholder={t('search')}
+                                                    value={searchDeliveryCompanyTerm}
+                                                    onChange={(e) => setSearchDeliveryCompanyTerm(e.target.value)}
+                                                />
+                                            </div>
+                                            <div className="max-h-64 overflow-y-auto">
+                                                {deliveryCompanies
+                                                    .filter((company) => company.company_name.toLowerCase().includes(searchDeliveryCompanyTerm.toLowerCase()))
+                                                    .map((company) => (
+                                                        <div
+                                                            key={company.id}
+                                                            className="cursor-pointer px-4 py-2 hover:bg-gray-100 dark:text-white-dark dark:hover:bg-[#191e3a]"
+                                                            onClick={() => {
+                                                                setForm((prev) => ({
+                                                                    ...prev,
+                                                                    delivery_companies_id: company.id,
+                                                                }));
+                                                                setIsDeliveryCompanyDropdownOpen(false);
+                                                                // Fetch pricing data for the selected company
+                                                                fetchPricingData(company.id);
+                                                            }}
+                                                        >
+                                                            {company.company_name}
+                                                        </div>
+                                                    ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Pricing Section - Only show if delivery company is selected */}
+                            {form.delivery_companies_id && (
+                                <div className="mt-8">
+                                    <div className="mb-5">
+                                        <h5 className="text-lg font-semibold dark:text-white-light">{t('delivery_pricing')}</h5>
+                                        <p className="text-gray-500 dark:text-gray-400 mt-1">{t('manage_delivery_prices_for_shop')}</p>
+                                    </div>
+
+                                    {/* Base Pricing */}
+                                    <div className="panel mb-5">
+                                        <div className="mb-5">
+                                            <h5 className="text-lg font-semibold dark:text-white-light">{t('base_delivery_prices')}</h5>
+                                            <p className="text-gray-500 dark:text-gray-400 mt-1">{t('standard_pricing_for_all_locations')}</p>
+                                        </div>
+                                        <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+                                            <div>
+                                                <label htmlFor="express_price" className="block text-sm font-bold text-gray-700 dark:text-white">
+                                                    Express (Same Day) <span className="text-red-500">*</span>
+                                                </label>
+                                                <div className="relative">
+                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                                                    <input
+                                                        type="number"
+                                                        id="express_price"
+                                                        className="form-input pl-8"
+                                                        value={deliveryPrices?.express_price || ''}
+                                                        onChange={(e) => handlePricingChange('express_price', e.target.value)}
+                                                        placeholder="0.00"
+                                                        step="0.01"
+                                                        min="0"
+                                                        required
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label htmlFor="fast_price" className="block text-sm font-bold text-gray-700 dark:text-white">
+                                                    Fast (2-3 Days) <span className="text-red-500">*</span>
+                                                </label>
+                                                <div className="relative">
+                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                                                    <input
+                                                        type="number"
+                                                        id="fast_price"
+                                                        className="form-input pl-8"
+                                                        value={deliveryPrices?.fast_price || ''}
+                                                        onChange={(e) => handlePricingChange('fast_price', e.target.value)}
+                                                        placeholder="0.00"
+                                                        step="0.01"
+                                                        min="0"
+                                                        required
+                                                    />
+                                                </div>
+                                            </div>
+                                            <div>
+                                                <label htmlFor="standard_price" className="block text-sm font-bold text-gray-700 dark:text-white">
+                                                    Standard (3-5 Days) <span className="text-red-500">*</span>
+                                                </label>
+                                                <div className="relative">
+                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
+                                                    <input
+                                                        type="number"
+                                                        id="standard_price"
+                                                        className="form-input pl-8"
+                                                        value={deliveryPrices?.standard_price || ''}
+                                                        onChange={(e) => handlePricingChange('standard_price', e.target.value)}
+                                                        placeholder="0.00"
+                                                        step="0.01"
+                                                        min="0"
+                                                        required
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Location Based Prices */}
+                                    <div className="panel">
+                                        <div className="mb-5">
+                                            <h5 className="text-lg font-semibold dark:text-white-light">{t('location_based_prices')}</h5>
+                                            <p className="text-gray-500 dark:text-gray-400 mt-1">{t('set_specific_prices_for_locations')}</p>
+                                        </div>
+
+                                        {/* Add New Location Price */}
+                                        <div className="mb-6 p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
+                                            <h6 className="text-md font-semibold mb-4">{t('add_new_location_price')}</h6>
+                                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 dark:text-white mb-1">{t('location_name')}</label>
+                                                    <input
+                                                        type="text"
+                                                        className="form-input"
+                                                        placeholder={t('enter_location_name')}
+                                                        value={newLocationPrice.location}
+                                                        onChange={(e) => setNewLocationPrice((prev) => ({ ...prev, location: e.target.value }))}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 dark:text-white mb-1">Express ($)</label>
+                                                    <input
+                                                        type="number"
+                                                        className="form-input"
+                                                        placeholder="0.00"
+                                                        step="0.01"
+                                                        min="0"
+                                                        value={newLocationPrice.express_price}
+                                                        onChange={(e) => setNewLocationPrice((prev) => ({ ...prev, express_price: e.target.value }))}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 dark:text-white mb-1">Fast ($)</label>
+                                                    <input
+                                                        type="number"
+                                                        className="form-input"
+                                                        placeholder="0.00"
+                                                        step="0.01"
+                                                        min="0"
+                                                        value={newLocationPrice.fast_price}
+                                                        onChange={(e) => setNewLocationPrice((prev) => ({ ...prev, fast_price: e.target.value }))}
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <label className="block text-sm font-medium text-gray-700 dark:text-white mb-1">Standard ($)</label>
+                                                    <input
+                                                        type="number"
+                                                        className="form-input"
+                                                        placeholder="0.00"
+                                                        step="0.01"
+                                                        min="0"
+                                                        value={newLocationPrice.standard_price}
+                                                        onChange={(e) => setNewLocationPrice((prev) => ({ ...prev, standard_price: e.target.value }))}
+                                                    />
+                                                </div>
+                                                <div className="flex items-end">
+                                                    <button type="button" className="btn btn-primary w-full" onClick={addLocationPrice}>
+                                                        <IconPlus className="h-4 w-4 mr-1" />
+                                                        {t('add')}
+                                                    </button>
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        {/* Existing Location Prices */}
+                                        <div className="grid grid-cols-1 gap-6">
+                                            {locationPrices.map((locationPrice, index) => (
+                                                <div key={locationPrice.id} className="border border-gray-200 dark:border-gray-700 rounded-md p-4">
+                                                    <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
+                                                        <div className="flex items-center flex-1">
+                                                            <h6 className="text-lg font-semibold min-w-[120px]">
+                                                                {t('location')} {index + 1}
+                                                            </h6>
+                                                            <input
+                                                                type="text"
+                                                                className="form-input flex-1 ml-4"
+                                                                placeholder={t('enter_location_name')}
+                                                                value={locationPrice.delivery_location}
+                                                                onChange={(e) => handleLocationPriceChange(locationPrice.id, 'delivery_location', e.target.value)}
+                                                            />
+                                                        </div>
+                                                        <button type="button" className="btn btn-outline-danger btn-sm" onClick={() => removeLocationPrice(locationPrice.id)}>
+                                                            <IconX className="h-4 w-4" />
+                                                        </button>
+                                                    </div>
+                                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-gray-700 dark:text-white mb-1">Express ($)</label>
+                                                            <input
+                                                                type="number"
+                                                                className="form-input"
+                                                                placeholder="0.00"
+                                                                step="0.01"
+                                                                min="0"
+                                                                value={locationPrice.express_price}
+                                                                onChange={(e) => handleLocationPriceChange(locationPrice.id, 'express_price', e.target.value)}
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-gray-700 dark:text-white mb-1">Fast ($)</label>
+                                                            <input
+                                                                type="number"
+                                                                className="form-input"
+                                                                placeholder="0.00"
+                                                                step="0.01"
+                                                                min="0"
+                                                                value={locationPrice.fast_price}
+                                                                onChange={(e) => handleLocationPriceChange(locationPrice.id, 'fast_price', e.target.value)}
+                                                            />
+                                                        </div>
+                                                        <div>
+                                                            <label className="block text-sm font-medium text-gray-700 dark:text-white mb-1">Standard ($)</label>
+                                                            <input
+                                                                type="number"
+                                                                className="form-input"
+                                                                placeholder="0.00"
+                                                                step="0.01"
+                                                                min="0"
+                                                                value={locationPrice.standard_price}
+                                                                onChange={(e) => handleLocationPriceChange(locationPrice.id, 'standard_price', e.target.value)}
+                                                            />
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
                 {/* Submit Button */}
                 <div className="flex justify-end gap-4">
                     <button type="button" className="btn btn-outline-danger" onClick={() => router.back()}>

@@ -43,7 +43,6 @@ const EditCategory = () => {
                 if (error) throw error;
                 setForm(data);
             } catch (error) {
-                console.error('Error fetching category:', error);
                 setAlert({ visible: true, message: t('error_loading_category'), type: 'danger' });
             } finally {
                 setLoading(false);
@@ -92,13 +91,11 @@ const EditCategory = () => {
                 if (fetchError) throw fetchError; // Update was successful
                 setForm(updatedCategory);
             } catch (error) {
-                console.error('Error updating category:', error);
                 throw error;
             }
 
             setAlert({ visible: true, message: t('category_updated_successfully'), type: 'success' });
         } catch (error) {
-            console.error(error);
             setAlert({
                 visible: true,
                 message: error instanceof Error ? error.message : t('error_updating_category'),
@@ -113,7 +110,7 @@ const EditCategory = () => {
     }
 
     return (
-        <div className="container mx-auto p-6">
+        <div className="container mx-auto p-6 w-full max-w-none">
             <div className="mb-6 flex items-center justify-between">
                 <div className="flex items-center gap-5">
                     {' '}

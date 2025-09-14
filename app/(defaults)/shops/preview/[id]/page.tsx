@@ -15,6 +15,9 @@ import IconMail from '@/components/icon/icon-mail';
 import IconX from '@/components/icon/icon-x';
 import IconCash from '@/components/icon/icon-cash-banknotes';
 import IconCreditCard from '@/components/icon/icon-credit-card';
+import IconCar from '@/components/icon/icon-car';
+import IconTruck from '@/components/icon/icon-truck';
+import IconBuilding from '@/components/icon/icon-building';
 import { DataTableSortStatus, DataTable } from 'mantine-datatable';
 import { sortBy } from 'lodash';
 import { getTranslation } from '@/i18n';
@@ -36,6 +39,12 @@ interface Category {
     id: number;
     title: string;
     desc: string;
+}
+
+interface DeliveryCompany {
+    id: number;
+    company_name: string;
+    logo_url: string | null;
 }
 
 interface ShopSale {
@@ -75,6 +84,7 @@ interface Shop {
     work_hours?: WorkHours[];
     phone_numbers?: string[];
     category_id?: number | null;
+    delivery_companies_id?: number | null;
     gallery?: string[] | null;
     latitude?: number | null; // Geographical location data
     longitude?: number | null; // Geographical location data
@@ -98,9 +108,22 @@ const ShopPreview = () => {
     const router = useRouter();
     const [shop, setShop] = useState<Shop | null>(null);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'owner' | 'details' | 'revenue' | 'transactions'>('owner');
+    const [activeTab, setActiveTab] = useState<'owner' | 'details' | 'revenue' | 'transactions' | 'delivery'>('owner');
     const [categories, setCategories] = useState<Category[]>([]);
     const [unauthorized, setUnauthorized] = useState(false);
+
+    // Delivery company and drivers/cars data
+    const [deliveryCompany, setDeliveryCompany] = useState<DeliveryCompany | null>(null);
+    const [drivers, setDrivers] = useState<any[]>([]);
+    const [cars, setCars] = useState<any[]>([]);
+
+    // Pricing data
+    const [deliveryPrices, setDeliveryPrices] = useState<{
+        express_price: number;
+        fast_price: number;
+        standard_price: number;
+    } | null>(null);
+    const [locationPrices, setLocationPrices] = useState<any[]>([]);
     const [productsCount, setProductsCount] = useState<number>(0);
     const [ordersCount, setOrdersCount] = useState<number>(0);
     const [newProductsCount, setNewProductsCount] = useState<number>(0);
@@ -217,7 +240,7 @@ const ShopPreview = () => {
                         }
                     }
                 } catch (error) {
-                    console.log('No active subscription found, using default commission rate');
+                    // No active subscription found, using default commission rate
                 }
 
                 // Add commission rate to shop data
@@ -233,6 +256,85 @@ const ShopPreview = () => {
 
                 if (categoriesError) throw categoriesError;
                 setCategories(categoriesData || []);
+
+                // Fetch delivery company data if shop has one
+                if (data.delivery_companies_id) {
+                    const { data: deliveryCompanyData, error: deliveryCompanyError } = await supabase
+                        .from('delivery_companies')
+                        .select('id, company_name, logo_url')
+                        .eq('id', data.delivery_companies_id)
+                        .single();
+
+                    if (deliveryCompanyError) throw deliveryCompanyError;
+                    setDeliveryCompany(deliveryCompanyData);
+
+                    // Fetch drivers for this delivery company
+                    const { data: driversData, error: driversError } = await supabase
+                        .from('delivery_drivers')
+                        .select(
+                            `
+                            id,
+                            name,
+                            avatar_url,
+                            phone,
+                            delivery_cars(
+                                id,
+                                plate_number,
+                                brand,
+                                model
+                            )
+                        `,
+                        )
+                        .eq('delivery_companies_id', data.delivery_companies_id);
+
+                    if (driversError) throw driversError;
+                    setDrivers(driversData || []);
+
+                    // Fetch cars for this delivery company
+                    const { data: carsData, error: carsError } = await supabase
+                        .from('delivery_cars')
+                        .select(
+                            `
+                            id,
+                            plate_number,
+                            brand,
+                            model,
+                            color,
+                            capacity,
+                            delivery_drivers(
+                                id,
+                                name,
+                                phone
+                            )
+                        `,
+                        )
+                        .eq('delivery_companies_id', data.delivery_companies_id);
+
+                    if (carsError) throw carsError;
+                    setCars(carsData || []);
+
+                    // Fetch delivery pricing data
+                    const { data: pricingData, error: pricingError } = await supabase
+                        .from('delivery_prices')
+                        .select('express_price, fast_price, standard_price')
+                        .eq('delivery_companies_id', data.delivery_companies_id)
+                        .single();
+
+                    if (!pricingError && pricingData) {
+                        setDeliveryPrices(pricingData);
+                    }
+
+                    // Fetch location-based pricing
+                    const { data: locationPricesData, error: locationPricesError } = await supabase
+                        .from('delivery_location_prices')
+                        .select('id, delivery_location, express_price, fast_price, standard_price')
+                        .eq('delivery_companies_id', data.delivery_companies_id)
+                        .order('delivery_location', { ascending: true });
+
+                    if (!locationPricesError) {
+                        setLocationPrices(locationPricesData || []);
+                    }
+                }
 
                 // Fetch products count
                 const { count: productsCount, error: productsError } = await supabase.from('products').select('id', { count: 'exact' }).eq('shop', data.id);
@@ -269,7 +371,6 @@ const ShopPreview = () => {
                 if (newOrdersError) throw newOrdersError;
                 setNewOrdersCount(newOrders || 0);
             } catch (error) {
-                console.error(error);
                 setAlert({ visible: true, message: 'Error fetching shop details', type: 'danger' });
             } finally {
                 setLoading(false);
@@ -346,7 +447,6 @@ const ShopPreview = () => {
             // Filter data based on timeFilter
             filterDataByTime(transformedSales);
         } catch (error) {
-            console.error('Error fetching shop sales data:', error);
             setAlert({
                 visible: true,
                 message: 'Error fetching sales data',
@@ -553,8 +653,8 @@ const ShopPreview = () => {
 
     if (unauthorized) {
         return (
-            <div className="container mx-auto p-6">
-                <div className="panel">
+            <div className="container mx-auto p-6 w-full max-w-none">
+                <div className="panel w-full max-w-none">
                     <div className="flex flex-col items-center justify-center p-6">
                         <div className="text-danger mb-4">
                             <svg
@@ -589,7 +689,7 @@ const ShopPreview = () => {
     }
 
     return (
-        <div className="container mx-auto p-6">
+        <div className="container mx-auto p-6 w-full max-w-none">
             <div className="flex items-center gap-4 mb-6">
                 {' '}
                 <div onClick={() => router.back()}>
@@ -686,6 +786,16 @@ const ShopPreview = () => {
                         <div className="flex items-center gap-2">
                             <IconCreditCard className="h-5 w-5" />
                             {t('shop_transactions')}
+                        </div>
+                    </button>
+                    <button
+                        type="button"
+                        className={`p-4 border-b-2 ${activeTab === 'delivery' ? 'border-primary text-primary' : 'border-transparent hover:border-gray-300'}`}
+                        onClick={() => setActiveTab('delivery')}
+                    >
+                        <div className="flex items-center gap-2">
+                            <IconTruck className="h-5 w-5" />
+                            {t('delivery')}
                         </div>
                     </button>
                 </div>
@@ -1338,6 +1448,200 @@ const ShopPreview = () => {
                                             </button>
                                         </div>
                                     </div>
+                                </div>
+                            </div>
+                        )}
+                    </div>
+                )}
+
+                {activeTab === 'delivery' && (
+                    <div className="lg:col-span-3">
+                        {shop?.delivery_companies_id ? (
+                            <div className="panel">
+                                <div className="mb-5">
+                                    <h5 className="text-lg font-semibold dark:text-white-light">{t('delivery_company')}</h5>
+                                    <p className="text-gray-500 dark:text-gray-400 mt-1">{t('shop_delivery_company_info')}</p>
+                                </div>
+
+                                {/* Delivery Company Info */}
+                                <div className="mb-8">
+                                    <div className="flex items-center mb-4">
+                                        <div className="h-16 w-16 rounded-lg border-2 border-gray-200 overflow-hidden bg-white mr-4">
+                                            <img
+                                                src={deliveryCompany?.logo_url || '/assets/images/company-placeholder.jpg'}
+                                                alt={deliveryCompany?.company_name}
+                                                className="h-full w-full object-cover"
+                                            />
+                                        </div>
+                                        <div>
+                                            <h3 className="text-xl font-bold text-primary">{deliveryCompany?.company_name}</h3>
+                                            <p className="text-gray-500 dark:text-gray-400">{t('delivery_company')}</p>
+                                        </div>
+                                    </div>
+                                </div>
+
+                                {/* Drivers Section */}
+                                <div className="mb-8">
+                                    <h6 className="text-lg font-semibold dark:text-white-light mb-4 flex items-center">
+                                        <IconUser className="h-5 w-5 mr-2" />
+                                        {t('drivers')} ({drivers.length})
+                                    </h6>
+                                    {drivers.length > 0 ? (
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                            {drivers.map((driver) => (
+                                                <div key={driver.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow">
+                                                    <div className="flex items-center mb-3">
+                                                        <div className="h-12 w-12 rounded-full overflow-hidden mr-3">
+                                                            <img src={driver.avatar_url || '/assets/images/user-placeholder.webp'} alt={driver.name} className="h-full w-full object-cover" />
+                                                        </div>
+                                                        <div className="flex-1">
+                                                            <h6 className="font-semibold text-primary text-lg">{driver.name}</h6>
+                                                            <p className="text-sm text-gray-500 dark:text-gray-400">{driver.phone || 'No phone'}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                                                        <p className="mb-2">
+                                                            <span className="font-medium">{t('assigned_car')}:</span>{' '}
+                                                            {driver.delivery_cars && driver.delivery_cars.length > 0 ? driver.delivery_cars[0].plate_number : t('not_assigned')}
+                                                        </p>
+                                                        {driver.delivery_cars && driver.delivery_cars.length > 0 && (
+                                                            <div className="flex flex-wrap gap-1">
+                                                                <span className="inline-block bg-primary/10 text-primary text-xs px-2 py-1 rounded">{driver.delivery_cars[0].brand}</span>
+                                                                <span className="inline-block bg-primary/10 text-primary text-xs px-2 py-1 rounded">{driver.delivery_cars[0].model}</span>
+                                                            </div>
+                                                        )}
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                                            <IconUser className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                                            <p>{t('no_drivers_found')}</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Cars Section */}
+                                <div>
+                                    <h6 className="text-lg font-semibold dark:text-white-light mb-4 flex items-center">
+                                        <IconCar className="h-5 w-5 mr-2" />
+                                        {t('cars')} ({cars.length})
+                                    </h6>
+                                    {cars.length > 0 ? (
+                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
+                                            {cars.map((car) => (
+                                                <div key={car.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow">
+                                                    <div className="flex items-center mb-3">
+                                                        <div className="h-12 w-12 rounded-md bg-primary-light dark:bg-primary text-primary dark:text-primary-light flex items-center justify-center mr-3">
+                                                            <IconCar className="h-6 w-6" />
+                                                        </div>
+                                                        <div className="flex-1">
+                                                            <h6 className="font-semibold text-primary text-lg">{car.plate_number}</h6>
+                                                            <p className="text-sm text-gray-500 dark:text-gray-400">{car.brand}</p>
+                                                        </div>
+                                                    </div>
+                                                    <div className="text-sm text-gray-600 dark:text-gray-400">
+                                                        <p className="mb-2">
+                                                            <span className="font-medium">{t('assigned_driver')}:</span>{' '}
+                                                            {car.delivery_drivers ? `${car.delivery_drivers.name} - ${car.delivery_drivers.phone || 'No phone'}` : t('not_assigned')}
+                                                        </p>
+                                                        <div className="flex flex-wrap gap-1">
+                                                            <span className="inline-block bg-primary/10 text-primary text-xs px-2 py-1 rounded">{car.model}</span>
+                                                            {car.color && <span className="inline-block bg-primary/10 text-primary text-xs px-2 py-1 rounded">{car.color}</span>}
+                                                            {car.capacity && <span className="inline-block bg-primary/10 text-primary text-xs px-2 py-1 rounded">{car.capacity} seats</span>}
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        </div>
+                                    ) : (
+                                        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                                            <IconCar className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                                            <p>{t('no_cars_found')}</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Pricing Section */}
+                                <div className="mt-8">
+                                    <h6 className="text-lg font-semibold dark:text-white-light mb-4 flex items-center">
+                                        <IconCash className="h-5 w-5 mr-2" />
+                                        {t('delivery_pricing')}
+                                    </h6>
+
+                                    {/* Base Pricing */}
+                                    <div className="panel mb-5">
+                                        <div className="mb-5">
+                                            <h5 className="text-lg font-semibold dark:text-white-light">{t('base_delivery_prices')}</h5>
+                                            <p className="text-gray-500 dark:text-gray-400 mt-1">{t('standard_pricing_for_all_locations')}</p>
+                                        </div>
+                                        <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
+                                            <div className="text-center p-4 bg-danger/10 rounded-lg">
+                                                <h6 className="text-sm font-semibold text-gray-700 dark:text-white mb-2">Express (Same Day)</h6>
+                                                <p className="text-2xl font-bold text-danger">${deliveryPrices?.express_price || 'N/A'}</p>
+                                            </div>
+                                            <div className="text-center p-4 bg-warning/10 rounded-lg">
+                                                <h6 className="text-sm font-semibold text-gray-700 dark:text-white mb-2">Fast (2-3 Days)</h6>
+                                                <p className="text-2xl font-bold text-warning">${deliveryPrices?.fast_price || 'N/A'}</p>
+                                            </div>
+                                            <div className="text-center p-4 bg-success/10 rounded-lg">
+                                                <h6 className="text-sm font-semibold text-gray-700 dark:text-white mb-2">Standard (3-5 Days)</h6>
+                                                <p className="text-2xl font-bold text-success">${deliveryPrices?.standard_price || 'N/A'}</p>
+                                            </div>
+                                        </div>
+                                    </div>
+
+                                    {/* Location Based Prices */}
+                                    <div className="panel">
+                                        <div className="mb-5">
+                                            <h5 className="text-lg font-semibold dark:text-white-light">{t('location_based_prices')}</h5>
+                                            <p className="text-gray-500 dark:text-gray-400 mt-1">{t('specific_pricing_for_different_locations')}</p>
+                                        </div>
+                                        {locationPrices && locationPrices.length > 0 ? (
+                                            <div className="grid grid-cols-1 gap-6">
+                                                {locationPrices.map((locationPrice, index) => (
+                                                    <div key={locationPrice.id} className="border border-gray-200 dark:border-gray-700 rounded-md p-4">
+                                                        <div className="flex items-center justify-between mb-4">
+                                                            <h6 className="text-lg font-semibold">{locationPrice.delivery_location}</h6>
+                                                        </div>
+                                                        <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
+                                                            <div className="text-center p-3 bg-danger/5 rounded-lg">
+                                                                <h6 className="text-sm font-semibold text-gray-700 dark:text-white mb-1">Express</h6>
+                                                                <p className="text-lg font-bold text-danger">${locationPrice.express_price}</p>
+                                                            </div>
+                                                            <div className="text-center p-3 bg-warning/5 rounded-lg">
+                                                                <h6 className="text-sm font-semibold text-gray-700 dark:text-white mb-1">Fast</h6>
+                                                                <p className="text-lg font-bold text-warning">${locationPrice.fast_price}</p>
+                                                            </div>
+                                                            <div className="text-center p-3 bg-success/5 rounded-lg">
+                                                                <h6 className="text-sm font-semibold text-gray-700 dark:text-white mb-1">Standard</h6>
+                                                                <p className="text-lg font-bold text-success">${locationPrice.standard_price}</p>
+                                                            </div>
+                                                        </div>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        ) : (
+                                            <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                                                <IconMapPin className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                                                <p>{t('no_location_prices_set')}</p>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            <div className="panel">
+                                <div className="flex flex-col items-center justify-center p-8">
+                                    <div className="text-gray-400 mb-4">
+                                        <IconBuilding className="h-16 w-16" />
+                                    </div>
+                                    <h3 className="text-lg font-semibold mb-2">{t('no_delivery_company')}</h3>
+                                    <p className="text-gray-500 dark:text-gray-400 mb-4">{t('shop_has_no_delivery_company')}</p>
+                                    <Link href={`/shops/edit/${shop?.id}`} className="btn btn-primary">
+                                        {t('select_delivery_company')}
+                                    </Link>
                                 </div>
                             </div>
                         )}

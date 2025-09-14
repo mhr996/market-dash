@@ -9,29 +9,27 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import React, { useEffect, useState } from 'react';
 import supabase from '@/lib/supabase';
-import StorageManager from '@/utils/storage-manager';
 import { Alert } from '@/components/elements/alerts/elements-alerts-default';
 import ConfirmModal from '@/components/modals/confirm-modal';
 import { getTranslation } from '@/i18n';
 
-// Updated shop type reflecting the join with profiles.
-interface Shop {
+interface DeliveryDriver {
     id: number;
-    shop_name: string;
-    shop_desc: string;
-    logo_url: string | null;
-    owner: string;
-    active: boolean;
+    name: string;
+    avatar_url: string | null;
+    phone: string | null;
+    id_number: string | null;
     created_at?: string;
-    public: boolean;
-    status: string;
-    profiles?: {
-        full_name: string;
-    };
+    delivery_cars?: Array<{
+        id: number;
+        plate_number: string;
+        brand: string;
+        model: string;
+    }>;
 }
 
-const ShopsList = () => {
-    const [items, setItems] = useState<Shop[]>([]);
+const DeliveryDriversList = () => {
+    const [items, setItems] = useState<DeliveryDriver[]>([]);
     const [loading, setLoading] = useState(true);
     const { t } = getTranslation();
     const router = useRouter();
@@ -39,8 +37,8 @@ const ShopsList = () => {
     const [page, setPage] = useState(1);
     const PAGE_SIZES = [10, 20, 30, 50, 100];
     const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
-    const [initialRecords, setInitialRecords] = useState<Shop[]>([]);
-    const [records, setRecords] = useState<Shop[]>([]);
+    const [initialRecords, setInitialRecords] = useState<DeliveryDriver[]>([]);
+    const [records, setRecords] = useState<DeliveryDriver[]>([]);
     const [selectedRecords, setSelectedRecords] = useState<any>([]);
 
     const [search, setSearch] = useState('');
@@ -51,7 +49,7 @@ const ShopsList = () => {
 
     // New state for confirm modal and alert.
     const [showConfirmModal, setShowConfirmModal] = useState(false);
-    const [shopToDelete, setShopToDelete] = useState<Shop | null>(null);
+    const [driverToDelete, setDriverToDelete] = useState<DeliveryDriver | null>(null);
     const [alert, setAlert] = useState<{ visible: boolean; message: string; type: 'success' | 'danger' }>({
         visible: false,
         message: '',
@@ -59,19 +57,31 @@ const ShopsList = () => {
     });
 
     useEffect(() => {
-        const fetchShops = async () => {
+        const fetchDrivers = async () => {
             try {
-                // Join the profiles table to fetch owner's full name.
-                const { data, error } = await supabase.from('shops').select('*, profiles(full_name)').order('created_at', { ascending: false });
+                const { data, error } = await supabase
+                    .from('delivery_drivers')
+                    .select(
+                        `
+                        *,
+                        delivery_cars(
+                            id,
+                            plate_number,
+                            brand,
+                            model
+                        )
+                    `,
+                    )
+                    .order('created_at', { ascending: false });
                 if (error) throw error;
-                setItems(data as Shop[]);
+                setItems(data as DeliveryDriver[]);
             } catch (error) {
-                // Error fetching shops
+                // Error fetching delivery drivers
             } finally {
                 setLoading(false);
             }
         };
-        fetchShops();
+        fetchDrivers();
     }, []);
 
     useEffect(() => {
@@ -88,26 +98,22 @@ const ShopsList = () => {
         setInitialRecords(
             items.filter((item) => {
                 const searchTerm = search.toLowerCase();
-                return (
-                    item.shop_name.toLowerCase().includes(searchTerm) ||
-                    // Also search owner name if available.
-                    (item.profiles?.full_name.toLowerCase().includes(searchTerm) ?? false)
-                );
+                return item.name.toLowerCase().includes(searchTerm) || item.phone?.toLowerCase().includes(searchTerm) || item.id_number?.toLowerCase().includes(searchTerm);
             }),
         );
     }, [items, search]);
 
     useEffect(() => {
-        const sorted = sortBy(initialRecords, sortStatus.columnAccessor as keyof Shop);
+        const sorted = sortBy(initialRecords, sortStatus.columnAccessor as keyof DeliveryDriver);
         setRecords(sortStatus.direction === 'desc' ? sorted.reverse() : sorted);
         setPage(1);
     }, [sortStatus, initialRecords]);
 
     const deleteRow = (id: number | null = null) => {
         if (id) {
-            const shop = items.find((s) => s.id === id);
-            if (shop) {
-                setShopToDelete(shop);
+            const driver = items.find((d) => d.id === id);
+            if (driver) {
+                setDriverToDelete(driver);
                 setShowConfirmModal(true);
             }
         }
@@ -115,21 +121,18 @@ const ShopsList = () => {
 
     // Confirm deletion callback.
     const confirmDeletion = async () => {
-        if (!shopToDelete || !shopToDelete.id) return;
+        if (!driverToDelete || !driverToDelete.id) return;
         try {
-            // Delete all shop data from storage (logo, cover, gallery, products)
-            await StorageManager.removeShopCompletely(shopToDelete.id);
-
-            const { error } = await supabase.from('shops').delete().eq('id', shopToDelete.id);
+            const { error } = await supabase.from('delivery_drivers').delete().eq('id', driverToDelete.id);
             if (error) throw error;
-            const updatedItems = items.filter((s) => s.id !== shopToDelete.id);
+            const updatedItems = items.filter((d) => d.id !== driverToDelete.id);
             setItems(updatedItems);
-            setAlert({ visible: true, message: t('shop_deleted_successfully'), type: 'success' });
+            setAlert({ visible: true, message: t('driver_deleted_successfully'), type: 'success' });
         } catch (error) {
-            setAlert({ visible: true, message: t('error_deleting_shop'), type: 'danger' });
+            setAlert({ visible: true, message: t('error_deleting_driver'), type: 'danger' });
         } finally {
             setShowConfirmModal(false);
-            setShopToDelete(null);
+            setDriverToDelete(null);
         }
     };
 
@@ -153,7 +156,7 @@ const ShopsList = () => {
                             <IconTrashLines />
                             {t('delete')}
                         </button>
-                        <Link href="/shops/add" className="btn btn-primary gap-2">
+                        <Link href="/delivery/drivers/add" className="btn btn-primary gap-2">
                             <IconPlus />
                             {t('add_new')}
                         </Link>
@@ -168,7 +171,7 @@ const ShopsList = () => {
                         className={`${loading ? 'filter blur-sm pointer-events-none' : 'table-hover whitespace-nowrap cursor-pointer'}`}
                         records={records}
                         onRowClick={(record) => {
-                            router.push(`/shops/preview/${record.id}`);
+                            router.push(`/delivery/drivers/preview/${record.id}`);
                         }}
                         columns={[
                             {
@@ -178,23 +181,47 @@ const ShopsList = () => {
                                 render: ({ id }) => <strong className="text-info">#{id}</strong>,
                             },
                             {
-                                accessor: 'shop_name',
-                                title: t('shop_name'),
+                                accessor: 'name',
+                                title: t('driver_name'),
                                 sortable: true,
-                                render: ({ shop_name, logo_url }) => (
+                                render: ({ name, avatar_url }) => (
                                     <div className="flex items-center font-semibold">
                                         <div className="w-max rounded-full ltr:mr-2 rtl:ml-2 flex items-center justify-center">
-                                            <img className="h-8 w-8 rounded-full object-cover" src={logo_url || `/assets/images/user-placeholder.webp`} alt="" />
+                                            <img className="h-8 w-8 rounded-full object-cover" src={avatar_url || `/assets/images/user-placeholder.webp`} alt="" />
                                         </div>
-                                        <div>{shop_name}</div>
+                                        <div>{name}</div>
                                     </div>
                                 ),
                             },
                             {
-                                accessor: 'owner',
-                                title: t('shop_owner'),
+                                accessor: 'phone',
+                                title: t('phone'),
                                 sortable: true,
-                                render: ({ owner, profiles }) => <span>{profiles ? profiles.full_name : owner}</span>,
+                                render: ({ phone }) => <span>{phone || 'N/A'}</span>,
+                            },
+                            {
+                                accessor: 'id_number',
+                                title: t('id_number'),
+                                sortable: true,
+                                render: ({ id_number }) => <span className="font-mono text-sm">{id_number || 'N/A'}</span>,
+                            },
+                            {
+                                accessor: 'delivery_cars',
+                                title: t('assigned_car'),
+                                sortable: false,
+                                render: ({ delivery_cars }) => (
+                                    <div className="flex flex-wrap gap-1">
+                                        {delivery_cars && delivery_cars.length > 0 ? (
+                                            delivery_cars.map((car) => (
+                                                <span key={car.id} className="badge bg-primary text-white text-xs">
+                                                    {car.plate_number}
+                                                </span>
+                                            ))
+                                        ) : (
+                                            <span className="text-gray-500 text-sm">No cars assigned</span>
+                                        )}
+                                    </div>
+                                ),
                             },
                             {
                                 accessor: 'created_at',
@@ -203,34 +230,16 @@ const ShopsList = () => {
                                 render: ({ created_at }) => (created_at ? <span>{new Date(created_at).toLocaleDateString('TR')}</span> : ''),
                             },
                             {
-                                accessor: 'status',
-                                title: t('status'),
-                                sortable: true,
-                                render: ({ status }) => {
-                                    let statusClass = 'warning';
-                                    if (status === 'Approved') statusClass = 'success';
-                                    else if (status === 'Rejected') statusClass = 'danger';
-
-                                    return <span className={`badge badge-outline-${statusClass}`}>{status ? t(status.toLowerCase()) : t('pending')}</span>;
-                                },
-                            },
-                            {
-                                accessor: 'visibility',
-                                title: t('visibility'),
-                                sortable: true,
-                                render: ({ public: isPublic }) => <span className={`badge badge-outline-${isPublic ? 'success' : 'danger'}`}>{isPublic ? t('public') : t('private')}</span>,
-                            },
-                            {
                                 accessor: 'action',
                                 title: t('actions'),
                                 sortable: false,
                                 textAlignment: 'center',
                                 render: ({ id }) => (
                                     <div className="mx-auto flex w-max items-center gap-4">
-                                        <Link href={`/shops/edit/${id}`} className="flex hover:text-info" onClick={(e) => e.stopPropagation()}>
+                                        <Link href={`/delivery/drivers/edit/${id}`} className="flex hover:text-info" onClick={(e) => e.stopPropagation()}>
                                             <IconEdit className="h-4.5 w-4.5" />
                                         </Link>
-                                        <Link href={`/shops/preview/${id}`} className="flex hover:text-primary" onClick={(e) => e.stopPropagation()}>
+                                        <Link href={`/delivery/drivers/preview/${id}`} className="flex hover:text-primary" onClick={(e) => e.stopPropagation()}>
                                             <IconEye />
                                         </Link>
                                         <button
@@ -270,10 +279,10 @@ const ShopsList = () => {
             <ConfirmModal
                 isOpen={showConfirmModal}
                 title={t('confirm_deletion')}
-                message={t('confirm_delete_shop')}
+                message={t('confirm_delete_driver')}
                 onCancel={() => {
                     setShowConfirmModal(false);
-                    setShopToDelete(null);
+                    setDriverToDelete(null);
                 }}
                 onConfirm={confirmDeletion}
                 confirmLabel={t('delete')}
@@ -284,4 +293,4 @@ const ShopsList = () => {
     );
 };
 
-export default ShopsList;
+export default DeliveryDriversList;

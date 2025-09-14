@@ -9,29 +9,26 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import React, { useEffect, useState } from 'react';
 import supabase from '@/lib/supabase';
-import StorageManager from '@/utils/storage-manager';
 import { Alert } from '@/components/elements/alerts/elements-alerts-default';
 import ConfirmModal from '@/components/modals/confirm-modal';
 import { getTranslation } from '@/i18n';
 
-// Updated shop type reflecting the join with profiles.
-interface Shop {
+// Updated delivery company type reflecting the join with delivery_prices.
+interface DeliveryCompany {
     id: number;
-    shop_name: string;
-    shop_desc: string;
+    company_name: string;
     logo_url: string | null;
-    owner: string;
-    active: boolean;
+    owner_name: string;
     created_at?: string;
-    public: boolean;
-    status: string;
-    profiles?: {
-        full_name: string;
+    delivery_prices?: {
+        express_price: number;
+        fast_price: number;
+        standard_price: number;
     };
 }
 
-const ShopsList = () => {
-    const [items, setItems] = useState<Shop[]>([]);
+const DeliveryCompaniesList = () => {
+    const [items, setItems] = useState<DeliveryCompany[]>([]);
     const [loading, setLoading] = useState(true);
     const { t } = getTranslation();
     const router = useRouter();
@@ -39,8 +36,8 @@ const ShopsList = () => {
     const [page, setPage] = useState(1);
     const PAGE_SIZES = [10, 20, 30, 50, 100];
     const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
-    const [initialRecords, setInitialRecords] = useState<Shop[]>([]);
-    const [records, setRecords] = useState<Shop[]>([]);
+    const [initialRecords, setInitialRecords] = useState<DeliveryCompany[]>([]);
+    const [records, setRecords] = useState<DeliveryCompany[]>([]);
     const [selectedRecords, setSelectedRecords] = useState<any>([]);
 
     const [search, setSearch] = useState('');
@@ -51,7 +48,7 @@ const ShopsList = () => {
 
     // New state for confirm modal and alert.
     const [showConfirmModal, setShowConfirmModal] = useState(false);
-    const [shopToDelete, setShopToDelete] = useState<Shop | null>(null);
+    const [companyToDelete, setCompanyToDelete] = useState<DeliveryCompany | null>(null);
     const [alert, setAlert] = useState<{ visible: boolean; message: string; type: 'success' | 'danger' }>({
         visible: false,
         message: '',
@@ -59,19 +56,31 @@ const ShopsList = () => {
     });
 
     useEffect(() => {
-        const fetchShops = async () => {
+        const fetchCompanies = async () => {
             try {
-                // Join the profiles table to fetch owner's full name.
-                const { data, error } = await supabase.from('shops').select('*, profiles(full_name)').order('created_at', { ascending: false });
+                // Join the delivery_prices table to fetch pricing information.
+                const { data, error } = await supabase
+                    .from('delivery_companies')
+                    .select(
+                        `
+                        *,
+                        delivery_prices(
+                            express_price, 
+                            fast_price, 
+                            standard_price
+                        )
+                    `,
+                    )
+                    .order('created_at', { ascending: false });
                 if (error) throw error;
-                setItems(data as Shop[]);
+                setItems(data as DeliveryCompany[]);
             } catch (error) {
-                // Error fetching shops
+                // Error fetching delivery companies
             } finally {
                 setLoading(false);
             }
         };
-        fetchShops();
+        fetchCompanies();
     }, []);
 
     useEffect(() => {
@@ -88,26 +97,22 @@ const ShopsList = () => {
         setInitialRecords(
             items.filter((item) => {
                 const searchTerm = search.toLowerCase();
-                return (
-                    item.shop_name.toLowerCase().includes(searchTerm) ||
-                    // Also search owner name if available.
-                    (item.profiles?.full_name.toLowerCase().includes(searchTerm) ?? false)
-                );
+                return item.company_name.toLowerCase().includes(searchTerm) || item.owner_name.toLowerCase().includes(searchTerm);
             }),
         );
     }, [items, search]);
 
     useEffect(() => {
-        const sorted = sortBy(initialRecords, sortStatus.columnAccessor as keyof Shop);
+        const sorted = sortBy(initialRecords, sortStatus.columnAccessor as keyof DeliveryCompany);
         setRecords(sortStatus.direction === 'desc' ? sorted.reverse() : sorted);
         setPage(1);
     }, [sortStatus, initialRecords]);
 
     const deleteRow = (id: number | null = null) => {
         if (id) {
-            const shop = items.find((s) => s.id === id);
-            if (shop) {
-                setShopToDelete(shop);
+            const company = items.find((c) => c.id === id);
+            if (company) {
+                setCompanyToDelete(company);
                 setShowConfirmModal(true);
             }
         }
@@ -115,21 +120,18 @@ const ShopsList = () => {
 
     // Confirm deletion callback.
     const confirmDeletion = async () => {
-        if (!shopToDelete || !shopToDelete.id) return;
+        if (!companyToDelete || !companyToDelete.id) return;
         try {
-            // Delete all shop data from storage (logo, cover, gallery, products)
-            await StorageManager.removeShopCompletely(shopToDelete.id);
-
-            const { error } = await supabase.from('shops').delete().eq('id', shopToDelete.id);
+            const { error } = await supabase.from('delivery_companies').delete().eq('id', companyToDelete.id);
             if (error) throw error;
-            const updatedItems = items.filter((s) => s.id !== shopToDelete.id);
+            const updatedItems = items.filter((c) => c.id !== companyToDelete.id);
             setItems(updatedItems);
-            setAlert({ visible: true, message: t('shop_deleted_successfully'), type: 'success' });
+            setAlert({ visible: true, message: t('company_deleted_successfully'), type: 'success' });
         } catch (error) {
-            setAlert({ visible: true, message: t('error_deleting_shop'), type: 'danger' });
+            setAlert({ visible: true, message: t('error_deleting_company'), type: 'danger' });
         } finally {
             setShowConfirmModal(false);
-            setShopToDelete(null);
+            setCompanyToDelete(null);
         }
     };
 
@@ -153,7 +155,7 @@ const ShopsList = () => {
                             <IconTrashLines />
                             {t('delete')}
                         </button>
-                        <Link href="/shops/add" className="btn btn-primary gap-2">
+                        <Link href="/delivery/companies/add" className="btn btn-primary gap-2">
                             <IconPlus />
                             {t('add_new')}
                         </Link>
@@ -168,7 +170,7 @@ const ShopsList = () => {
                         className={`${loading ? 'filter blur-sm pointer-events-none' : 'table-hover whitespace-nowrap cursor-pointer'}`}
                         records={records}
                         onRowClick={(record) => {
-                            router.push(`/shops/preview/${record.id}`);
+                            router.push(`/delivery/companies/preview/${record.id}`);
                         }}
                         columns={[
                             {
@@ -178,23 +180,23 @@ const ShopsList = () => {
                                 render: ({ id }) => <strong className="text-info">#{id}</strong>,
                             },
                             {
-                                accessor: 'shop_name',
-                                title: t('shop_name'),
+                                accessor: 'company_name',
+                                title: t('company_name'),
                                 sortable: true,
-                                render: ({ shop_name, logo_url }) => (
+                                render: ({ company_name, logo_url }) => (
                                     <div className="flex items-center font-semibold">
                                         <div className="w-max rounded-full ltr:mr-2 rtl:ml-2 flex items-center justify-center">
                                             <img className="h-8 w-8 rounded-full object-cover" src={logo_url || `/assets/images/user-placeholder.webp`} alt="" />
                                         </div>
-                                        <div>{shop_name}</div>
+                                        <div>{company_name}</div>
                                     </div>
                                 ),
                             },
                             {
                                 accessor: 'owner',
-                                title: t('shop_owner'),
+                                title: t('owner_name'),
                                 sortable: true,
-                                render: ({ owner, profiles }) => <span>{profiles ? profiles.full_name : owner}</span>,
+                                render: ({ owner_name }) => <span>{owner_name}</span>,
                             },
                             {
                                 accessor: 'created_at',
@@ -203,22 +205,31 @@ const ShopsList = () => {
                                 render: ({ created_at }) => (created_at ? <span>{new Date(created_at).toLocaleDateString('TR')}</span> : ''),
                             },
                             {
-                                accessor: 'status',
-                                title: t('status'),
+                                accessor: 'express_price',
+                                title: t('express_same_day'),
                                 sortable: true,
-                                render: ({ status }) => {
-                                    let statusClass = 'warning';
-                                    if (status === 'Approved') statusClass = 'success';
-                                    else if (status === 'Rejected') statusClass = 'danger';
-
-                                    return <span className={`badge badge-outline-${statusClass}`}>{status ? t(status.toLowerCase()) : t('pending')}</span>;
+                                render: ({ delivery_prices }) => {
+                                    const prices = Array.isArray(delivery_prices) ? delivery_prices[0] : delivery_prices;
+                                    return <span className="font-semibold text-danger">${prices?.express_price || 'N/A'}</span>;
                                 },
                             },
                             {
-                                accessor: 'visibility',
-                                title: t('visibility'),
+                                accessor: 'fast_price',
+                                title: t('fast_2_3_days'),
                                 sortable: true,
-                                render: ({ public: isPublic }) => <span className={`badge badge-outline-${isPublic ? 'success' : 'danger'}`}>{isPublic ? t('public') : t('private')}</span>,
+                                render: ({ delivery_prices }) => {
+                                    const prices = Array.isArray(delivery_prices) ? delivery_prices[0] : delivery_prices;
+                                    return <span className="font-semibold text-warning">${prices?.fast_price || 'N/A'}</span>;
+                                },
+                            },
+                            {
+                                accessor: 'standard_price',
+                                title: t('standard_3_5_days'),
+                                sortable: true,
+                                render: ({ delivery_prices }) => {
+                                    const prices = Array.isArray(delivery_prices) ? delivery_prices[0] : delivery_prices;
+                                    return <span className="font-semibold text-success">${prices?.standard_price || 'N/A'}</span>;
+                                },
                             },
                             {
                                 accessor: 'action',
@@ -227,10 +238,10 @@ const ShopsList = () => {
                                 textAlignment: 'center',
                                 render: ({ id }) => (
                                     <div className="mx-auto flex w-max items-center gap-4">
-                                        <Link href={`/shops/edit/${id}`} className="flex hover:text-info" onClick={(e) => e.stopPropagation()}>
+                                        <Link href={`/delivery/companies/edit/${id}`} className="flex hover:text-info" onClick={(e) => e.stopPropagation()}>
                                             <IconEdit className="h-4.5 w-4.5" />
                                         </Link>
-                                        <Link href={`/shops/preview/${id}`} className="flex hover:text-primary" onClick={(e) => e.stopPropagation()}>
+                                        <Link href={`/delivery/companies/preview/${id}`} className="flex hover:text-primary" onClick={(e) => e.stopPropagation()}>
                                             <IconEye />
                                         </Link>
                                         <button
@@ -270,10 +281,10 @@ const ShopsList = () => {
             <ConfirmModal
                 isOpen={showConfirmModal}
                 title={t('confirm_deletion')}
-                message={t('confirm_delete_shop')}
+                message={t('confirm_delete_company')}
                 onCancel={() => {
                     setShowConfirmModal(false);
-                    setShopToDelete(null);
+                    setCompanyToDelete(null);
                 }}
                 onConfirm={confirmDeletion}
                 confirmLabel={t('delete')}
@@ -284,4 +295,4 @@ const ShopsList = () => {
     );
 };
 
-export default ShopsList;
+export default DeliveryCompaniesList;

@@ -52,7 +52,6 @@ const ProductDetailsPage = ({ params }: ProductDetailsPageProps) => {
                 if (error) throw error;
                 setProduct(data);
             } catch (error) {
-                console.error('Error fetching product:', error);
             } finally {
                 setLoading(false);
             }
@@ -84,7 +83,7 @@ const ProductDetailsPage = ({ params }: ProductDetailsPageProps) => {
     }
 
     return (
-        <div className="container mx-auto p-6">
+        <div className="container mx-auto p-6 w-full max-w-none">
             <div className="flex items-center gap-5 mb-6">
                 {' '}
                 <div onClick={() => router.back()}>

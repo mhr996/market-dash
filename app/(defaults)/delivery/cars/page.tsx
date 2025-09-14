@@ -9,29 +9,30 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import React, { useEffect, useState } from 'react';
 import supabase from '@/lib/supabase';
-import StorageManager from '@/utils/storage-manager';
 import { Alert } from '@/components/elements/alerts/elements-alerts-default';
 import ConfirmModal from '@/components/modals/confirm-modal';
 import { getTranslation } from '@/i18n';
 
-// Updated shop type reflecting the join with profiles.
-interface Shop {
+interface DeliveryCar {
     id: number;
-    shop_name: string;
-    shop_desc: string;
-    logo_url: string | null;
-    owner: string;
-    active: boolean;
+    plate_number: string;
+    brand: string;
+    model: string;
+    color: string | null;
+    capacity: number | null;
+    car_number: string | null;
+    car_model: string | null;
+    delivery_drivers_id: number | null;
     created_at?: string;
-    public: boolean;
-    status: string;
-    profiles?: {
-        full_name: string;
+    delivery_drivers?: {
+        id: number;
+        name: string;
+        phone: string | null;
     };
 }
 
-const ShopsList = () => {
-    const [items, setItems] = useState<Shop[]>([]);
+const DeliveryCarsList = () => {
+    const [items, setItems] = useState<DeliveryCar[]>([]);
     const [loading, setLoading] = useState(true);
     const { t } = getTranslation();
     const router = useRouter();
@@ -39,8 +40,8 @@ const ShopsList = () => {
     const [page, setPage] = useState(1);
     const PAGE_SIZES = [10, 20, 30, 50, 100];
     const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
-    const [initialRecords, setInitialRecords] = useState<Shop[]>([]);
-    const [records, setRecords] = useState<Shop[]>([]);
+    const [initialRecords, setInitialRecords] = useState<DeliveryCar[]>([]);
+    const [records, setRecords] = useState<DeliveryCar[]>([]);
     const [selectedRecords, setSelectedRecords] = useState<any>([]);
 
     const [search, setSearch] = useState('');
@@ -51,7 +52,7 @@ const ShopsList = () => {
 
     // New state for confirm modal and alert.
     const [showConfirmModal, setShowConfirmModal] = useState(false);
-    const [shopToDelete, setShopToDelete] = useState<Shop | null>(null);
+    const [carToDelete, setCarToDelete] = useState<DeliveryCar | null>(null);
     const [alert, setAlert] = useState<{ visible: boolean; message: string; type: 'success' | 'danger' }>({
         visible: false,
         message: '',
@@ -59,19 +60,30 @@ const ShopsList = () => {
     });
 
     useEffect(() => {
-        const fetchShops = async () => {
+        const fetchCars = async () => {
             try {
-                // Join the profiles table to fetch owner's full name.
-                const { data, error } = await supabase.from('shops').select('*, profiles(full_name)').order('created_at', { ascending: false });
+                const { data, error } = await supabase
+                    .from('delivery_cars')
+                    .select(
+                        `
+                        *,
+                        delivery_drivers(
+                            id,
+                            name,
+                            phone
+                        )
+                    `,
+                    )
+                    .order('created_at', { ascending: false });
                 if (error) throw error;
-                setItems(data as Shop[]);
+                setItems(data as DeliveryCar[]);
             } catch (error) {
-                // Error fetching shops
+                // Error fetching delivery cars
             } finally {
                 setLoading(false);
             }
         };
-        fetchShops();
+        fetchCars();
     }, []);
 
     useEffect(() => {
@@ -89,25 +101,27 @@ const ShopsList = () => {
             items.filter((item) => {
                 const searchTerm = search.toLowerCase();
                 return (
-                    item.shop_name.toLowerCase().includes(searchTerm) ||
-                    // Also search owner name if available.
-                    (item.profiles?.full_name.toLowerCase().includes(searchTerm) ?? false)
+                    item.plate_number.toLowerCase().includes(searchTerm) ||
+                    item.brand.toLowerCase().includes(searchTerm) ||
+                    item.model.toLowerCase().includes(searchTerm) ||
+                    item.color?.toLowerCase().includes(searchTerm) ||
+                    item.delivery_drivers?.name.toLowerCase().includes(searchTerm)
                 );
             }),
         );
     }, [items, search]);
 
     useEffect(() => {
-        const sorted = sortBy(initialRecords, sortStatus.columnAccessor as keyof Shop);
+        const sorted = sortBy(initialRecords, sortStatus.columnAccessor as keyof DeliveryCar);
         setRecords(sortStatus.direction === 'desc' ? sorted.reverse() : sorted);
         setPage(1);
     }, [sortStatus, initialRecords]);
 
     const deleteRow = (id: number | null = null) => {
         if (id) {
-            const shop = items.find((s) => s.id === id);
-            if (shop) {
-                setShopToDelete(shop);
+            const car = items.find((c) => c.id === id);
+            if (car) {
+                setCarToDelete(car);
                 setShowConfirmModal(true);
             }
         }
@@ -115,21 +129,18 @@ const ShopsList = () => {
 
     // Confirm deletion callback.
     const confirmDeletion = async () => {
-        if (!shopToDelete || !shopToDelete.id) return;
+        if (!carToDelete || !carToDelete.id) return;
         try {
-            // Delete all shop data from storage (logo, cover, gallery, products)
-            await StorageManager.removeShopCompletely(shopToDelete.id);
-
-            const { error } = await supabase.from('shops').delete().eq('id', shopToDelete.id);
+            const { error } = await supabase.from('delivery_cars').delete().eq('id', carToDelete.id);
             if (error) throw error;
-            const updatedItems = items.filter((s) => s.id !== shopToDelete.id);
+            const updatedItems = items.filter((c) => c.id !== carToDelete.id);
             setItems(updatedItems);
-            setAlert({ visible: true, message: t('shop_deleted_successfully'), type: 'success' });
+            setAlert({ visible: true, message: t('car_deleted_successfully'), type: 'success' });
         } catch (error) {
-            setAlert({ visible: true, message: t('error_deleting_shop'), type: 'danger' });
+            setAlert({ visible: true, message: t('error_deleting_car'), type: 'danger' });
         } finally {
             setShowConfirmModal(false);
-            setShopToDelete(null);
+            setCarToDelete(null);
         }
     };
 
@@ -153,7 +164,7 @@ const ShopsList = () => {
                             <IconTrashLines />
                             {t('delete')}
                         </button>
-                        <Link href="/shops/add" className="btn btn-primary gap-2">
+                        <Link href="/delivery/cars/add" className="btn btn-primary gap-2">
                             <IconPlus />
                             {t('add_new')}
                         </Link>
@@ -168,7 +179,7 @@ const ShopsList = () => {
                         className={`${loading ? 'filter blur-sm pointer-events-none' : 'table-hover whitespace-nowrap cursor-pointer'}`}
                         records={records}
                         onRowClick={(record) => {
-                            router.push(`/shops/preview/${record.id}`);
+                            router.push(`/delivery/cars/preview/${record.id}`);
                         }}
                         columns={[
                             {
@@ -178,23 +189,38 @@ const ShopsList = () => {
                                 render: ({ id }) => <strong className="text-info">#{id}</strong>,
                             },
                             {
-                                accessor: 'shop_name',
-                                title: t('shop_name'),
+                                accessor: 'plate_number',
+                                title: t('plate_number'),
                                 sortable: true,
-                                render: ({ shop_name, logo_url }) => (
-                                    <div className="flex items-center font-semibold">
-                                        <div className="w-max rounded-full ltr:mr-2 rtl:ml-2 flex items-center justify-center">
-                                            <img className="h-8 w-8 rounded-full object-cover" src={logo_url || `/assets/images/user-placeholder.webp`} alt="" />
-                                        </div>
-                                        <div>{shop_name}</div>
-                                    </div>
-                                ),
+                                render: ({ plate_number }) => <span className="font-semibold">{plate_number}</span>,
                             },
                             {
-                                accessor: 'owner',
-                                title: t('shop_owner'),
+                                accessor: 'brand',
+                                title: t('brand'),
                                 sortable: true,
-                                render: ({ owner, profiles }) => <span>{profiles ? profiles.full_name : owner}</span>,
+                            },
+                            {
+                                accessor: 'model',
+                                title: t('model'),
+                                sortable: true,
+                            },
+                            {
+                                accessor: 'color',
+                                title: t('color'),
+                                sortable: true,
+                                render: ({ color }) => <span className="badge bg-primary text-white">{color || 'N/A'}</span>,
+                            },
+                            {
+                                accessor: 'capacity',
+                                title: t('capacity'),
+                                sortable: true,
+                                render: ({ capacity }) => <span>{capacity || 'N/A'}</span>,
+                            },
+                            {
+                                accessor: 'delivery_drivers.name',
+                                title: t('driver'),
+                                sortable: false,
+                                render: ({ delivery_drivers }) => <span className="font-semibold text-success">{delivery_drivers?.name || 'Unassigned'}</span>,
                             },
                             {
                                 accessor: 'created_at',
@@ -203,34 +229,16 @@ const ShopsList = () => {
                                 render: ({ created_at }) => (created_at ? <span>{new Date(created_at).toLocaleDateString('TR')}</span> : ''),
                             },
                             {
-                                accessor: 'status',
-                                title: t('status'),
-                                sortable: true,
-                                render: ({ status }) => {
-                                    let statusClass = 'warning';
-                                    if (status === 'Approved') statusClass = 'success';
-                                    else if (status === 'Rejected') statusClass = 'danger';
-
-                                    return <span className={`badge badge-outline-${statusClass}`}>{status ? t(status.toLowerCase()) : t('pending')}</span>;
-                                },
-                            },
-                            {
-                                accessor: 'visibility',
-                                title: t('visibility'),
-                                sortable: true,
-                                render: ({ public: isPublic }) => <span className={`badge badge-outline-${isPublic ? 'success' : 'danger'}`}>{isPublic ? t('public') : t('private')}</span>,
-                            },
-                            {
                                 accessor: 'action',
                                 title: t('actions'),
                                 sortable: false,
                                 textAlignment: 'center',
                                 render: ({ id }) => (
                                     <div className="mx-auto flex w-max items-center gap-4">
-                                        <Link href={`/shops/edit/${id}`} className="flex hover:text-info" onClick={(e) => e.stopPropagation()}>
+                                        <Link href={`/delivery/cars/edit/${id}`} className="flex hover:text-info" onClick={(e) => e.stopPropagation()}>
                                             <IconEdit className="h-4.5 w-4.5" />
                                         </Link>
-                                        <Link href={`/shops/preview/${id}`} className="flex hover:text-primary" onClick={(e) => e.stopPropagation()}>
+                                        <Link href={`/delivery/cars/preview/${id}`} className="flex hover:text-primary" onClick={(e) => e.stopPropagation()}>
                                             <IconEye />
                                         </Link>
                                         <button
@@ -270,10 +278,10 @@ const ShopsList = () => {
             <ConfirmModal
                 isOpen={showConfirmModal}
                 title={t('confirm_deletion')}
-                message={t('confirm_delete_shop')}
+                message={t('confirm_delete_car')}
                 onCancel={() => {
                     setShowConfirmModal(false);
-                    setShopToDelete(null);
+                    setCarToDelete(null);
                 }}
                 onConfirm={confirmDeletion}
                 confirmLabel={t('delete')}
@@ -284,4 +292,4 @@ const ShopsList = () => {
     );
 };
 
-export default ShopsList;
+export default DeliveryCarsList;
