@@ -32,14 +32,19 @@ const AssignmentModal = ({ order, isOpen, onClose, onAssign }: { order: any; isO
     const fetchDrivers = async () => {
         try {
             setLoading(true);
-            // Get the shop's delivery company from the product
-            const { data: productData } = await supabase.from('products').select('shop, shops(delivery_companies_id)').eq('id', order.product_id).single();
+            // Get the product's shop ID
+            const { data: productData } = await supabase.from('products').select('shop').eq('id', order.product_id).single();
 
-            if (productData?.shops?.[0]?.delivery_companies_id) {
-                // Fetch drivers for this delivery company
-                const { data: driversData } = await supabase.from('delivery_drivers').select('id, name, phone, avatar_url').eq('delivery_companies_id', productData.shops[0].delivery_companies_id);
+            if (productData?.shop) {
+                // Get the shop's delivery company
+                const { data: shopData } = await supabase.from('shops').select('delivery_companies_id').eq('id', productData.shop).single();
 
-                setDrivers(driversData || []);
+                if (shopData?.delivery_companies_id) {
+                    // Fetch drivers for this delivery company
+                    const { data: driversData } = await supabase.from('delivery_drivers').select('id, name, phone, avatar_url').eq('delivery_companies_id', shopData.delivery_companies_id);
+
+                    setDrivers(driversData || []);
+                }
             }
         } catch (error) {
             // Error fetching drivers
@@ -370,7 +375,7 @@ const OrdersList = () => {
                 .select(
                     `
                     *,
-                    products(id, title, price, images, shop, shops(shop_name, delivery_companies_id)),
+                    products(id, title, price, images, shop),
                     profiles(id, full_name, email),
                     assigned_driver:delivery_drivers(id, name, phone, avatar_url)
                 `,
@@ -381,8 +386,54 @@ const OrdersList = () => {
 
             setItems(data as OrderData[]);
 
-            // Transform data for display
-            const transformed = data.map(formatOrderForDisplay);
+            // Get all product IDs from orders
+            const productIds = data.map((order) => order.product_id).filter(Boolean);
+
+            if (productIds.length === 0) {
+                setDisplayItems([]);
+                return;
+            }
+
+            // Get products with their shop IDs
+            const { data: productsData, error: productsError } = await supabase.from('products').select('id, title, price, images, shop').in('id', productIds);
+
+            if (productsError) throw productsError;
+
+            // Get shop IDs from products
+            const shopIds = productsData?.map((p) => p.shop).filter(Boolean) || [];
+
+            if (shopIds.length === 0) {
+                setDisplayItems([]);
+                return;
+            }
+
+            // Get shops with their delivery company info
+            const { data: shopsData, error: shopsError } = await supabase.from('shops').select('id, shop_name, delivery_companies_id').in('id', shopIds);
+
+            if (shopsError) throw shopsError;
+
+            // Create a map of shop data for easy lookup
+            const shopMap = new Map();
+            shopsData?.forEach((shop) => {
+                shopMap.set(shop.id, shop);
+            });
+
+            // Transform data for display with shop information
+            const transformed = data.map((order) => {
+                const product = productsData?.find((p) => p.id === order.product_id);
+                const shop = product ? shopMap.get(product.shop) : null;
+
+                return formatOrderForDisplay({
+                    ...order,
+                    products: product
+                        ? {
+                              ...product,
+                              shops: shop ? [shop] : [],
+                          }
+                        : undefined,
+                });
+            });
+
             setDisplayItems(transformed);
         } catch (error) {
             setAlert({
