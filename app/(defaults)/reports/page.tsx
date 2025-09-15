@@ -615,9 +615,9 @@ const Reports = () => {
     };
 
     return (
-        <div className="space-y-6">
+        <div className="space-y-6 w-full max-w-none">
             {/* Header */}
-            <div className={`panel border-white-light px-6 py-6 shadow-[4px_6px_10px_-3px_#bfc9d4] dark:border-[#1b2e4b] dark:shadow-none ${isRtl ? 'rtl' : 'ltr'}`}>
+            <div className={`panel border-white-light px-6 py-6 shadow-[4px_6px_10px_-3px_#bfc9d4] dark:border-[#1b2e4b] dark:shadow-none ${isRtl ? 'rtl' : 'ltr'} w-full max-w-none`}>
                 <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
                     <div>
                         <h1 className="text-2xl font-bold text-black dark:text-white-light">{t('reports')}</h1>
@@ -637,7 +637,7 @@ const Reports = () => {
             </div>
 
             {/* Filters Panel */}
-            <div className={`panel ${isRtl ? 'rtl' : 'ltr'}`}>
+            <div className={`panel ${isRtl ? 'rtl' : 'ltr'} w-full max-w-none`}>
                 <div className="mb-6 flex items-center justify-between">
                     <div className="flex items-center gap-2">
                         <IconSettings className="h-5 w-5 text-primary" />
@@ -723,7 +723,7 @@ const Reports = () => {
                 <div className="space-y-6">
                     {/* Overview Tab */}
                     {activeTab === 0 && (
-                        <div className="space-y-6">
+                        <div className="space-y-6 w-full max-w-none">
                             {/* Overview Cards */}
                             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-4">
                                 {/* Sales Card */}
@@ -916,7 +916,7 @@ const Reports = () => {
 
                     {/* Sales Analytics Tab */}
                     {activeTab === 1 && (
-                        <div className="space-y-6">
+                        <div className="space-y-6 w-full max-w-none">
                             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                                 <div className="panel">
                                     <div className="mb-5 flex items-center justify-between">
@@ -1005,7 +1005,7 @@ const Reports = () => {
 
                     {/* Shop Performance Tab */}
                     {activeTab === 2 && (
-                        <div className="space-y-6">
+                        <div className="space-y-6 w-full max-w-none">
                             <div className="panel">
                                 <div className="mb-5 flex items-center justify-between">
                                     <h5 className="text-lg font-semibold dark:text-white-light">{t('top_performing_shops')}</h5>
@@ -1056,7 +1056,7 @@ const Reports = () => {
 
                     {/* Product Insights Tab */}
                     {activeTab === 3 && (
-                        <div className="space-y-6">
+                        <div className="space-y-6 w-full max-w-none">
                             <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
                                 <div className="panel">
                                     <div className="mb-5 flex items-center justify-between">
@@ -1122,7 +1122,7 @@ const Reports = () => {
 
                     {/* User Analytics Tab */}
                     {activeTab === 4 && (
-                        <div className="space-y-6">
+                        <div className="space-y-6 w-full max-w-none">
                             <div className="panel">
                                 <div className="mb-5 flex items-center justify-between">
                                     <h5 className="text-lg font-semibold dark:text-white-light">{t('user_growth_trend')}</h5>
@@ -1183,7 +1183,7 @@ const Reports = () => {
 
                     {/* Comparison Tab */}
                     {activeTab === 5 && (
-                        <div className="space-y-6">
+                        <div className="space-y-6 w-full max-w-none">
                             <div className="panel">
                                 <div className="mb-5 flex items-center justify-between">
                                     <h5 className="text-lg font-semibold dark:text-white-light">{t('shop_comparison')}</h5>

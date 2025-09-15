@@ -339,10 +339,10 @@ const HomePage = () => {
 
     return (
         <div>
-            <div className="pt-5 max-w-[1600px]">
+            <div className="pt-5 w-full max-w-none">
                 {/* Welcome Banner */}
-                <div className="mb-6">
-                    <div className="panel h-full dark:!border-[#191e3a] !bg-gradient-to-r from-blue-500/25 via-sky-500/25 to-cyan-500/25 dark:!bg-gradient-to-r dark:from-blue-500/10 dark:via-sky-500/10 dark:to-cyan-500/10">
+                <div className="mb-6 w-full max-w-none">
+                    <div className="panel h-full dark:!border-[#191e3a] !bg-gradient-to-r from-blue-500/25 via-sky-500/25 to-cyan-500/25 dark:!bg-gradient-to-r dark:from-blue-500/10 dark:via-sky-500/10 dark:to-cyan-500/10 w-full max-w-none">
                         <div className="flex flex-col sm:flex-row items-start justify-between mb-5">
                             <div>
                                 <h5 className="font-semibold text-lg dark:text-white-light">{t('welcome_to_dashboard')}</h5>

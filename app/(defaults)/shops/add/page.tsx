@@ -503,7 +503,7 @@ const AddShopPage = () => {
             {/* Form Container with tabbed layout */}
             <form onSubmit={handleSubmit}>
                 {/* Cover Image */}
-                <div className="panel mb-5 overflow-hidden">
+                <div className="panel mb-5 overflow-hidden w-full max-w-none">
                     <div className="relative h-52 w-full">
                         <img src={form.cover_image_url || '/assets/images/img-placeholder-fallback.webp'} alt="Shop Cover" className="h-full w-full object-cover" />
                         <div className="absolute inset-0 bg-black bg-opacity-40 flex items-center justify-center">
@@ -546,7 +546,7 @@ const AddShopPage = () => {
                     />
                 </div>{' '}
                 {activeTab === 0 && (
-                    <div className="panel mb-5">
+                    <div className="panel mb-5 w-full max-w-none">
                         <div className="mb-5">
                             <h5 className="text-lg font-semibold dark:text-white-light">{t('basic_information')}</h5>
                         </div>
@@ -738,7 +738,7 @@ const AddShopPage = () => {
                     </div>
                 )}{' '}
                 {activeTab === 1 && (
-                    <div className="panel mb-5">
+                    <div className="panel mb-5 w-full max-w-none">
                         <div className="mb-5">
                             <h5 className="text-lg font-semibold dark:text-white-light">{t('shop_details')}</h5>
                         </div>
@@ -819,7 +819,7 @@ const AddShopPage = () => {
                     </div>
                 )}{' '}
                 {activeTab === 2 && (
-                    <div className="panel mb-5">
+                    <div className="panel mb-5 w-full max-w-none">
                         <div className="mb-5">
                             <h5 className="text-lg font-semibold dark:text-white-light">{t('working_hours')}</h5>
                             <p className="text-gray-500 dark:text-gray-400 mt-1">{t('set_working_hours')}</p>
@@ -868,7 +868,7 @@ const AddShopPage = () => {
                     </div>
                 )}{' '}
                 {activeTab === 3 && (
-                    <div className="panel mb-5">
+                    <div className="panel mb-5 w-full max-w-none">
                         <div className="mb-5">
                             <h5 className="text-lg font-semibold dark:text-white-light">{t('shop_gallery')}</h5>
                             <p className="text-gray-500 dark:text-gray-400 mt-1">{t('upload_gallery_images_info')}</p>
@@ -885,7 +885,7 @@ const AddShopPage = () => {
                     </div>
                 )}
                 {activeTab === 4 && (
-                    <div className="panel mb-5">
+                    <div className="panel mb-5 w-full max-w-none">
                         <div className="mb-5">
                             <h5 className="text-lg font-semibold dark:text-white-light">{t('delivery_settings')}</h5>
                             <p className="text-gray-500 dark:text-gray-400 mt-1">{t('select_delivery_company_for_shop')}</p>
@@ -952,7 +952,7 @@ const AddShopPage = () => {
                                     </div>
 
                                     {/* Base Pricing */}
-                                    <div className="panel mb-5">
+                                    <div className="panel mb-5 w-full max-w-none">
                                         <div className="mb-5">
                                             <h5 className="text-lg font-semibold dark:text-white-light">{t('base_delivery_prices')}</h5>
                                             <p className="text-gray-500 dark:text-gray-400 mt-1">{t('standard_pricing_for_all_locations')}</p>

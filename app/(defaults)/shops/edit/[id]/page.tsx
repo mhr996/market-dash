@@ -531,7 +531,7 @@ const EditShop = () => {
             {/* Edit Form */}
             <form onSubmit={handleSubmit}>
                 {/* Cover Image */}
-                <div className="panel mb-5 overflow-hidden">
+                <div className="panel mb-5 overflow-hidden w-full max-w-none">
                     {' '}
                     <div className="relative h-52 w-full">
                         <img src={form.cover_image_url || '/assets/images/img-placeholder-fallback.webp'} alt={t('shop_cover_image')} className="h-full w-full object-cover" />
@@ -594,7 +594,7 @@ const EditShop = () => {
                     />
                 </div>
                 {activeTab === 0 && (
-                    <div className="panel mb-5">
+                    <div className="panel mb-5 w-full max-w-none">
                         <div className="mb-5">
                             <h5 className="text-lg font-semibold dark:text-white-light">{t('basic_information')}</h5>
                         </div>
@@ -743,7 +743,7 @@ const EditShop = () => {
                     </div>
                 )}
                 {activeTab === 1 && (
-                    <div className="panel mb-5">
+                    <div className="panel mb-5 w-full max-w-none">
                         <div className="mb-5">
                             <h5 className="text-lg font-semibold dark:text-white-light">Shop Details</h5>
                         </div>
@@ -825,7 +825,7 @@ const EditShop = () => {
                     </div>
                 )}
                 {activeTab === 2 && (
-                    <div className="panel mb-5">
+                    <div className="panel mb-5 w-full max-w-none">
                         <div className="mb-5">
                             <h5 className="text-lg font-semibold dark:text-white-light">Working Hours</h5>
                             <p className="text-gray-500 dark:text-gray-400 mt-1">Set your shop's working hours for each day of the week</p>
@@ -873,7 +873,7 @@ const EditShop = () => {
                     </div>
                 )}
                 {activeTab === 3 && (
-                    <div className="panel mb-5">
+                    <div className="panel mb-5 w-full max-w-none">
                         <div className="mb-5">
                             <h5 className="text-lg font-semibold dark:text-white-light">Shop Gallery</h5>
                             <p className="text-gray-500 dark:text-gray-400 mt-1">Upload images for your shop gallery</p>
@@ -892,7 +892,7 @@ const EditShop = () => {
                     </div>
                 )}
                 {activeTab === 4 && (
-                    <div className="panel mb-5">
+                    <div className="panel mb-5 w-full max-w-none">
                         <div className="mb-5">
                             <h5 className="text-lg font-semibold dark:text-white-light">{t('delivery_settings')}</h5>
                             <p className="text-gray-500 dark:text-gray-400 mt-1">{t('select_delivery_company_for_shop')}</p>
@@ -960,7 +960,7 @@ const EditShop = () => {
                                     </div>
 
                                     {/* Base Pricing */}
-                                    <div className="panel mb-5">
+                                    <div className="panel mb-5 w-full max-w-none">
                                         <div className="mb-5">
                                             <h5 className="text-lg font-semibold dark:text-white-light">{t('base_delivery_prices')}</h5>
                                             <p className="text-gray-500 dark:text-gray-400 mt-1">{t('standard_pricing_for_all_locations')}</p>

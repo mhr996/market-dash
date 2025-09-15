@@ -531,7 +531,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
     ];
 
     return (
-        <div className="panel">
+        <div className="panel w-full max-w-none">
             {alert && <Alert type={alert.type} title={alert.type === 'success' ? t('success') : t('error')} message={alert.message} onClose={() => setAlert(null)} />}
 
             {/* Tabs */}

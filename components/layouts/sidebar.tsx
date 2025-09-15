@@ -194,7 +194,7 @@ const Sidebar = () => {
                                                 <li>
                                                     <Link href="/delivery/cars" className="group nav-link">
                                                         <div className="flex items-center">
-                                                            <IconCar className="shrink-0 group-hover:!text-primary" />
+                                                            <IconTruck className="shrink-0 group-hover:!text-primary" />
                                                             <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Cars</span>
                                                         </div>
                                                     </Link>
@@ -204,6 +204,14 @@ const Sidebar = () => {
                                                         <div className="flex items-center">
                                                             <IconUsers className="shrink-0 group-hover:!text-primary" />
                                                             <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Drivers</span>
+                                                        </div>
+                                                    </Link>
+                                                </li>
+                                                <li>
+                                                    <Link href="/delivery/orders" className="group nav-link">
+                                                        <div className="flex items-center">
+                                                            <IconMenuNotes className="shrink-0 group-hover:!text-primary" />
+                                                            <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Orders</span>
                                                         </div>
                                                     </Link>
                                                 </li>

@@ -419,7 +419,7 @@ const RevenuePage = () => {
                     <div className="animate-spin rounded-full border-[3px] border-primary border-t-transparent h-12 w-12"></div>
                 </div>
             )}
-            <div className="pt-5 max-w-[1600px]">
+            <div className="pt-5 w-full max-w-none">
                 {/* Page Title */}
                 <div className="mb-6">
                     <h5 className="text-lg font-semibold dark:text-white-light">{t('revenue')}</h5>
@@ -561,8 +561,8 @@ const RevenuePage = () => {
                 </div>
 
                 {/* Shop Revenue Table */}
-                <div className="panel border-white-light px-0 dark:border-[#1b2e4b]">
-                    <div className="invoice-table">
+                <div className="panel border-white-light px-0 dark:border-[#1b2e4b] w-full max-w-none">
+                    <div className="invoice-table w-full max-w-none">
                         {' '}
                         <div className="mb-4.5 flex flex-col gap-5 px-5 md:flex-row md:items-center">
                             <h5 className="text-lg font-semibold dark:text-white-light">
@@ -572,9 +572,9 @@ const RevenuePage = () => {
                                 <input type="text" className="form-input w-auto" placeholder={t('search')} value={search} onChange={(e) => setSearch(e.target.value)} />
                             </div>
                         </div>{' '}
-                        <div className="datatables pagination-padding relative">
+                        <div className="datatables pagination-padding relative w-full max-w-none">
                             <DataTable
-                                className={`${stats.loading ? 'filter blur-sm pointer-events-none' : 'table-hover whitespace-nowrap'}`}
+                                className={`${stats.loading ? 'filter blur-sm pointer-events-none' : 'table-hover whitespace-nowrap'} w-full max-w-none`}
                                 records={records}
                                 columns={[
                                     {

@@ -102,7 +102,7 @@ const SubscriptionsList = () => {
     }, [sortStatus, initialRecords]);
 
     return (
-        <div className="panel border-white-light px-0 dark:border-[#1b2e4b]">
+        <div className="panel border-white-light px-0 dark:border-[#1b2e4b] w-full max-w-none">
             {/* Alert */}
             {alert.visible && (
                 <div className="mb-4 ml-4 max-w-96">

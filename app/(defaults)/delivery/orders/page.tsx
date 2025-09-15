@@ -165,23 +165,12 @@ const formatOrderForDisplay = (order: OrderData) => {
         Shipped: 'processing',
     };
 
-    // Map status to delivery status
-    const deliveryStatusMap: { [key: string]: string } = {
-        Active: 'preparing',
-        Completed: 'delivered',
-        Cancelled: 'cancelled',
-        Delivered: 'delivered',
-        Pending: 'pending',
-        Shipped: 'shipped',
-    };
-
     return {
         id: order.id,
         name: order.products?.title || 'Product',
         image: order.products?.images?.[0] || null,
         buyer: order.profiles?.full_name || shippingAddress.name || 'Unknown Customer',
         shop_name: order.products?.shops?.[0]?.shop_name || 'Unknown Shop',
-        delivery_status: deliveryStatusMap[order.status] || 'pending',
         city: shippingAddress.city || 'Unknown City',
         date: order.created_at,
         total: `$${(order.products?.price || 0).toFixed(2)}`,
@@ -219,7 +208,7 @@ interface Order {
     items: { name: string; quantity: number; price: number }[];
 }
 
-const OrdersList = () => {
+const DeliveryOrdersList = () => {
     const { t } = getTranslation();
     const router = useRouter();
     const [items, setItems] = useState<OrderData[]>([]);
@@ -233,7 +222,6 @@ const OrdersList = () => {
     const [selectedRecords, setSelectedRecords] = useState<any>([]);
 
     const [search, setSearch] = useState('');
-    const [deliveryFilter, setDeliveryFilter] = useState('all'); // 'all', 'delivery', 'pickup', 'confirmed'
     const [sortStatus, setSortStatus] = useState<DataTableSortStatus>({
         columnAccessor: 'date',
         direction: 'desc',
@@ -242,10 +230,6 @@ const OrdersList = () => {
     const [orderToDelete, setOrderToDelete] = useState<OrderData | null>(null);
     const [showAssignModal, setShowAssignModal] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState<any>(null);
-    const [showConfirmOrderModal, setShowConfirmOrderModal] = useState(false);
-    const [orderToConfirm, setOrderToConfirm] = useState<OrderData | null>(null);
-    const [showUnconfirmModal, setShowUnconfirmModal] = useState(false);
-    const [orderToUnconfirm, setOrderToUnconfirm] = useState<OrderData | null>(null);
     const [alert, setAlert] = useState<{ visible: boolean; message: string; type: 'success' | 'danger' }>({
         visible: false,
         message: '',
@@ -299,6 +283,7 @@ const OrdersList = () => {
         const to = from + pageSize;
         setRecords([...initialRecords.slice(from, to)]);
     }, [page, pageSize, initialRecords]);
+
     useEffect(() => {
         const filtered = displayItems.filter((item) => {
             const matchesSearch =
@@ -306,24 +291,15 @@ const OrdersList = () => {
                 item.buyer.toLowerCase().includes(search.toLowerCase()) ||
                 item.total.toLowerCase().includes(search.toLowerCase()) ||
                 item.shop_name.toLowerCase().includes(search.toLowerCase()) ||
-                item.delivery_status.toLowerCase().includes(search.toLowerCase()) ||
                 item.city.toLowerCase().includes(search.toLowerCase());
 
-            let matchesFilter = true;
-            if (deliveryFilter === 'delivery') {
-                matchesFilter = item.delivery_type === 'delivery' && !item.confirmed;
-            } else if (deliveryFilter === 'pickup') {
-                matchesFilter = item.delivery_type === 'pickup' && !item.confirmed;
-            } else if (deliveryFilter === 'confirmed') {
-                matchesFilter = item.confirmed === true;
-            } else if (deliveryFilter === 'all') {
-                matchesFilter = !item.confirmed;
-            }
+            // Only show confirmed delivery orders
+            const matchesFilter = item.confirmed === true && item.delivery_type === 'delivery';
 
             return matchesSearch && matchesFilter;
         });
         setInitialRecords(filtered);
-    }, [search, displayItems, deliveryFilter]);
+    }, [search, displayItems]);
 
     useEffect(() => {
         const data = sortBy(initialRecords, sortStatus.columnAccessor);
@@ -385,42 +361,6 @@ const OrdersList = () => {
         } catch (error) {
             setAlert({ visible: true, message: 'Error removing driver', type: 'danger' });
         }
-    };
-
-    const handleConfirmOrder = async (order: OrderData | null) => {
-        if (!order) return;
-
-        try {
-            const { error } = await supabase.from('orders').update({ confirmed: true }).eq('id', order.id);
-
-            if (error) throw error;
-
-            // Refresh the data
-            await fetchOrders();
-            setAlert({ visible: true, message: 'Order Confirmed', type: 'success' });
-        } catch (error) {
-            setAlert({ visible: true, message: 'Error confirming order', type: 'danger' });
-        }
-        setShowConfirmOrderModal(false);
-        setOrderToConfirm(null);
-    };
-
-    const handleUnconfirmOrder = async (order: OrderData | null) => {
-        if (!order) return;
-
-        try {
-            const { error } = await supabase.from('orders').update({ confirmed: false }).eq('id', order.id);
-
-            if (error) throw error;
-
-            // Refresh the data
-            await fetchOrders();
-            setAlert({ visible: true, message: 'Order Unconfirmed', type: 'success' });
-        } catch (error) {
-            setAlert({ visible: true, message: 'Error unconfirming order', type: 'danger' });
-        }
-        setShowUnconfirmModal(false);
-        setOrderToUnconfirm(null);
     };
 
     const fetchOrders = async () => {
@@ -510,11 +450,16 @@ const OrdersList = () => {
                     </Link>
                 </li>
                 <li className="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
-                    <span>{t('orders')}</span>
+                    <Link href="/delivery" className="text-primary hover:underline">
+                        Delivery
+                    </Link>
+                </li>
+                <li className="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
+                    <span>Orders</span>
                 </li>
             </ul>
             <div className="panel mt-6 w-full max-w-none">
-                {/* Confirmation Modal */}{' '}
+                {/* Confirmation Modal */}
                 <ConfirmModal
                     isOpen={showConfirmModal}
                     title={t('delete_order')}
@@ -525,30 +470,6 @@ const OrdersList = () => {
                         setOrderToDelete(null);
                     }}
                     confirmLabel={t('delete')}
-                />
-                {/* Order Confirmation Modal */}
-                <ConfirmModal
-                    isOpen={showConfirmOrderModal}
-                    title="Confirm Order"
-                    message="Are you sure you want to confirm this delivery order?"
-                    onConfirm={() => handleConfirmOrder(orderToConfirm)}
-                    onCancel={() => {
-                        setShowConfirmOrderModal(false);
-                        setOrderToConfirm(null);
-                    }}
-                    confirmLabel="Confirm"
-                />
-                {/* Order Unconfirm Modal */}
-                <ConfirmModal
-                    isOpen={showUnconfirmModal}
-                    title="Unconfirm Order"
-                    message="Are you sure you want to unconfirm this order? It will be moved back to the main orders list."
-                    onConfirm={() => handleUnconfirmOrder(orderToUnconfirm)}
-                    onCancel={() => {
-                        setShowUnconfirmModal(false);
-                        setOrderToUnconfirm(null);
-                    }}
-                    confirmLabel="Unconfirm"
                 />
                 {/* Assignment Modal */}
                 <AssignmentModal
@@ -567,7 +488,6 @@ const OrdersList = () => {
                 {/* Alert */}
                 {alert.visible && (
                     <div className="mb-4">
-                        {' '}
                         <Alert
                             type={alert.type}
                             title={alert.type === 'success' ? t('success') : t('error')}
@@ -578,44 +498,6 @@ const OrdersList = () => {
                 )}
                 <div className="invoice-table overflow-x-auto w-full max-w-none">
                     <div className="mb-4.5 flex flex-col gap-5 px-5 md:flex-row md:items-center">
-                        <div className="flex gap-2">
-                            <button
-                                type="button"
-                                onClick={() => setDeliveryFilter('all')}
-                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                                    deliveryFilter === 'all' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-dark dark:text-gray-300 dark:hover:bg-gray-600'
-                                }`}
-                            >
-                                All Orders
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setDeliveryFilter('delivery')}
-                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                                    deliveryFilter === 'delivery' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-dark dark:text-gray-300 dark:hover:bg-gray-600'
-                                }`}
-                            >
-                                Delivery Orders
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setDeliveryFilter('pickup')}
-                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                                    deliveryFilter === 'pickup' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-dark dark:text-gray-300 dark:hover:bg-gray-600'
-                                }`}
-                            >
-                                Pickup Orders
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setDeliveryFilter('confirmed')}
-                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                                    deliveryFilter === 'confirmed' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-dark dark:text-gray-300 dark:hover:bg-gray-600'
-                                }`}
-                            >
-                                Confirmed Orders
-                            </button>
-                        </div>
                         <div className="ltr:ml-auto rtl:mr-auto">
                             <input type="text" className="form-input w-auto" placeholder={t('search')} value={search} onChange={(e) => setSearch(e.target.value)} />
                         </div>
@@ -697,54 +579,55 @@ const OrdersList = () => {
                                     ),
                                 },
                                 {
-                                    accessor: 'delivery_type',
-                                    title: 'Type',
-                                    sortable: true,
-                                    render: ({ delivery_type }) => (
-                                        <span className={`badge ${delivery_type === 'delivery' ? 'badge-outline-primary' : 'badge-outline-secondary'}`}>
-                                            {delivery_type === 'delivery' ? 'Delivery' : 'Pickup'}
-                                        </span>
-                                    ),
-                                },
-                                {
-                                    accessor: 'confirmed',
-                                    title: 'Confirmation',
+                                    accessor: 'assigned_driver',
+                                    title: 'Driver',
                                     sortable: false,
-                                    render: ({ confirmed, delivery_type, id }) => {
-                                        if (delivery_type === 'pickup') {
-                                            return <span className="text-gray-500">N/A</span>;
-                                        }
-                                        if (confirmed) {
+                                    render: ({ assigned_driver, id }) => {
+                                        if (assigned_driver) {
                                             return (
-                                                <button
-                                                    type="button"
-                                                    className="btn btn-outline-danger btn-xs"
-                                                    title="Unconfirm Order"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        const order = items.find((d) => d.id === id);
-                                                        setOrderToUnconfirm(order || null);
-                                                        setShowUnconfirmModal(true);
-                                                    }}
-                                                >
-                                                    Unconfirm
-                                                </button>
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                                            <IconUser className="h-4 w-4 text-primary" />
+                                                        </div>
+                                                        <div>
+                                                            <div className="text-sm font-medium">{assigned_driver.name}</div>
+                                                            <div className="text-xs text-gray-500">{assigned_driver.phone}</div>
+                                                        </div>
+                                                    </div>
+                                                    <button
+                                                        type="button"
+                                                        className="btn btn-outline-warning btn-xs w-full"
+                                                        title="Remove Driver Assignment"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleRemoveDriver(id);
+                                                        }}
+                                                    >
+                                                        <IconUser className="h-3 w-3" />
+                                                        <span className="ml-1">Remove</span>
+                                                    </button>
+                                                </div>
                                             );
                                         }
                                         return (
-                                            <button
-                                                type="button"
-                                                className="btn btn-outline-success btn-xs"
-                                                title="Confirm Order"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    const order = items.find((d) => d.id === id);
-                                                    setOrderToConfirm(order || null);
-                                                    setShowConfirmOrderModal(true);
-                                                }}
-                                            >
-                                                Confirm
-                                            </button>
+                                            <div className="space-y-2">
+                                                <span className="text-orange-500">Unassigned</span>
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-outline-success btn-xs w-full"
+                                                    title="Assign Driver"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        const order = displayItems.find((d) => d.id === id);
+                                                        setSelectedOrder(order);
+                                                        setShowAssignModal(true);
+                                                    }}
+                                                >
+                                                    <IconUser className="h-3 w-3" />
+                                                    <span className="ml-1">Assign</span>
+                                                </button>
+                                            </div>
                                         );
                                     },
                                 },
@@ -804,4 +687,4 @@ const OrdersList = () => {
     );
 };
 
-export default OrdersList;
+export default DeliveryOrdersList;

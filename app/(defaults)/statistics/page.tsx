@@ -1012,7 +1012,7 @@ const StatisticsPage = () => {
     }
 
     return (
-        <div className="container mx-auto p-6">
+        <div className="w-full max-w-none p-6">
             {/* Header */}
             <div className="mb-6">
                 <div className="flex items-center gap-5 mb-4">
@@ -1045,7 +1045,7 @@ const StatisticsPage = () => {
             <StatisticsFilter shops={allShops} users={allUsers} onFilterChange={handleFilterChange} currentFilters={filters} isLoading={loading} />
 
             {/* Overview Stats */}
-            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6">
+            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6 gap-4 mb-6 w-full max-w-none">
                 <StatCard icon={<IconStore className="w-5 h-5 text-white" />} title={t('total_shops')} value={overallStats.totalShops} color="bg-primary" />
                 <StatCard icon={<IconShoppingCart className="w-5 h-5 text-white" />} title={t('total_products')} value={overallStats.totalProducts} color="bg-success" />
                 <StatCard icon={<IconUsers className="w-5 h-5 text-white" />} title={t('total_visits')} value={overallStats.totalVisits} color="bg-info" />
@@ -1189,7 +1189,7 @@ const StatisticsPage = () => {
                 // Views Analytics Content
                 <>
                     {activeTab === 0 && (
-                        <div className="space-y-4">
+                        <div className="space-y-4 w-full max-w-none">
                             <h2 className="text-xl font-semibold text-dark dark:text-white mb-4">{t('top_visited_shops')}</h2>
                             {topShops.length > 0 ? (
                                 topShops.map((shop, index) => <ShopCard key={shop.id} shop={shop} rank={index + 1} />)
@@ -1202,7 +1202,7 @@ const StatisticsPage = () => {
                     )}
 
                     {activeTab === 1 && (
-                        <div className="space-y-4">
+                        <div className="space-y-4 w-full max-w-none">
                             <h2 className="text-xl font-semibold text-dark dark:text-white mb-4">{t('most_viewed_products')}</h2>
                             {topProducts.length > 0 ? (
                                 topProducts.map((product, index) => <ProductCard key={product.id} product={product} rank={index + 1} metric="views" />)
@@ -1215,7 +1215,7 @@ const StatisticsPage = () => {
                     )}
 
                     {activeTab === 2 && (
-                        <div className="space-y-4">
+                        <div className="space-y-4 w-full max-w-none">
                             <h2 className="text-xl font-semibold text-dark dark:text-white mb-4">{t('most_carted_products')}</h2>
                             {mostCartedProducts.length > 0 ? (
                                 mostCartedProducts.map((product, index) => <ProductCard key={product.id} product={product} rank={index + 1} metric="cart" />)
@@ -1228,7 +1228,7 @@ const StatisticsPage = () => {
                     )}
 
                     {activeTab === 3 && (
-                        <div className="space-y-4">
+                        <div className="space-y-4 w-full max-w-none">
                             <h2 className="text-xl font-semibold text-dark dark:text-white mb-4">{t('most_viewed_categories')}</h2>
                             {topCategories.length > 0 ? (
                                 topCategories.map((category, index) => <CategoryCard key={category.id} category={category} rank={index + 1} />)

@@ -724,7 +724,7 @@ const ShopPreview = () => {
                 </div>
             )}
             {/* Shop Header with Cover Image */}
-            <div className="mb-6 rounded-md overflow-hidden">
+            <div className="mb-6 rounded-md overflow-hidden w-full max-w-none">
                 <div className="relative h-64 w-full">
                     <img src={shop.cover_image_url || '/assets/images/img-placeholder-fallback.webp'} alt={`${shop.shop_name} Cover`} className="h-full w-full object-cover" />
                     <div className="absolute bottom-0 left-0 w-full bg-gradient-to-t from-black to-transparent p-6">
@@ -805,7 +805,7 @@ const ShopPreview = () => {
                 {activeTab === 'revenue' && (
                     <div className="lg:col-span-3">
                         {/* Shop Revenue Content */}
-                        <div className="panel mb-5">
+                        <div className="panel mb-5 w-full max-w-none">
                             <div className="flex flex-wrap justify-between items-center mb-5">
                                 <h5 className="text-lg font-semibold dark:text-white-light">{t('shop_revenue_summary')}</h5>
 
@@ -1326,7 +1326,7 @@ const ShopPreview = () => {
                         </div>
 
                         {/* Transaction History Table */}
-                        <div className="panel border-white-light px-0 dark:border-[#1b2e4b]">
+                        <div className="panel border-white-light px-0 dark:border-[#1b2e4b] w-full max-w-none">
                             <div className="invoice-table">
                                 <div className="mb-4.5 flex flex-col gap-5 px-5 md:flex-row md:items-center">
                                     <h5 className="text-lg font-semibold dark:text-white-light">{t('transaction_history')}</h5>
@@ -1571,7 +1571,7 @@ const ShopPreview = () => {
                                     </h6>
 
                                     {/* Base Pricing */}
-                                    <div className="panel mb-5">
+                                    <div className="panel mb-5 w-full max-w-none">
                                         <div className="mb-5">
                                             <h5 className="text-lg font-semibold dark:text-white-light">{t('base_delivery_prices')}</h5>
                                             <p className="text-gray-500 dark:text-gray-400 mt-1">{t('standard_pricing_for_all_locations')}</p>
