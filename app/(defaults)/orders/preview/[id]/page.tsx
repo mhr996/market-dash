@@ -56,7 +56,7 @@ interface Order {
     buyer: string;
     date: string;
     total: string;
-    status: 'completed' | 'processing' | 'cancelled';
+    status: 'processing' | 'on_the_way' | 'completed';
     address: string;
     items: { name: string; quantity: number; price: number }[];
 }
@@ -104,6 +104,21 @@ const PreviewOrder = () => {
                 const paymentMethod = parseJsonField(data.payment_method);
                 const shippingMethod = parseJsonField(data.shipping_method);
 
+                // Map database status to display status
+                const statusMap: { [key: string]: 'processing' | 'on_the_way' | 'completed' } = {
+                    Active: 'processing',
+                    Completed: 'completed',
+                    Cancelled: 'completed',
+                    Delivered: 'completed',
+                    Pending: 'processing',
+                    Shipped: 'on_the_way',
+                    'On The Way': 'on_the_way',
+                    Processing: 'processing',
+                    processing: 'processing',
+                    on_the_way: 'on_the_way',
+                    completed: 'completed',
+                };
+
                 const formattedOrder = {
                     id: data.id,
                     name: data.products?.title || 'Product',
@@ -111,7 +126,7 @@ const PreviewOrder = () => {
                     buyer: data.profiles?.full_name || shippingAddress.name || 'Unknown Customer',
                     date: data.created_at,
                     total: `$${(data.products?.price || 0).toFixed(2)}`,
-                    status: data.status,
+                    status: statusMap[data.status] || 'processing',
                     address: `${shippingAddress.address || ''}, ${shippingAddress.city || ''}, ${shippingAddress.zip || ''}`.trim(),
                     items: [
                         {
@@ -267,8 +282,8 @@ const PreviewOrder = () => {
                                 </div>
                                 <div>
                                     <strong>{t('status')}:</strong>
-                                    <span className={`badge badge-outline-${order.status === 'completed' ? 'success' : order.status === 'processing' ? 'warning' : 'danger'} mx-2`}>
-                                        {t(`${order.status}`)}
+                                    <span className={`badge badge-outline-${order.status === 'completed' ? 'success' : order.status === 'on_the_way' ? 'warning' : 'info'} mx-2`}>
+                                        {order.status === 'on_the_way' ? 'On The Way' : order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                                     </span>
                                 </div>
                             </div>
@@ -358,7 +373,7 @@ const PreviewOrder = () => {
                                     <strong>{t('shop_name')}:</strong>
                                     <p className="mt-1">{order.shop?.shop_name || 'N/A'}</p>
                                 </div>
-                              
+
                                 {order.shop?.address && (
                                     <div>
                                         <strong>{t('shop_address')}:</strong>
@@ -375,7 +390,6 @@ const PreviewOrder = () => {
                                         </div>
                                     </div>
                                 )}
-                              
                             </div>
                         </div>
 
@@ -512,8 +526,8 @@ const PreviewOrder = () => {
                                     </div>
                                     <div>
                                         <strong>{t('status')}:</strong>
-                                        <span className={`badge badge-outline-${order.status === 'completed' ? 'success' : order.status === 'processing' ? 'warning' : 'danger'} mx-2`}>
-                                            {t(`${order.status}`)}
+                                        <span className={`badge badge-outline-${order.status === 'completed' ? 'success' : order.status === 'on_the_way' ? 'warning' : 'info'} mx-2`}>
+                                            {order.status === 'on_the_way' ? 'On The Way' : order.status.charAt(0).toUpperCase() + order.status.slice(1)}
                                         </span>
                                     </div>
                                 </div>

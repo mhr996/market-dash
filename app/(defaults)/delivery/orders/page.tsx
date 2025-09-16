@@ -6,16 +6,137 @@ import IconTrashLines from '@/components/icon/icon-trash-lines';
 import IconPrinter from '@/components/icon/icon-printer';
 import IconDownload from '@/components/icon/icon-download';
 import IconUser from '@/components/icon/icon-user';
+import IconCaretDown from '@/components/icon/icon-caret-down';
 import { sortBy } from 'lodash';
 import { DataTableSortStatus, DataTable } from 'mantine-datatable';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useRef } from 'react';
+import { createPortal } from 'react-dom';
 import { Alert } from '@/components/elements/alerts/elements-alerts-default';
 import ConfirmModal from '@/components/modals/confirm-modal';
 import { getTranslation } from '@/i18n';
 import { generateOrderReceiptPDF } from '@/utils/pdf-generator';
 import supabase from '@/lib/supabase';
+
+// Status Dropdown Component
+const StatusDropdown = ({ currentStatus, orderId, onStatusChange }: { currentStatus: string; orderId: number; onStatusChange: (orderId: number, newStatus: string) => void }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [showConfirmModal, setShowConfirmModal] = useState(false);
+    const [pendingStatus, setPendingStatus] = useState<string>('');
+    const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
+    const dropdownRef = useRef<HTMLDivElement>(null);
+    const triggerRef = useRef<HTMLDivElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
+
+    useEffect(() => {
+        if (isOpen && triggerRef.current) {
+            const rect = triggerRef.current.getBoundingClientRect();
+            setDropdownPosition({
+                top: rect.bottom + window.scrollY + 4,
+                left: rect.left + window.scrollX,
+                width: rect.width,
+            });
+        }
+    }, [isOpen]);
+
+    const statusOptions = [
+        { value: 'processing', label: 'Processing', color: 'text-info' },
+        { value: 'on_the_way', label: 'On The Way', color: 'text-warning' },
+        { value: 'completed', label: 'Completed', color: 'text-success' },
+    ];
+
+    const currentOption = statusOptions.find((option) => option.value === currentStatus) || statusOptions[0];
+
+    const handleStatusSelect = (newStatus: string) => {
+        if (newStatus === 'completed') {
+            setPendingStatus(newStatus);
+            setShowConfirmModal(true);
+        } else {
+            onStatusChange(orderId, newStatus);
+        }
+        setIsOpen(false);
+    };
+
+    const handleConfirmStatusChange = () => {
+        onStatusChange(orderId, pendingStatus);
+        setShowConfirmModal(false);
+        setPendingStatus('');
+    };
+
+    const handleCancelStatusChange = () => {
+        setShowConfirmModal(false);
+        setPendingStatus('');
+    };
+
+    return (
+        <>
+            <div ref={triggerRef} className="relative">
+                <div
+                    className="cursor-pointer rounded border border-[#e0e6ed] bg-white p-2 text-xs dark:border-[#191e3a] dark:bg-black dark:text-white-dark flex items-center justify-between min-w-[120px]"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setIsOpen(!isOpen);
+                    }}
+                >
+                    <span className={currentOption.color}>{currentOption.label}</span>
+                    <IconCaretDown className={`h-3 w-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                </div>
+            </div>
+
+            {/* Portal for dropdown to render outside table container */}
+            {isOpen &&
+                createPortal(
+                    <div
+                        ref={dropdownRef}
+                        className="fixed z-[9999] rounded-md border border-gray-300 bg-white shadow-xl dark:border-gray-600 dark:bg-gray-800"
+                        style={{
+                            top: dropdownPosition.top,
+                            left: dropdownPosition.left,
+                            width: dropdownPosition.width,
+                            minWidth: '120px',
+                        }}
+                    >
+                        {statusOptions.map((option) => (
+                            <div
+                                key={option.value}
+                                className="cursor-pointer px-3 py-2 text-xs text-gray-800 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700 first:rounded-t-md last:rounded-b-md"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleStatusSelect(option.value);
+                                }}
+                            >
+                                <span className={option.color}>{option.label}</span>
+                            </div>
+                        ))}
+                    </div>,
+                    document.body,
+                )}
+
+            {/* Confirmation Modal for Completed Status */}
+            <ConfirmModal
+                isOpen={showConfirmModal}
+                title="Confirm Status Change"
+                message="Are you sure you want to mark this order as completed? This action cannot be undone."
+                onConfirm={handleConfirmStatusChange}
+                onCancel={handleCancelStatusChange}
+                confirmLabel="Yes, Mark as Completed"
+            />
+        </>
+    );
+};
 
 // Assignment Modal Component
 const AssignmentModal = ({ order, isOpen, onClose, onAssign }: { order: any; isOpen: boolean; onClose: () => void; onAssign: (driverId: number) => void }) => {
@@ -156,13 +277,18 @@ const formatOrderForDisplay = (order: OrderData) => {
     const deliveryType = order.shipping_method === '"delivery"' || order.shipping_method === 'delivery' ? 'delivery' : 'pickup';
 
     // Map database status to display status
-    const statusMap: { [key: string]: 'completed' | 'processing' | 'cancelled' } = {
+    const statusMap: { [key: string]: 'processing' | 'on_the_way' | 'completed' } = {
         Active: 'processing',
         Completed: 'completed',
-        Cancelled: 'cancelled',
+        Cancelled: 'completed', // Treat cancelled as completed for display
         Delivered: 'completed',
         Pending: 'processing',
-        Shipped: 'processing',
+        Shipped: 'on_the_way',
+        'On The Way': 'on_the_way',
+        Processing: 'processing',
+        processing: 'processing',
+        on_the_way: 'on_the_way',
+        completed: 'completed',
     };
 
     return {
@@ -203,7 +329,7 @@ interface Order {
     buyer: string;
     date: string;
     total: string;
-    status: 'completed' | 'processing' | 'cancelled';
+    status: 'processing' | 'on_the_way' | 'completed';
     address: string;
     items: { name: string; quantity: number; price: number }[];
 }
@@ -222,6 +348,7 @@ const DeliveryOrdersList = () => {
     const [selectedRecords, setSelectedRecords] = useState<any>([]);
 
     const [search, setSearch] = useState('');
+    const [deliveryFilter, setDeliveryFilter] = useState('all'); // 'all', 'completed'
     const [sortStatus, setSortStatus] = useState<DataTableSortStatus>({
         columnAccessor: 'date',
         direction: 'desc',
@@ -293,13 +420,19 @@ const DeliveryOrdersList = () => {
                 item.shop_name.toLowerCase().includes(search.toLowerCase()) ||
                 item.city.toLowerCase().includes(search.toLowerCase());
 
-            // Only show confirmed delivery orders
-            const matchesFilter = item.confirmed === true && item.delivery_type === 'delivery';
+            let matchesFilter = true;
+            if (deliveryFilter === 'completed') {
+                // Show only completed delivery orders
+                matchesFilter = item.confirmed === true && item.delivery_type === 'delivery' && item.status === 'completed';
+            } else if (deliveryFilter === 'all') {
+                // Show all confirmed delivery orders that are not completed
+                matchesFilter = item.confirmed === true && item.delivery_type === 'delivery' && item.status !== 'completed';
+            }
 
             return matchesSearch && matchesFilter;
         });
         setInitialRecords(filtered);
-    }, [search, displayItems]);
+    }, [search, displayItems, deliveryFilter]);
 
     useEffect(() => {
         const data = sortBy(initialRecords, sortStatus.columnAccessor);
@@ -360,6 +493,25 @@ const DeliveryOrdersList = () => {
             setAlert({ visible: true, message: 'Driver assignment removed', type: 'success' });
         } catch (error) {
             setAlert({ visible: true, message: 'Error removing driver', type: 'danger' });
+        }
+    };
+
+    const handleStatusUpdate = async (orderId: number, newStatus: string) => {
+        try {
+            const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
+
+            if (error) throw error;
+
+            // Update local state immediately for better UX
+            const updatedItems = items.map((item) => (item.id === orderId ? { ...item, status: newStatus } : item));
+            setItems(updatedItems);
+
+            const updatedDisplayItems = displayItems.map((item) => (item.id === orderId ? { ...item, status: newStatus } : item));
+            setDisplayItems(updatedDisplayItems);
+
+            setAlert({ visible: true, message: 'Order status updated successfully', type: 'success' });
+        } catch (error) {
+            setAlert({ visible: true, message: 'Error updating order status', type: 'danger' });
         }
     };
 
@@ -498,6 +650,26 @@ const DeliveryOrdersList = () => {
                 )}
                 <div className="invoice-table overflow-x-auto w-full max-w-none">
                     <div className="mb-4.5 flex flex-col gap-5 px-5 md:flex-row md:items-center">
+                        <div className="flex gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setDeliveryFilter('all')}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                    deliveryFilter === 'all' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-dark dark:text-gray-300 dark:hover:bg-gray-600'
+                                }`}
+                            >
+                                All Orders
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setDeliveryFilter('completed')}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
+                                    deliveryFilter === 'completed' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-dark dark:text-gray-300 dark:hover:bg-gray-600'
+                                }`}
+                            >
+                                Completed Orders
+                            </button>
+                        </div>
                         <div className="ltr:ml-auto rtl:mr-auto">
                             <input type="text" className="form-input w-auto" placeholder={t('search')} value={search} onChange={(e) => setSearch(e.target.value)} />
                         </div>
@@ -572,11 +744,7 @@ const DeliveryOrdersList = () => {
                                     accessor: 'status',
                                     title: t('status'),
                                     sortable: true,
-                                    render: ({ status }) => (
-                                        <span className={`badge badge-outline-${status === 'completed' ? 'success' : status === 'processing' ? 'warning' : 'danger'}`}>
-                                            {t(`order_status_${status}`)}
-                                        </span>
-                                    ),
+                                    render: ({ status, id }) => <StatusDropdown currentStatus={status} orderId={id} onStatusChange={handleStatusUpdate} />,
                                 },
                                 {
                                     accessor: 'assigned_driver',
