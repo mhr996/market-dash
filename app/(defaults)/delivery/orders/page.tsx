@@ -7,6 +7,14 @@ import IconPrinter from '@/components/icon/icon-printer';
 import IconDownload from '@/components/icon/icon-download';
 import IconUser from '@/components/icon/icon-user';
 import IconCaretDown from '@/components/icon/icon-caret-down';
+import IconMessage from '@/components/icon/icon-message';
+import IconDotsVertical from '@/components/icon/icon-dots-vertical';
+import IconX from '@/components/icon/icon-x';
+import IconCheck from '@/components/icon/icon-check';
+import IconAlertTriangle from '@/components/icon/icon-info-triangle';
+import IconClock from '@/components/icon/icon-clock';
+import IconSettings from '@/components/icon/icon-settings';
+import IconTruck from '@/components/icon/icon-truck';
 import { sortBy } from 'lodash';
 import { DataTableSortStatus, DataTable } from 'mantine-datatable';
 import Link from 'next/link';
@@ -19,8 +27,121 @@ import { getTranslation } from '@/i18n';
 import { generateOrderReceiptPDF } from '@/utils/pdf-generator';
 import supabase from '@/lib/supabase';
 
+// Delivery Type Dropdown Component
+const DeliveryTypeDropdown = ({ currentType, orderId, onTypeChange }: { currentType: string; orderId: number; onTypeChange: (orderId: number, newType: string) => void }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [showConfirmModal, setShowConfirmModal] = useState(false);
+    const [pendingType, setPendingType] = useState<string>('');
+    const triggerRef = useRef<HTMLDivElement>(null);
+    const dropdownRef = useRef<HTMLDivElement>(null);
+
+    const typeOptions = [
+        { value: 'pickup', label: 'Pickup', color: 'text-secondary' },
+        { value: 'delivery', label: 'Delivery', color: 'text-primary' },
+    ];
+
+    const currentOption = typeOptions.find((option) => option.value === currentType) || typeOptions[0];
+
+    const handleClickOutside = (event: MouseEvent) => {
+        if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node) && triggerRef.current && !triggerRef.current.contains(event.target as Node)) {
+            setIsOpen(false);
+        }
+    };
+
+    useEffect(() => {
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
+
+    const handleTypeSelect = (type: string) => {
+        if (type !== currentType) {
+            setPendingType(type);
+            setShowConfirmModal(true);
+        }
+        setIsOpen(false);
+    };
+
+    const handleConfirmTypeChange = () => {
+        onTypeChange(orderId, pendingType);
+        setShowConfirmModal(false);
+        setPendingType('');
+    };
+
+    const handleCancelTypeChange = () => {
+        setShowConfirmModal(false);
+        setPendingType('');
+    };
+
+    return (
+        <>
+            <div ref={triggerRef} className="relative">
+                <div
+                    className="flex items-center gap-1 px-2 py-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-600 min-w-[100px]"
+                    onClick={(e) => {
+                        e.stopPropagation();
+                        setIsOpen(!isOpen);
+                    }}
+                >
+                    <span className={`text-xs font-medium ${currentOption.color}`}>{currentOption.label}</span>
+                    <IconCaretDown className={`h-3 w-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
+                </div>
+            </div>
+
+            {isOpen &&
+                createPortal(
+                    <div
+                        ref={dropdownRef}
+                        className="absolute bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg z-50 min-w-[120px]"
+                        style={{
+                            top: (triggerRef.current?.getBoundingClientRect().bottom || 0) + window.scrollY + 4,
+                            left: (triggerRef.current?.getBoundingClientRect().left || 0) + window.scrollX,
+                        }}
+                    >
+                        {typeOptions.map((option) => (
+                            <div
+                                key={option.value}
+                                className="px-3 py-2 text-xs first:rounded-t-md last:rounded-b-md cursor-pointer text-gray-800 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"
+                                onClick={(e) => {
+                                    e.stopPropagation();
+                                    handleTypeSelect(option.value);
+                                }}
+                            >
+                                <span className={option.color}>{option.label}</span>
+                            </div>
+                        ))}
+                    </div>,
+                    document.body,
+                )}
+
+            <ConfirmModal
+                isOpen={showConfirmModal}
+                onCancel={handleCancelTypeChange}
+                onConfirm={handleConfirmTypeChange}
+                title="Change Order Type"
+                message={`Are you sure you want to change this order to ${pendingType === 'delivery' ? 'Delivery' : 'Pickup'}?`}
+            />
+        </>
+    );
+};
+
 // Status Dropdown Component
-const StatusDropdown = ({ currentStatus, orderId, onStatusChange }: { currentStatus: string; orderId: number; onStatusChange: (orderId: number, newStatus: string) => void }) => {
+const StatusDropdown = ({
+    currentStatus,
+    orderId,
+    onStatusChange,
+    hasAssignedDriver,
+    onOpenCommentModal,
+    onOpenDangerModal,
+}: {
+    currentStatus: string;
+    orderId: number;
+    onStatusChange: (orderId: number, newStatus: string) => void;
+    hasAssignedDriver: boolean;
+    onOpenCommentModal: () => void;
+    onOpenDangerModal: () => void;
+}) => {
     const [isOpen, setIsOpen] = useState(false);
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [pendingStatus, setPendingStatus] = useState<string>('');
@@ -30,7 +151,7 @@ const StatusDropdown = ({ currentStatus, orderId, onStatusChange }: { currentSta
 
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
+            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node) && triggerRef.current && !triggerRef.current.contains(event.target as Node)) {
                 setIsOpen(false);
             }
         };
@@ -55,10 +176,16 @@ const StatusDropdown = ({ currentStatus, orderId, onStatusChange }: { currentSta
     const statusOptions = [
         { value: 'processing', label: 'Processing', color: 'text-info' },
         { value: 'on_the_way', label: 'On The Way', color: 'text-warning' },
-        { value: 'completed', label: 'Completed', color: 'text-success' },
+        {
+            value: 'completed',
+            label: 'Completed',
+            color: 'text-success',
+            disabled: !hasAssignedDriver,
+        },
     ];
 
     const currentOption = statusOptions.find((option) => option.value === currentStatus) || statusOptions[0];
+    const isArchivedStatus = currentStatus === 'cancelled' || currentStatus === 'rejected';
 
     const handleStatusSelect = (newStatus: string) => {
         if (newStatus === 'completed') {
@@ -80,6 +207,15 @@ const StatusDropdown = ({ currentStatus, orderId, onStatusChange }: { currentSta
         setShowConfirmModal(false);
         setPendingStatus('');
     };
+
+    // If it's an archived status, show as read-only badge
+    if (isArchivedStatus) {
+        return (
+            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
+                {currentStatus === 'cancelled' ? 'Cancelled' : 'Rejected'}
+            </span>
+        );
+    }
 
     return (
         <>
@@ -112,15 +248,49 @@ const StatusDropdown = ({ currentStatus, orderId, onStatusChange }: { currentSta
                         {statusOptions.map((option) => (
                             <div
                                 key={option.value}
-                                className="cursor-pointer px-3 py-2 text-xs text-gray-800 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700 first:rounded-t-md last:rounded-b-md"
+                                className={`px-3 py-2 text-xs first:rounded-t-md ${
+                                    option.disabled ? 'text-gray-400 cursor-not-allowed' : 'cursor-pointer text-gray-800 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700'
+                                }`}
                                 onClick={(e) => {
                                     e.stopPropagation();
-                                    handleStatusSelect(option.value);
+                                    if (!option.disabled) {
+                                        handleStatusSelect(option.value);
+                                    }
                                 }}
                             >
-                                <span className={option.color}>{option.label}</span>
+                                <span className={option.disabled ? 'text-gray-400' : option.color}>
+                                    {option.label}
+                                    {option.disabled && ' (Assign driver first)'}
+                                </span>
                             </div>
                         ))}
+                        <div className="border-t border-gray-200 dark:border-gray-600 my-1"></div>
+                        <div
+                            className="cursor-pointer px-3 py-2 text-xs hover:bg-gray-100 dark:hover:bg-gray-700"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onOpenCommentModal();
+                                setIsOpen(false);
+                            }}
+                        >
+                            <div className="flex items-center gap-2">
+                                <IconMessage className="h-3 w-3 text-info" />
+                                <span className="text-info">Add Comment</span>
+                            </div>
+                        </div>
+                        <div
+                            className="cursor-pointer px-3 py-2 text-xs hover:bg-gray-100 dark:hover:bg-gray-700 rounded-b-md"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                onOpenDangerModal();
+                                setIsOpen(false);
+                            }}
+                        >
+                            <div className="flex items-center gap-2">
+                                <IconAlertTriangle className="h-3 w-3 text-danger" />
+                                <span className="text-danger">Cancel/Reject</span>
+                            </div>
+                        </div>
                     </div>,
                     document.body,
                 )}
@@ -134,6 +304,250 @@ const StatusDropdown = ({ currentStatus, orderId, onStatusChange }: { currentSta
                 onCancel={handleCancelStatusChange}
                 confirmLabel="Yes, Mark as Completed"
             />
+        </>
+    );
+};
+
+// Comment Modal Component
+const CommentModal = ({ order, isOpen, onClose, onSave }: { order: any; isOpen: boolean; onClose: () => void; onSave: (orderId: number, comment: string) => void }) => {
+    const [comment, setComment] = useState('');
+    const [loading, setLoading] = useState(false);
+
+    useEffect(() => {
+        if (order && isOpen) {
+            setComment(order.comment || '');
+        }
+    }, [order, isOpen]);
+
+    const handleSave = async () => {
+        if (!order) return;
+
+        setLoading(true);
+        try {
+            await onSave(order.id, comment);
+            onClose();
+        } catch (error) {
+            // Error handling is done in parent component
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg w-96 max-w-full mx-4">
+                <h3 className="text-lg font-semibold mb-4">Order Comment</h3>
+                <div className="space-y-4">
+                    <div>
+                        <label className="block text-sm font-medium mb-2">Comment:</label>
+                        <textarea value={comment} onChange={(e) => setComment(e.target.value)} className="form-textarea w-full h-32 resize-none" placeholder="Add a comment for this order..." />
+                    </div>
+                    <div className="flex gap-2 justify-end">
+                        <button onClick={onClose} className="btn btn-outline" disabled={loading}>
+                            Cancel
+                        </button>
+                        <button onClick={handleSave} className="btn btn-primary" disabled={loading}>
+                            {loading ? 'Saving...' : 'Save Comment'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// Danger Modal Component for Cancel/Reject actions
+const DangerModal = ({
+    order,
+    isOpen,
+    onClose,
+    onCancelOrder,
+    onRejectOrder,
+}: {
+    order: any;
+    isOpen: boolean;
+    onClose: () => void;
+    onCancelOrder: (orderId: number, comment: string) => void;
+    onRejectOrder: (orderId: number, comment: string) => void;
+}) => {
+    const [comment, setComment] = useState('');
+    const [loading, setLoading] = useState(false);
+    const [actionType, setActionType] = useState<'cancel' | 'reject'>('cancel');
+
+    useEffect(() => {
+        if (order && isOpen) {
+            setComment(order.comment || '');
+        }
+    }, [order, isOpen]);
+
+    const handleSave = async () => {
+        if (!order) return;
+
+        setLoading(true);
+        try {
+            if (actionType === 'cancel') {
+                await onCancelOrder(order.id, comment);
+            } else if (actionType === 'reject') {
+                await onRejectOrder(order.id, comment);
+            }
+            onClose();
+        } catch (error) {
+            // Error handling is done in parent component
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    if (!isOpen) return null;
+
+    return (
+        <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg w-96 max-w-full mx-4">
+                <h3 className="text-lg font-semibold mb-4 text-danger">Cancel or Reject Order</h3>
+                <div className="space-y-4">
+                    {/* Action Type Selection */}
+                    <div>
+                        <label className="block text-sm font-medium mb-2">Select Action:</label>
+                        <div className="flex gap-2">
+                            <button type="button" onClick={() => setActionType('cancel')} className={`btn btn-sm ${actionType === 'cancel' ? 'btn-danger' : 'btn-outline-danger'}`}>
+                                Cancel Order
+                            </button>
+                            <button type="button" onClick={() => setActionType('reject')} className={`btn btn-sm ${actionType === 'reject' ? 'btn-danger' : 'btn-outline-danger'}`}>
+                                Reject Order
+                            </button>
+                        </div>
+                    </div>
+
+                    {/* Comment Field */}
+                    <div>
+                        <label className="block text-sm font-medium mb-2">
+                            Reason <span className="text-danger">*</span>:
+                        </label>
+                        <textarea
+                            value={comment}
+                            onChange={(e) => setComment(e.target.value)}
+                            className="form-textarea w-full h-32 resize-none"
+                            placeholder="Please provide a reason for this action..."
+                            required
+                        />
+                    </div>
+
+                    <div className="flex gap-2 justify-end">
+                        <button onClick={onClose} className="btn btn-outline" disabled={loading}>
+                            Cancel
+                        </button>
+                        <button onClick={handleSave} className="btn btn-danger" disabled={loading || !comment.trim()}>
+                            {loading ? 'Processing...' : actionType === 'cancel' ? 'Cancel Order' : 'Reject Order'}
+                        </button>
+                    </div>
+                </div>
+            </div>
+        </div>
+    );
+};
+
+// Actions Menu Component
+const ActionsMenu = ({ orderId, onView, onDownload, onDelete }: { orderId: number; onView: () => void; onDownload: () => void; onDelete: () => void }) => {
+    const [isOpen, setIsOpen] = useState(false);
+    const [menuPosition, setMenuPosition] = useState({ top: 0, left: 0 });
+    const menuRef = useRef<HTMLDivElement>(null);
+    const triggerRef = useRef<HTMLButtonElement>(null);
+
+    useEffect(() => {
+        const handleClickOutside = (event: MouseEvent) => {
+            if (menuRef.current && !menuRef.current.contains(event.target as Node) && triggerRef.current && !triggerRef.current.contains(event.target as Node)) {
+                setIsOpen(false);
+            }
+        };
+
+        document.addEventListener('mousedown', handleClickOutside);
+        return () => {
+            document.removeEventListener('mousedown', handleClickOutside);
+        };
+    }, []);
+
+    useEffect(() => {
+        if (isOpen && triggerRef.current) {
+            const rect = triggerRef.current.getBoundingClientRect();
+            setMenuPosition({
+                top: rect.bottom + window.scrollY + 4,
+                left: rect.left + window.scrollX - 100, // Offset to align menu properly
+            });
+        }
+    }, [isOpen]);
+
+    const handleAction = (action: () => void) => {
+        action();
+        setIsOpen(false);
+    };
+
+    return (
+        <>
+            <button
+                ref={triggerRef}
+                type="button"
+                className="hover:text-gray-600 dark:hover:text-gray-300"
+                title="More Actions"
+                onClick={(e) => {
+                    e.stopPropagation();
+                    setIsOpen(!isOpen);
+                }}
+            >
+                <IconDotsVertical className="h-5 w-5" />
+            </button>
+
+            {isOpen &&
+                createPortal(
+                    <div
+                        ref={menuRef}
+                        className="fixed z-[9999] rounded-md border border-gray-300 bg-white shadow-xl dark:border-gray-600 dark:bg-gray-800"
+                        style={{
+                            top: menuPosition.top,
+                            left: menuPosition.left,
+                            minWidth: '120px',
+                        }}
+                    >
+                        <button
+                            className="w-full px-3 py-2 text-left text-xs text-gray-800 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700 first:rounded-t-md"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleAction(onView);
+                            }}
+                        >
+                            <div className="flex items-center gap-2">
+                                <IconEye className="h-4 w-4" />
+                                View Order
+                            </div>
+                        </button>
+                        <button
+                            className="w-full px-3 py-2 text-left text-xs text-gray-800 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleAction(onDownload);
+                            }}
+                        >
+                            <div className="flex items-center gap-2">
+                                <IconDownload className="h-4 w-4" />
+                                Download PDF
+                            </div>
+                        </button>
+                        <button
+                            className="w-full px-3 py-2 text-left text-xs text-red-600 hover:bg-red-50 dark:text-red-400 dark:hover:bg-red-900/20 last:rounded-b-md"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                handleAction(onDelete);
+                            }}
+                        >
+                            <div className="flex items-center gap-2">
+                                <IconTrashLines className="h-4 w-4" />
+                                Delete Order
+                            </div>
+                        </button>
+                    </div>,
+                    document.body,
+                )}
         </>
     );
 };
@@ -230,6 +644,7 @@ interface OrderData {
     payment_method: any;
     assigned_driver_id?: number;
     confirmed?: boolean;
+    comment?: string;
     // Joined data
     products?: {
         id: number;
@@ -319,6 +734,7 @@ const formatOrderForDisplay = (order: OrderData) => {
         assigned_driver: order.assigned_driver,
         delivery_company_id: order.products?.shops?.[0]?.delivery_companies_id,
         confirmed: order.confirmed || false,
+        comment: order.comment || '',
     };
 };
 
@@ -348,13 +764,16 @@ const DeliveryOrdersList = () => {
     const [selectedRecords, setSelectedRecords] = useState<any>([]);
 
     const [search, setSearch] = useState('');
-    const [deliveryFilter, setDeliveryFilter] = useState('all'); // 'all', 'completed'
+    const [deliveryFilter, setDeliveryFilter] = useState('processing'); // 'processing', 'on_the_way', 'completed', 'archived'
     const [sortStatus, setSortStatus] = useState<DataTableSortStatus>({
         columnAccessor: 'date',
         direction: 'desc',
     });
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [orderToDelete, setOrderToDelete] = useState<OrderData | null>(null);
+    const [showCommentModal, setShowCommentModal] = useState(false);
+    const [showDangerModal, setShowDangerModal] = useState(false);
+    const [selectedOrderForComment, setSelectedOrderForComment] = useState<any>(null);
     const [showAssignModal, setShowAssignModal] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState<any>(null);
     const [alert, setAlert] = useState<{ visible: boolean; message: string; type: 'success' | 'danger' }>({
@@ -421,12 +840,20 @@ const DeliveryOrdersList = () => {
                 item.city.toLowerCase().includes(search.toLowerCase());
 
             let matchesFilter = true;
-            if (deliveryFilter === 'completed') {
-                // Show only completed delivery orders
-                matchesFilter = item.confirmed === true && item.delivery_type === 'delivery' && item.status === 'completed';
-            } else if (deliveryFilter === 'all') {
-                // Show all confirmed delivery orders that are not completed
-                matchesFilter = item.confirmed === true && item.delivery_type === 'delivery' && item.status !== 'completed';
+            // Only show confirmed delivery orders
+            if (item.confirmed !== true || item.delivery_type !== 'delivery') {
+                matchesFilter = false;
+            } else {
+                // Filter by status
+                if (deliveryFilter === 'processing') {
+                    matchesFilter = item.status === 'processing';
+                } else if (deliveryFilter === 'on_the_way') {
+                    matchesFilter = item.status === 'on_the_way';
+                } else if (deliveryFilter === 'completed') {
+                    matchesFilter = item.status === 'completed';
+                } else if (deliveryFilter === 'archived') {
+                    matchesFilter = item.status === 'cancelled' || item.status === 'rejected';
+                }
             }
 
             return matchesSearch && matchesFilter;
@@ -512,6 +939,67 @@ const DeliveryOrdersList = () => {
             setAlert({ visible: true, message: 'Order status updated successfully', type: 'success' });
         } catch (error) {
             setAlert({ visible: true, message: 'Error updating order status', type: 'danger' });
+        }
+    };
+
+    const handleTypeUpdate = async (orderId: number, newType: string) => {
+        try {
+            const { error } = await supabase.from('orders').update({ shipping_method: newType }).eq('id', orderId);
+
+            if (error) throw error;
+
+            // Update local state immediately for better UX
+            const updatedItems = items.map((item) => (item.id === orderId ? { ...item, delivery_type: newType } : item));
+            setItems(updatedItems);
+
+            const updatedDisplayItems = displayItems.map((item) => (item.id === orderId ? { ...item, delivery_type: newType } : item));
+            setDisplayItems(updatedDisplayItems);
+
+            setAlert({ visible: true, message: 'Order type updated successfully', type: 'success' });
+        } catch (error) {
+            setAlert({ visible: true, message: 'Error updating order type', type: 'danger' });
+        }
+    };
+
+    const handleCommentSave = async (orderId: number, comment: string) => {
+        try {
+            const { error } = await supabase.from('orders').update({ comment }).eq('id', orderId);
+            if (error) throw error;
+            const updatedItems = items.map((item) => (item.id === orderId ? { ...item, comment } : item));
+            setItems(updatedItems);
+            const updatedDisplayItems = displayItems.map((item) => (item.id === orderId ? { ...item, comment } : item));
+            setDisplayItems(updatedDisplayItems);
+            setAlert({ visible: true, message: 'Comment saved successfully', type: 'success' });
+        } catch (error) {
+            setAlert({ visible: true, message: 'Error saving comment', type: 'danger' });
+        }
+    };
+
+    const handleCancelOrder = async (orderId: number, comment: string) => {
+        try {
+            const { error } = await supabase.from('orders').update({ status: 'cancelled', comment }).eq('id', orderId);
+            if (error) throw error;
+            const updatedItems = items.map((item) => (item.id === orderId ? { ...item, status: 'cancelled', comment } : item));
+            setItems(updatedItems);
+            const updatedDisplayItems = displayItems.map((item) => (item.id === orderId ? { ...item, status: 'cancelled', comment } : item));
+            setDisplayItems(updatedDisplayItems);
+            setAlert({ visible: true, message: 'Order cancelled successfully', type: 'success' });
+        } catch (error) {
+            setAlert({ visible: true, message: 'Error cancelling order', type: 'danger' });
+        }
+    };
+
+    const handleRejectOrder = async (orderId: number, comment: string) => {
+        try {
+            const { error } = await supabase.from('orders').update({ status: 'rejected', comment }).eq('id', orderId);
+            if (error) throw error;
+            const updatedItems = items.map((item) => (item.id === orderId ? { ...item, status: 'rejected', comment } : item));
+            setItems(updatedItems);
+            const updatedDisplayItems = displayItems.map((item) => (item.id === orderId ? { ...item, status: 'rejected', comment } : item));
+            setDisplayItems(updatedDisplayItems);
+            setAlert({ visible: true, message: 'Order rejected successfully', type: 'success' });
+        } catch (error) {
+            setAlert({ visible: true, message: 'Error rejecting order', type: 'danger' });
         }
     };
 
@@ -637,6 +1125,16 @@ const DeliveryOrdersList = () => {
                         }
                     }}
                 />
+                {/* Comment Modal */}
+                <CommentModal
+                    order={selectedOrderForComment}
+                    isOpen={showCommentModal}
+                    onClose={() => {
+                        setShowCommentModal(false);
+                        setSelectedOrderForComment(null);
+                    }}
+                    onSave={handleCommentSave}
+                />
                 {/* Alert */}
                 {alert.visible && (
                     <div className="mb-4">
@@ -653,21 +1151,43 @@ const DeliveryOrdersList = () => {
                         <div className="flex gap-2">
                             <button
                                 type="button"
-                                onClick={() => setDeliveryFilter('all')}
-                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                                    deliveryFilter === 'all' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-dark dark:text-gray-300 dark:hover:bg-gray-600'
+                                onClick={() => setDeliveryFilter('processing')}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+                                    deliveryFilter === 'processing' ? 'bg-info text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-dark dark:text-gray-300 dark:hover:bg-gray-600'
                                 }`}
                             >
-                                All Orders
+                                <IconSettings className={`h-4 w-4 ${deliveryFilter === 'processing' ? 'text-white' : 'text-info'}`} />
+                                Processing
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setDeliveryFilter('on_the_way')}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+                                    deliveryFilter === 'on_the_way' ? 'bg-warning text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-dark dark:text-gray-300 dark:hover:bg-gray-600'
+                                }`}
+                            >
+                                <IconTruck className={`h-4 w-4 ${deliveryFilter === 'on_the_way' ? 'text-white' : 'text-warning'}`} />
+                                On The Way
                             </button>
                             <button
                                 type="button"
                                 onClick={() => setDeliveryFilter('completed')}
-                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors ${
-                                    deliveryFilter === 'completed' ? 'bg-primary text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-dark dark:text-gray-300 dark:hover:bg-gray-600'
+                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+                                    deliveryFilter === 'completed' ? 'bg-success text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-dark dark:text-gray-300 dark:hover:bg-gray-600'
                                 }`}
                             >
-                                Completed Orders
+                                <IconCheck className={`h-4 w-4 ${deliveryFilter === 'completed' ? 'text-white' : 'text-success'}`} />
+                                Completed
+                            </button>
+                            <button
+                                type="button"
+                                onClick={() => setDeliveryFilter('archived')}
+                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
+                                    deliveryFilter === 'archived' ? 'bg-danger text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-dark dark:text-gray-300 dark:hover:bg-gray-600'
+                                }`}
+                            >
+                                <IconX className={`h-4 w-4 ${deliveryFilter === 'archived' ? 'text-white' : 'text-danger'}`} />
+                                Archived
                             </button>
                         </div>
                         <div className="ltr:ml-auto rtl:mr-auto">
@@ -695,6 +1215,18 @@ const DeliveryOrdersList = () => {
                                     render: ({ id }) => <strong className="text-info">#{id}</strong>,
                                 },
                                 {
+                                    accessor: 'date',
+                                    title: t('date'),
+                                    sortable: true,
+                                    render: ({ date }) => new Date(date).toLocaleDateString(),
+                                },
+                                {
+                                    accessor: 'shop_name',
+                                    title: t('shop_name'),
+                                    sortable: true,
+                                    render: ({ shop_name }) => <span className="font-medium">{shop_name}</span>,
+                                },
+                                {
                                     accessor: 'image',
                                     title: t('image'),
                                     sortable: false,
@@ -717,22 +1249,10 @@ const DeliveryOrdersList = () => {
                                     sortable: true,
                                 },
                                 {
-                                    accessor: 'shop_name',
-                                    title: t('shop_name'),
-                                    sortable: true,
-                                    render: ({ shop_name }) => <span className="font-medium">{shop_name}</span>,
-                                },
-                                {
                                     accessor: 'city',
                                     title: t('city'),
                                     sortable: true,
                                     render: ({ city }) => <span className="">{city}</span>,
-                                },
-                                {
-                                    accessor: 'date',
-                                    title: t('date'),
-                                    sortable: true,
-                                    render: ({ date }) => new Date(date).toLocaleDateString(),
                                 },
                                 {
                                     accessor: 'total',
@@ -741,10 +1261,33 @@ const DeliveryOrdersList = () => {
                                     render: ({ total }) => <span className="font-semibold text-success">{total}</span>,
                                 },
                                 {
+                                    accessor: 'delivery_type',
+                                    title: 'Type',
+                                    sortable: true,
+                                    render: ({ delivery_type, id }) => <DeliveryTypeDropdown currentType={delivery_type} orderId={id} onTypeChange={handleTypeUpdate} />,
+                                },
+                                {
                                     accessor: 'status',
                                     title: t('status'),
                                     sortable: true,
-                                    render: ({ status, id }) => <StatusDropdown currentStatus={status} orderId={id} onStatusChange={handleStatusUpdate} />,
+                                    render: ({ status, id, assigned_driver }) => (
+                                        <StatusDropdown
+                                            currentStatus={status}
+                                            orderId={id}
+                                            onStatusChange={handleStatusUpdate}
+                                            hasAssignedDriver={!!assigned_driver}
+                                            onOpenCommentModal={() => {
+                                                const order = displayItems.find((d) => d.id === id);
+                                                setSelectedOrderForComment(order);
+                                                setShowCommentModal(true);
+                                            }}
+                                            onOpenDangerModal={() => {
+                                                const order = displayItems.find((d) => d.id === id);
+                                                setSelectedOrderForComment(order);
+                                                setShowDangerModal(true);
+                                            }}
+                                        />
+                                    ),
                                 },
                                 {
                                     accessor: 'assigned_driver',
@@ -753,49 +1296,43 @@ const DeliveryOrdersList = () => {
                                     render: ({ assigned_driver, id }) => {
                                         if (assigned_driver) {
                                             return (
-                                                <div className="space-y-2">
-                                                    <div className="flex items-center gap-2">
-                                                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                                            <IconUser className="h-4 w-4 text-primary" />
-                                                        </div>
-                                                        <div>
-                                                            <div className="text-sm font-medium">{assigned_driver.name}</div>
-                                                            <div className="text-xs text-gray-500">{assigned_driver.phone}</div>
-                                                        </div>
+                                                <div className="flex items-center gap-2 group">
+                                                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                                        <IconUser className="h-4 w-4 text-primary" />
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <div className="text-sm font-medium">{assigned_driver.name}</div>
+                                                        <div className="text-xs text-gray-500">{assigned_driver.phone}</div>
                                                     </div>
                                                     <button
                                                         type="button"
-                                                        className="btn btn-outline-warning btn-xs w-full"
-                                                        title="Remove Driver Assignment"
+                                                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-red-100 rounded-full"
+                                                        title="Unassign Driver"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             handleRemoveDriver(id);
                                                         }}
                                                     >
-                                                        <IconUser className="h-3 w-3" />
-                                                        <span className="ml-1">Remove</span>
+                                                        <IconX className="h-4 w-4 text-red-500" />
                                                     </button>
                                                 </div>
                                             );
                                         }
                                         return (
-                                            <div className="space-y-2">
-                                                <span className="text-orange-500">Unassigned</span>
-                                                <button
-                                                    type="button"
-                                                    className="btn btn-outline-success btn-xs w-full"
-                                                    title="Assign Driver"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        const order = displayItems.find((d) => d.id === id);
-                                                        setSelectedOrder(order);
-                                                        setShowAssignModal(true);
-                                                    }}
-                                                >
-                                                    <IconUser className="h-3 w-3" />
-                                                    <span className="ml-1">Assign</span>
-                                                </button>
-                                            </div>
+                                            <button
+                                                type="button"
+                                                className="btn btn-outline-success btn-sm"
+                                                title="Assign Driver"
+                                                onClick={(e) => {
+                                                    e.stopPropagation();
+                                                    const order = displayItems.find((d) => d.id === id);
+                                                    setSelectedOrder(order);
+                                                    setShowAssignModal(true);
+                                                }}
+                                            >
+                                                <IconUser className="h-4 w-4" />
+                                                <span className="ml-1">ASSIGN</span>
+                                            </button>
                                         );
                                     },
                                 },
@@ -805,33 +1342,46 @@ const DeliveryOrdersList = () => {
                                     titleClassName: '!text-center',
                                     render: ({ id }) => (
                                         <div className="flex items-center justify-center gap-2">
-                                            <Link href={`/orders/preview/${id}`} className="hover:text-info" title={t('view_order')} onClick={(e) => e.stopPropagation()}>
-                                                <IconEye className="h-5 w-5" />
-                                            </Link>
                                             <button
                                                 type="button"
-                                                className="hover:text-success"
-                                                title={t('download_pdf')}
+                                                className="hover:text-warning relative"
+                                                title="Add Comment"
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    handleDownloadOrderPDF(id);
+                                                    const order = displayItems.find((d) => d.id === id);
+                                                    setSelectedOrderForComment(order);
+                                                    setShowCommentModal(true);
                                                 }}
                                             >
-                                                <IconDownload className="h-5 w-5" />
+                                                <IconMessage className="h-5 w-5" />
+                                                {(() => {
+                                                    const order = displayItems.find((d) => d.id === id);
+                                                    return order?.comment ? <span className="absolute -top-1 -right-1 h-2 w-2 bg-warning rounded-full"></span> : null;
+                                                })()}
                                             </button>
                                             <button
                                                 type="button"
                                                 className="hover:text-danger"
-                                                title={t('delete_order')}
+                                                title="Cancel/Reject Order"
                                                 onClick={(e) => {
                                                     e.stopPropagation();
+                                                    const order = displayItems.find((d) => d.id === id);
+                                                    setSelectedOrderForComment(order);
+                                                    setShowDangerModal(true);
+                                                }}
+                                            >
+                                                <IconAlertTriangle className="h-5 w-5" />
+                                            </button>
+                                            <ActionsMenu
+                                                orderId={id}
+                                                onView={() => router.push(`/delivery/orders/preview/${id}`)}
+                                                onDownload={() => handleDownloadOrderPDF(id)}
+                                                onDelete={() => {
                                                     const order = items.find((d) => d.id === id);
                                                     setOrderToDelete(order || null);
                                                     setShowConfirmModal(true);
                                                 }}
-                                            >
-                                                <IconTrashLines className="h-5 w-5" />
-                                            </button>
+                                            />
                                         </div>
                                     ),
                                 },
@@ -851,6 +1401,27 @@ const DeliveryOrdersList = () => {
                     </div>
                 </div>
             </div>
+
+            {/* Modals */}
+            <CommentModal
+                order={selectedOrderForComment}
+                isOpen={showCommentModal}
+                onClose={() => {
+                    setShowCommentModal(false);
+                    setSelectedOrderForComment(null);
+                }}
+                onSave={handleCommentSave}
+            />
+            <DangerModal
+                order={selectedOrderForComment}
+                isOpen={showDangerModal}
+                onClose={() => {
+                    setShowDangerModal(false);
+                    setSelectedOrderForComment(null);
+                }}
+                onCancelOrder={handleCancelOrder}
+                onRejectOrder={handleRejectOrder}
+            />
         </div>
     );
 };

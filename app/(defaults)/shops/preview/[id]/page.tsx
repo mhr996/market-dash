@@ -394,7 +394,7 @@ const ShopPreview = () => {
         if (!shop) return;
 
         try {
-            // Fetch orders with product details for this specific shop
+            // Fetch only completed orders with product details for this specific shop
             const { data: ordersData, error } = await supabase
                 .from('orders')
                 .select(
@@ -413,6 +413,7 @@ const ShopPreview = () => {
                 `,
                 )
                 .eq('products.shop', shop.id)
+                .eq('status', 'completed')
                 .order('created_at', { ascending: false });
 
             if (error) throw error;
@@ -424,7 +425,7 @@ const ShopPreview = () => {
                     const finalPrice = product?.sale_price || product?.price || 0;
                     const quantity = 1; // Orders table doesn't have quantity, defaulting to 1
                     const total = finalPrice * quantity;
-                    const commission_rate = shop?.commission_rate || 10; // Use shop's commission rate or default 10%
+                    const commission_rate = 10; // Fixed 10% commission as requested
                     const commission = parseFloat(((total * commission_rate) / 100).toFixed(2));
 
                     return {
@@ -437,7 +438,7 @@ const ShopPreview = () => {
                         commission,
                         commission_rate,
                         date: order.created_at,
-                        status: order.status || 'Unknown',
+                        status: 'Completed', // Always completed since we filter for completed orders
                     };
                 }) || [];
 
@@ -488,7 +489,7 @@ const ShopPreview = () => {
     const calculateRevenueSummary = (data: ShopSale[]) => {
         const totalRevenue = data.reduce((sum, sale) => sum + sale.total, 0);
         const totalCommission = data.reduce((sum, sale) => sum + sale.commission, 0);
-        const commissionRate = shop?.commission_rate || 10;
+        const commissionRate = 10; // Fixed 10% commission as requested
         const netRevenue = totalRevenue - totalCommission;
 
         setShopRevenueSummary({
@@ -502,25 +503,17 @@ const ShopPreview = () => {
     // Handle shop transaction data when transactions tab is active
     useEffect(() => {
         if (shop && activeTab === 'transactions') {
-            // For now, we'll show a simple message since there's no transactions table
-            // In a real-world scenario, you would have a transactions table to track payouts
-            const basicTransactions: ShopTransaction[] = [
-                {
-                    id: 1,
-                    transaction_id: `TXN-INITIAL`,
-                    amount: shop.balance || 0,
-                    date: shop.created_at || new Date().toISOString(),
-                    status: 'completed',
-                    description: 'Initial shop balance',
-                    payment_method: 'Platform Credit',
-                },
-            ];
+            // Calculate total commission from completed orders
+            const totalCommission = shopSales.reduce((sum, sale) => sum + sale.commission, 0);
+
+            // Keep transaction table empty for now
+            const basicTransactions: ShopTransaction[] = [];
 
             setShopTransactions(basicTransactions);
             setTransactionRecords(basicTransactions);
-            setPlatformBalance(shop.balance || 0); // Use actual shop balance
+            setPlatformBalance(totalCommission); // Use total commission as shop balance
         }
-    }, [shop, activeTab]);
+    }, [shop, activeTab, shopSales]);
 
     // Transaction search and pagination
     useEffect(() => {
@@ -902,7 +895,7 @@ const ShopPreview = () => {
                         </div>
 
                         {/* Shop Sales Table */}
-                        <div className="panel border-white-light px-0 dark:border-[#1b2e4b]">
+                        <div className="panel border-white-light px-0 dark:border-[#1b2e4b] w-full max-w-none">
                             <div className="invoice-table">
                                 <div className="mb-4.5 flex flex-col gap-5 px-5 md:flex-row md:items-center">
                                     <h5 className="text-lg font-semibold dark:text-white-light">{t('sales_history')}</h5>
@@ -1305,10 +1298,10 @@ const ShopPreview = () => {
                 {activeTab === 'transactions' && (
                     <div className="lg:col-span-3">
                         {/* Shop Transactions Content */}
-                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
+                        <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6 w-full max-w-none">
                             {/* Platform Balance Card */}
-                            <div className="lg:col-span-3">
-                                <div className="panel bg-gradient-to-r from-blue-500 to-blue-600 text-white">
+                            <div className="lg:col-span-3 w-full max-w-none">
+                                <div className="panel bg-gradient-to-r from-blue-500 to-blue-600 text-white w-full max-w-none">
                                     <div className="flex items-center justify-between">
                                         <div>
                                             <h5 className="text-lg font-semibold mb-2">{t('shop_balance')}</h5>
@@ -1316,7 +1309,7 @@ const ShopPreview = () => {
                                             <p className="text-blue-100 mt-1">{t('amount_owed_to_shop')}</p>
                                         </div>
                                         <div className="text-right">
-                                            <button className="btn btn-primary bg-white text-blue-600 hover:bg-gray-100" onClick={() => setShowPaymentModal(true)}>
+                                            <button className="btn btn-primary bg-white text-blue-600 hover:bg-gray-100 opacity-50 cursor-not-allowed" disabled>
                                                 {t('send_payment')}
                                             </button>
                                         </div>

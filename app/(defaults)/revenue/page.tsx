@@ -114,11 +114,16 @@ const RevenuePage = () => {
             setIsLoading(true);
 
             try {
-                // Get all orders with product and shop information
-                const { data: orders, error: ordersError } = await supabase.from('orders').select(`
+                // Get only completed orders with product and shop information
+                const { data: orders, error: ordersError } = await supabase
+                    .from('orders')
+                    .select(
+                        `
                         *,
-                        products(id, title, price, shop, shops(id, shop_name, balance, owner, profiles(full_name)))
-                    `);
+                        products(id, title, price, sale_price, shop, shops(id, shop_name, balance, owner, profiles(full_name)))
+                    `,
+                    )
+                    .eq('status', 'completed');
 
                 if (ordersError) throw ordersError;
 
@@ -138,8 +143,8 @@ const RevenuePage = () => {
                 const lastYearOrders = orders?.filter((order) => new Date(order.created_at).getFullYear() === lastYear) || [];
 
                 // Calculate total revenue and commissions
-                const currentRevenue = currentYearOrders.reduce((sum, order) => sum + (order.products?.price || 0), 0);
-                const lastRevenue = lastYearOrders.reduce((sum, order) => sum + (order.products?.price || 0), 0);
+                const currentRevenue = currentYearOrders.reduce((sum, order) => sum + (order.products?.sale_price || order.products?.price || 0), 0);
+                const lastRevenue = lastYearOrders.reduce((sum, order) => sum + (order.products?.sale_price || order.products?.price || 0), 0);
 
                 // Assume 10% commission rate as default (can be made dynamic based on license)
                 const defaultCommissionRate = 0.1;
@@ -157,7 +162,7 @@ const RevenuePage = () => {
 
                 currentYearOrders.forEach((order) => {
                     const month = new Date(order.created_at).getMonth();
-                    const revenue = order.products?.price || 0;
+                    const revenue = order.products?.sale_price || order.products?.price || 0;
                     monthlyRevenue[month] += revenue;
                     monthlyCommissions[month] += revenue * defaultCommissionRate;
                 });
@@ -195,7 +200,7 @@ const RevenuePage = () => {
                     if (order.products?.shops) {
                         const shopId = order.products.shop;
                         const shop = order.products.shops;
-                        const revenue = order.products.price || 0;
+                        const revenue = order.products.sale_price || order.products.price || 0;
                         const commission = revenue * defaultCommissionRate;
 
                         if (shopRevenueMap.has(shopId)) {
