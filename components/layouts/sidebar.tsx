@@ -184,6 +184,14 @@ const Sidebar = () => {
                                         <AnimateHeight duration={300} height={currentMenu === 'delivery' ? 'auto' : 0}>
                                             <ul className="sub-menu [&>li>a]:before:content-none [&>li>button]:before:content-none">
                                                 <li>
+                                                    <Link href="/delivery" className="group nav-link">
+                                                        <div className="flex items-center">
+                                                            <IconMenuDashboard className="shrink-0 group-hover:!text-primary" />
+                                                            <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Dashboard</span>
+                                                        </div>
+                                                    </Link>
+                                                </li>
+                                                <li>
                                                     <Link href="/delivery/companies" className="group nav-link">
                                                         <div className="flex items-center">
                                                             <IconBuilding className="shrink-0 group-hover:!text-primary" />

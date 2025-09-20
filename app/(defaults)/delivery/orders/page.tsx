@@ -26,310 +26,103 @@ import ConfirmModal from '@/components/modals/confirm-modal';
 import { getTranslation } from '@/i18n';
 import { generateOrderReceiptPDF } from '@/utils/pdf-generator';
 import supabase from '@/lib/supabase';
-
-// Delivery Type Dropdown Component
-const DeliveryTypeDropdown = ({ currentType, orderId, onTypeChange }: { currentType: string; orderId: number; onTypeChange: (orderId: number, newType: string) => void }) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const [showConfirmModal, setShowConfirmModal] = useState(false);
-    const [pendingType, setPendingType] = useState<string>('');
-    const triggerRef = useRef<HTMLDivElement>(null);
-    const dropdownRef = useRef<HTMLDivElement>(null);
-
-    const typeOptions = [
-        { value: 'pickup', label: 'Pickup', color: 'text-secondary' },
-        { value: 'delivery', label: 'Delivery', color: 'text-primary' },
-    ];
-
-    const currentOption = typeOptions.find((option) => option.value === currentType) || typeOptions[0];
-
-    const handleClickOutside = (event: MouseEvent) => {
-        if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node) && triggerRef.current && !triggerRef.current.contains(event.target as Node)) {
-            setIsOpen(false);
-        }
-    };
-
-    useEffect(() => {
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
-    }, []);
-
-    const handleTypeSelect = (type: string) => {
-        if (type !== currentType) {
-            setPendingType(type);
-            setShowConfirmModal(true);
-        }
-        setIsOpen(false);
-    };
-
-    const handleConfirmTypeChange = () => {
-        onTypeChange(orderId, pendingType);
-        setShowConfirmModal(false);
-        setPendingType('');
-    };
-
-    const handleCancelTypeChange = () => {
-        setShowConfirmModal(false);
-        setPendingType('');
-    };
-
-    return (
-        <>
-            <div ref={triggerRef} className="relative">
-                <div
-                    className="flex items-center gap-1 px-2 py-1 rounded-md border border-gray-300 dark:border-gray-600 bg-white dark:bg-gray-700 cursor-pointer hover:bg-gray-50 dark:hover:bg-gray-600 min-w-[100px]"
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        setIsOpen(!isOpen);
-                    }}
-                >
-                    <span className={`text-xs font-medium ${currentOption.color}`}>{currentOption.label}</span>
-                    <IconCaretDown className={`h-3 w-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-                </div>
-            </div>
-
-            {isOpen &&
-                createPortal(
-                    <div
-                        ref={dropdownRef}
-                        className="absolute bg-white dark:bg-gray-800 border border-gray-200 dark:border-gray-600 rounded-md shadow-lg z-50 min-w-[120px]"
-                        style={{
-                            top: (triggerRef.current?.getBoundingClientRect().bottom || 0) + window.scrollY + 4,
-                            left: (triggerRef.current?.getBoundingClientRect().left || 0) + window.scrollX,
-                        }}
-                    >
-                        {typeOptions.map((option) => (
-                            <div
-                                key={option.value}
-                                className="px-3 py-2 text-xs first:rounded-t-md last:rounded-b-md cursor-pointer text-gray-800 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700"
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    handleTypeSelect(option.value);
-                                }}
-                            >
-                                <span className={option.color}>{option.label}</span>
-                            </div>
-                        ))}
-                    </div>,
-                    document.body,
-                )}
-
-            <ConfirmModal
-                isOpen={showConfirmModal}
-                onCancel={handleCancelTypeChange}
-                onConfirm={handleConfirmTypeChange}
-                title="Change Order Type"
-                message={`Are you sure you want to change this order to ${pendingType === 'delivery' ? 'Delivery' : 'Pickup'}?`}
-            />
-        </>
-    );
-};
-
-// Status Dropdown Component
-const StatusDropdown = ({
-    currentStatus,
-    orderId,
-    onStatusChange,
-    hasAssignedDriver,
-    onOpenCommentModal,
-    onOpenDangerModal,
-}: {
-    currentStatus: string;
-    orderId: number;
-    onStatusChange: (orderId: number, newStatus: string) => void;
-    hasAssignedDriver: boolean;
-    onOpenCommentModal: () => void;
-    onOpenDangerModal: () => void;
-}) => {
-    const [isOpen, setIsOpen] = useState(false);
-    const [showConfirmModal, setShowConfirmModal] = useState(false);
-    const [pendingStatus, setPendingStatus] = useState<string>('');
-    const [dropdownPosition, setDropdownPosition] = useState({ top: 0, left: 0, width: 0 });
-    const dropdownRef = useRef<HTMLDivElement>(null);
-    const triggerRef = useRef<HTMLDivElement>(null);
-
-    useEffect(() => {
-        const handleClickOutside = (event: MouseEvent) => {
-            if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node) && triggerRef.current && !triggerRef.current.contains(event.target as Node)) {
-                setIsOpen(false);
-            }
-        };
-
-        document.addEventListener('mousedown', handleClickOutside);
-        return () => {
-            document.removeEventListener('mousedown', handleClickOutside);
-        };
-    }, []);
-
-    useEffect(() => {
-        if (isOpen && triggerRef.current) {
-            const rect = triggerRef.current.getBoundingClientRect();
-            setDropdownPosition({
-                top: rect.bottom + window.scrollY + 4,
-                left: rect.left + window.scrollX,
-                width: rect.width,
-            });
-        }
-    }, [isOpen]);
-
-    const statusOptions = [
-        { value: 'processing', label: 'Processing', color: 'text-info' },
-        { value: 'on_the_way', label: 'On The Way', color: 'text-warning' },
-        {
-            value: 'completed',
-            label: 'Completed',
-            color: 'text-success',
-            disabled: !hasAssignedDriver,
-        },
-    ];
-
-    const currentOption = statusOptions.find((option) => option.value === currentStatus) || statusOptions[0];
-    const isArchivedStatus = currentStatus === 'cancelled' || currentStatus === 'rejected';
-
-    const handleStatusSelect = (newStatus: string) => {
-        if (newStatus === 'completed') {
-            setPendingStatus(newStatus);
-            setShowConfirmModal(true);
-        } else {
-            onStatusChange(orderId, newStatus);
-        }
-        setIsOpen(false);
-    };
-
-    const handleConfirmStatusChange = () => {
-        onStatusChange(orderId, pendingStatus);
-        setShowConfirmModal(false);
-        setPendingStatus('');
-    };
-
-    const handleCancelStatusChange = () => {
-        setShowConfirmModal(false);
-        setPendingStatus('');
-    };
-
-    // If it's an archived status, show as read-only badge
-    if (isArchivedStatus) {
-        return (
-            <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200">
-                {currentStatus === 'cancelled' ? 'Cancelled' : 'Rejected'}
-            </span>
-        );
-    }
-
-    return (
-        <>
-            <div ref={triggerRef} className="relative">
-                <div
-                    className="cursor-pointer rounded border border-[#e0e6ed] bg-white p-2 text-xs dark:border-[#191e3a] dark:bg-black dark:text-white-dark flex items-center justify-between min-w-[120px]"
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        setIsOpen(!isOpen);
-                    }}
-                >
-                    <span className={currentOption.color}>{currentOption.label}</span>
-                    <IconCaretDown className={`h-3 w-3 transition-transform ${isOpen ? 'rotate-180' : ''}`} />
-                </div>
-            </div>
-
-            {/* Portal for dropdown to render outside table container */}
-            {isOpen &&
-                createPortal(
-                    <div
-                        ref={dropdownRef}
-                        className="fixed z-[9999] rounded-md border border-gray-300 bg-white shadow-xl dark:border-gray-600 dark:bg-gray-800"
-                        style={{
-                            top: dropdownPosition.top,
-                            left: dropdownPosition.left,
-                            width: dropdownPosition.width,
-                            minWidth: '120px',
-                        }}
-                    >
-                        {statusOptions.map((option) => (
-                            <div
-                                key={option.value}
-                                className={`px-3 py-2 text-xs first:rounded-t-md ${
-                                    option.disabled ? 'text-gray-400 cursor-not-allowed' : 'cursor-pointer text-gray-800 hover:bg-gray-100 dark:text-white dark:hover:bg-gray-700'
-                                }`}
-                                onClick={(e) => {
-                                    e.stopPropagation();
-                                    if (!option.disabled) {
-                                        handleStatusSelect(option.value);
-                                    }
-                                }}
-                            >
-                                <span className={option.disabled ? 'text-gray-400' : option.color}>
-                                    {option.label}
-                                    {option.disabled && ' (Assign driver first)'}
-                                </span>
-                            </div>
-                        ))}
-                        <div className="border-t border-gray-200 dark:border-gray-600 my-1"></div>
-                        <div
-                            className="cursor-pointer px-3 py-2 text-xs hover:bg-gray-100 dark:hover:bg-gray-700"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onOpenCommentModal();
-                                setIsOpen(false);
-                            }}
-                        >
-                            <div className="flex items-center gap-2">
-                                <IconMessage className="h-3 w-3 text-info" />
-                                <span className="text-info">Add Comment</span>
-                            </div>
-                        </div>
-                        <div
-                            className="cursor-pointer px-3 py-2 text-xs hover:bg-gray-100 dark:hover:bg-gray-700 rounded-b-md"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onOpenDangerModal();
-                                setIsOpen(false);
-                            }}
-                        >
-                            <div className="flex items-center gap-2">
-                                <IconAlertTriangle className="h-3 w-3 text-danger" />
-                                <span className="text-danger">Cancel/Reject</span>
-                            </div>
-                        </div>
-                    </div>,
-                    document.body,
-                )}
-
-            {/* Confirmation Modal for Completed Status */}
-            <ConfirmModal
-                isOpen={showConfirmModal}
-                title="Confirm Status Change"
-                message="Are you sure you want to mark this order as completed? This action cannot be undone."
-                onConfirm={handleConfirmStatusChange}
-                onCancel={handleCancelStatusChange}
-                confirmLabel="Yes, Mark as Completed"
-            />
-        </>
-    );
-};
+import DateRangeSelector from '@/components/date-range-selector';
+import MultiSelect from '@/components/multi-select';
 
 // Comment Modal Component
-const CommentModal = ({ order, isOpen, onClose, onSave }: { order: any; isOpen: boolean; onClose: () => void; onSave: (orderId: number, comment: string) => void }) => {
+const CommentModal = ({
+    order,
+    isOpen,
+    onClose,
+    onSave,
+    onRefreshComments,
+}: {
+    order: any;
+    isOpen: boolean;
+    onClose: () => void;
+    onSave: (orderId: number, comment: string) => void;
+    onRefreshComments: () => void;
+}) => {
     const [comment, setComment] = useState('');
     const [loading, setLoading] = useState(false);
+    const [comments, setComments] = useState<any[]>([]);
+    const [currentUser, setCurrentUser] = useState<any>(null);
 
     useEffect(() => {
         if (order && isOpen) {
-            setComment(order.comment || '');
+            setComment('');
+            fetchComments();
+            fetchCurrentUser();
         }
     }, [order, isOpen]);
 
-    const handleSave = async () => {
+    const fetchComments = async () => {
         if (!order) return;
-
-        setLoading(true);
         try {
-            await onSave(order.id, comment);
-            onClose();
+            const { data, error } = await supabase
+                .from('order_comments')
+                .select(
+                    `
+                    *,
+                    profiles(id, full_name)
+                `,
+                )
+                .eq('order_id', order.id)
+                .order('created_at', { ascending: false });
+
+            if (error) throw error;
+            setComments(data || []);
         } catch (error) {
-            // Error handling is done in parent component
+            console.error('Error fetching comments:', error);
+        }
+    };
+
+    const fetchCurrentUser = async () => {
+        try {
+            const {
+                data: { user },
+            } = await supabase.auth.getUser();
+            if (user) {
+                const { data: profile } = await supabase.from('profiles').select('id, full_name').eq('id', user.id).single();
+                setCurrentUser(profile);
+            }
+        } catch (error) {
+            console.error('Error fetching current user:', error);
+        }
+    };
+
+    const handleSaveComment = async () => {
+        if (!order || !currentUser || !comment.trim()) return;
+        try {
+            setLoading(true);
+            const { error } = await supabase.from('order_comments').insert({
+                order_id: order.id,
+                comment: comment.trim(),
+                user_id: currentUser.id,
+            });
+
+            if (error) throw error;
+
+            await fetchComments();
+            setComment('');
+            // Refresh the orders with comments list
+            onRefreshComments();
+        } catch (error) {
+            console.error('Error saving comment:', error);
         } finally {
             setLoading(false);
+        }
+    };
+
+    const handleDeleteComment = async (commentId: number) => {
+        try {
+            const { error } = await supabase.from('order_comments').delete().eq('id', commentId);
+            if (error) throw error;
+            await fetchComments();
+            // Refresh the orders with comments list
+            onRefreshComments();
+        } catch (error) {
+            console.error('Error deleting comment:', error);
         }
     };
 
@@ -337,21 +130,51 @@ const CommentModal = ({ order, isOpen, onClose, onSave }: { order: any; isOpen: 
 
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
-            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg w-96 max-w-full mx-4">
-                <h3 className="text-lg font-semibold mb-4">Order Comment</h3>
-                <div className="space-y-4">
-                    <div>
-                        <label className="block text-sm font-medium mb-2">Comment:</label>
-                        <textarea value={comment} onChange={(e) => setComment(e.target.value)} className="form-textarea w-full h-32 resize-none" placeholder="Add a comment for this order..." />
-                    </div>
-                    <div className="flex gap-2 justify-end">
-                        <button onClick={onClose} className="btn btn-outline" disabled={loading}>
-                            Cancel
-                        </button>
-                        <button onClick={handleSave} className="btn btn-primary" disabled={loading}>
+            <div className="bg-white dark:bg-gray-800 p-6 rounded-lg w-full max-w-2xl mx-4 max-h-[80vh] overflow-y-auto">
+                <h3 className="text-lg font-semibold mb-4">Order Comments</h3>
+
+                {/* Add New Comment */}
+                <div className="mb-6">
+                    <label className="block text-sm font-medium mb-2">Add Comment:</label>
+                    <textarea value={comment} onChange={(e) => setComment(e.target.value)} className="form-textarea w-full h-24 resize-none" placeholder="Add a comment for this order..." />
+                    <div className="flex gap-2 justify-end mt-2">
+                        <button onClick={handleSaveComment} className="btn btn-primary btn-sm" disabled={loading || !comment.trim()}>
                             {loading ? 'Saving...' : 'Save Comment'}
                         </button>
                     </div>
+                </div>
+
+                {/* Comments List */}
+                <div className="space-y-3">
+                    <h4 className="font-medium text-sm text-gray-600 dark:text-gray-400">Previous Comments:</h4>
+                    {comments.length === 0 ? (
+                        <p className="text-gray-500 text-sm">No comments yet</p>
+                    ) : (
+                        comments.map((commentItem) => (
+                            <div key={commentItem.id} className="border-l-4 border-primary pl-4 py-2 group">
+                                <div className="flex justify-between items-start mb-1">
+                                    <span className="font-medium text-sm">{commentItem.profiles?.full_name || 'Unknown User'}</span>
+                                    <div className="flex items-center gap-2">
+                                        <span className="text-xs text-gray-500">{new Date(commentItem.created_at).toLocaleString()}</span>
+                                        <button
+                                            onClick={() => handleDeleteComment(commentItem.id)}
+                                            className="opacity-0 group-hover:opacity-100 transition-opacity text-red-500 hover:text-red-700"
+                                            title="Delete comment"
+                                        >
+                                            <IconX className="h-4 w-4" />
+                                        </button>
+                                    </div>
+                                </div>
+                                <p className="text-sm text-gray-700 dark:text-gray-300">{commentItem.comment}</p>
+                            </div>
+                        ))
+                    )}
+                </div>
+
+                <div className="flex gap-2 justify-end mt-6">
+                    <button onClick={onClose} className="btn btn-outline">
+                        Close
+                    </button>
                 </div>
             </div>
         </div>
@@ -689,13 +512,13 @@ const formatOrderForDisplay = (order: OrderData) => {
     const shippingMethod = parseJsonField(order.shipping_method);
 
     // Get delivery type from shipping_method - handle JSON string format
-    const deliveryType = order.shipping_method === '"delivery"' || order.shipping_method === 'delivery' ? 'delivery' : 'pickup';
+    const deliveryType = order.shipping_method === '"delivery"' || order.shipping_method === 'delivery' || shippingMethod?.type === 'delivery' ? 'delivery' : 'pickup';
 
     // Map database status to display status
-    const statusMap: { [key: string]: 'processing' | 'on_the_way' | 'completed' } = {
+    const statusMap: { [key: string]: 'processing' | 'on_the_way' | 'completed' | 'cancelled' | 'rejected' } = {
         Active: 'processing',
         Completed: 'completed',
-        Cancelled: 'completed', // Treat cancelled as completed for display
+        Cancelled: 'cancelled', // Keep cancelled as cancelled
         Delivered: 'completed',
         Pending: 'processing',
         Shipped: 'on_the_way',
@@ -704,6 +527,8 @@ const formatOrderForDisplay = (order: OrderData) => {
         processing: 'processing',
         on_the_way: 'on_the_way',
         completed: 'completed',
+        cancelled: 'cancelled',
+        rejected: 'rejected',
     };
 
     return {
@@ -769,6 +594,13 @@ const DeliveryOrdersList = () => {
         columnAccessor: 'date',
         direction: 'desc',
     });
+    const [dateRange, setDateRange] = useState<Date[]>([]);
+    const [selectedShops, setSelectedShops] = useState<number[]>([]);
+    const [selectedDrivers, setSelectedDrivers] = useState<number[]>([]);
+    const [availableShops, setAvailableShops] = useState<any[]>([]);
+    const [availableDrivers, setAvailableDrivers] = useState<any[]>([]);
+    const [ordersWithComments, setOrdersWithComments] = useState<Set<number>>(new Set());
+    const [currentUser, setCurrentUser] = useState<any>(null);
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [orderToDelete, setOrderToDelete] = useState<OrderData | null>(null);
     const [showCommentModal, setShowCommentModal] = useState(false);
@@ -776,6 +608,8 @@ const DeliveryOrdersList = () => {
     const [selectedOrderForComment, setSelectedOrderForComment] = useState<any>(null);
     const [showAssignModal, setShowAssignModal] = useState(false);
     const [selectedOrder, setSelectedOrder] = useState<any>(null);
+    const [showCompleteModal, setShowCompleteModal] = useState(false);
+    const [orderToComplete, setOrderToComplete] = useState<any>(null);
     const [alert, setAlert] = useState<{ visible: boolean; message: string; type: 'success' | 'danger' }>({
         visible: false,
         message: '',
@@ -818,6 +652,10 @@ const DeliveryOrdersList = () => {
 
     useEffect(() => {
         fetchOrders();
+        fetchShops();
+        fetchDrivers();
+        fetchOrdersWithComments();
+        fetchCurrentUser();
     }, []);
 
     useEffect(() => {
@@ -840,26 +678,65 @@ const DeliveryOrdersList = () => {
                 item.city.toLowerCase().includes(search.toLowerCase());
 
             let matchesFilter = true;
-            // Only show confirmed delivery orders
-            if (item.confirmed !== true || item.delivery_type !== 'delivery') {
-                matchesFilter = false;
+
+            // For archived orders, show delivery orders that are cancelled or rejected
+            if (deliveryFilter === 'archived') {
+                const isDelivery = item.delivery_type === 'delivery';
+                const isCancelledOrRejected = item.status === 'cancelled' || item.status === 'rejected';
+                matchesFilter = isDelivery && isCancelledOrRejected;
+
+                console.log('Archived check:', {
+                    id: item.id,
+                    delivery_type: item.delivery_type,
+                    status: item.status,
+                    isDelivery,
+                    isCancelledOrRejected,
+                    matches: matchesFilter,
+                });
             } else {
-                // Filter by status
-                if (deliveryFilter === 'processing') {
-                    matchesFilter = item.status === 'processing';
-                } else if (deliveryFilter === 'on_the_way') {
-                    matchesFilter = item.status === 'on_the_way';
-                } else if (deliveryFilter === 'completed') {
-                    matchesFilter = item.status === 'completed';
-                } else if (deliveryFilter === 'archived') {
-                    matchesFilter = item.status === 'cancelled' || item.status === 'rejected';
+                // For other filters, only show confirmed delivery orders
+                if (item.confirmed !== true || item.delivery_type !== 'delivery') {
+                    matchesFilter = false;
+                } else {
+                    // Filter by status
+                    if (deliveryFilter === 'processing') {
+                        matchesFilter = item.status === 'processing';
+                    } else if (deliveryFilter === 'on_the_way') {
+                        matchesFilter = item.status === 'on_the_way';
+                    } else if (deliveryFilter === 'completed') {
+                        matchesFilter = item.status === 'completed';
+                    }
+                }
+            }
+
+            // Filter by date range
+            if (dateRange.length === 2) {
+                const itemDate = new Date(item.date);
+                if (itemDate < dateRange[0] || itemDate > dateRange[1]) {
+                    matchesFilter = false;
+                }
+            }
+
+            // Filter by selected shops
+            if (selectedShops.length > 0) {
+                const shopId = item.products?.shops?.[0]?.id;
+                if (!shopId || !selectedShops.includes(shopId)) {
+                    matchesFilter = false;
+                }
+            }
+
+            // Filter by selected drivers
+            if (selectedDrivers.length > 0) {
+                const driverId = item.assigned_driver_id;
+                if (!driverId || !selectedDrivers.includes(driverId)) {
+                    matchesFilter = false;
                 }
             }
 
             return matchesSearch && matchesFilter;
         });
         setInitialRecords(filtered);
-    }, [search, displayItems, deliveryFilter]);
+    }, [search, displayItems, deliveryFilter, dateRange, selectedShops, selectedDrivers]);
 
     useEffect(() => {
         const data = sortBy(initialRecords, sortStatus.columnAccessor);
@@ -893,13 +770,19 @@ const DeliveryOrdersList = () => {
 
     const handleAssignDriver = async (orderId: number, driverId: number) => {
         try {
-            const { error } = await supabase.from('orders').update({ assigned_driver_id: driverId }).eq('id', orderId);
+            const { error } = await supabase
+                .from('orders')
+                .update({
+                    assigned_driver_id: driverId,
+                    status: 'on_the_way', // Automatically change status to on_the_way when driver is assigned
+                })
+                .eq('id', orderId);
 
             if (error) throw error;
 
             // Refresh the data to get the assigned driver info
             await fetchOrders();
-            setAlert({ visible: true, message: 'Driver assigned successfully', type: 'success' });
+            setAlert({ visible: true, message: 'Driver assigned successfully and order moved to On The Way', type: 'success' });
 
             // Close the assignment modal
             setShowAssignModal(false);
@@ -944,7 +827,12 @@ const DeliveryOrdersList = () => {
 
     const handleTypeUpdate = async (orderId: number, newType: string) => {
         try {
-            const { error } = await supabase.from('orders').update({ shipping_method: newType }).eq('id', orderId);
+            const { error } = await supabase
+                .from('orders')
+                .update({
+                    shipping_method: `"${newType}"`,
+                })
+                .eq('id', orderId);
 
             if (error) throw error;
 
@@ -962,27 +850,67 @@ const DeliveryOrdersList = () => {
     };
 
     const handleCommentSave = async (orderId: number, comment: string) => {
+        if (!currentUser) return;
         try {
-            const { error } = await supabase.from('orders').update({ comment }).eq('id', orderId);
+            const { error } = await supabase.from('order_comments').insert({
+                order_id: orderId,
+                comment,
+                user_id: currentUser.id,
+            });
             if (error) throw error;
-            const updatedItems = items.map((item) => (item.id === orderId ? { ...item, comment } : item));
-            setItems(updatedItems);
-            const updatedDisplayItems = displayItems.map((item) => (item.id === orderId ? { ...item, comment } : item));
-            setDisplayItems(updatedDisplayItems);
             setAlert({ visible: true, message: 'Comment saved successfully', type: 'success' });
         } catch (error) {
             setAlert({ visible: true, message: 'Error saving comment', type: 'danger' });
         }
     };
 
+    const addTrackingEntry = async (orderId: number, action: string) => {
+        if (!currentUser) return;
+        try {
+            const { error } = await supabase.from('order_tracking').insert({
+                order_id: orderId,
+                action,
+                user_id: currentUser.id,
+            });
+            if (error) throw error;
+        } catch (error) {
+            console.error('Error adding tracking entry:', error);
+        }
+    };
+
+    const fetchOrdersWithComments = async () => {
+        try {
+            const { data, error } = await supabase.from('order_comments').select('order_id').not('order_id', 'is', null);
+
+            if (error) throw error;
+
+            const orderIdsWithComments = new Set(data.map((item) => item.order_id));
+            setOrdersWithComments(orderIdsWithComments);
+        } catch (error) {
+            console.error('Error fetching orders with comments:', error);
+        }
+    };
+
     const handleCancelOrder = async (orderId: number, comment: string) => {
         try {
-            const { error } = await supabase.from('orders').update({ status: 'cancelled', comment }).eq('id', orderId);
+            // Update order status
+            const { error } = await supabase.from('orders').update({ status: 'cancelled' }).eq('id', orderId);
             if (error) throw error;
-            const updatedItems = items.map((item) => (item.id === orderId ? { ...item, status: 'cancelled', comment } : item));
+
+            // Add comment if provided
+            if (comment.trim()) {
+                await handleCommentSave(orderId, comment);
+            }
+
+            // Add tracking entry
+            await addTrackingEntry(orderId, 'Order Cancelled');
+
+            // Update local state
+            const updatedItems = items.map((item) => (item.id === orderId ? { ...item, status: 'cancelled' } : item));
             setItems(updatedItems);
-            const updatedDisplayItems = displayItems.map((item) => (item.id === orderId ? { ...item, status: 'cancelled', comment } : item));
+            const updatedDisplayItems = displayItems.map((item) => (item.id === orderId ? { ...item, status: 'cancelled' } : item));
             setDisplayItems(updatedDisplayItems);
+
             setAlert({ visible: true, message: 'Order cancelled successfully', type: 'success' });
         } catch (error) {
             setAlert({ visible: true, message: 'Error cancelling order', type: 'danger' });
@@ -991,33 +919,116 @@ const DeliveryOrdersList = () => {
 
     const handleRejectOrder = async (orderId: number, comment: string) => {
         try {
-            const { error } = await supabase.from('orders').update({ status: 'rejected', comment }).eq('id', orderId);
+            // Update order status
+            const { error } = await supabase.from('orders').update({ status: 'rejected' }).eq('id', orderId);
             if (error) throw error;
-            const updatedItems = items.map((item) => (item.id === orderId ? { ...item, status: 'rejected', comment } : item));
+
+            // Add comment if provided
+            if (comment.trim()) {
+                await handleCommentSave(orderId, comment);
+            }
+
+            // Add tracking entry
+            await addTrackingEntry(orderId, 'Order Rejected');
+
+            // Update local state
+            const updatedItems = items.map((item) => (item.id === orderId ? { ...item, status: 'rejected' } : item));
             setItems(updatedItems);
-            const updatedDisplayItems = displayItems.map((item) => (item.id === orderId ? { ...item, status: 'rejected', comment } : item));
+            const updatedDisplayItems = displayItems.map((item) => (item.id === orderId ? { ...item, status: 'rejected' } : item));
             setDisplayItems(updatedDisplayItems);
+
             setAlert({ visible: true, message: 'Order rejected successfully', type: 'success' });
         } catch (error) {
             setAlert({ visible: true, message: 'Error rejecting order', type: 'danger' });
         }
     };
 
+    const handleCompleteOrder = async (order: any) => {
+        if (!order) return;
+
+        try {
+            const { error } = await supabase.from('orders').update({ status: 'completed' }).eq('id', order.id);
+
+            if (error) throw error;
+
+            // Refresh the data
+            await fetchOrders();
+            setAlert({ visible: true, message: 'Order completed successfully', type: 'success' });
+        } catch (error) {
+            setAlert({ visible: true, message: 'Error completing order', type: 'danger' });
+        }
+        setShowCompleteModal(false);
+        setOrderToComplete(null);
+    };
+
+    const fetchShops = async () => {
+        try {
+            const { data, error } = await supabase.from('shops').select('id, shop_name, logo_url').order('shop_name');
+            if (error) throw error;
+            setAvailableShops(data || []);
+        } catch (error) {
+            console.error('Error fetching shops:', error);
+        }
+    };
+
+    const fetchDrivers = async () => {
+        try {
+            const { data, error } = await supabase.from('delivery_drivers').select('id, name, phone, avatar_url').order('name');
+            if (error) throw error;
+            setAvailableDrivers(data || []);
+        } catch (error) {
+            console.error('Error fetching drivers:', error);
+        }
+    };
+
+    const fetchCurrentUser = async () => {
+        try {
+            const {
+                data: { user },
+            } = await supabase.auth.getUser();
+            if (user) {
+                const { data: profile } = await supabase.from('profiles').select('id, full_name').eq('id', user.id).single();
+                setCurrentUser(profile);
+            }
+        } catch (error) {
+            console.error('Error fetching current user:', error);
+        }
+    };
+
     const fetchOrders = async () => {
         try {
-            const { data, error } = await supabase
-                .from('orders')
-                .select(
+            // Build query with filters
+            let query = supabase.from('orders').select(
                     `
                     *,
                     products(id, title, price, images, shop),
                     profiles(id, full_name, email),
                     assigned_driver:delivery_drivers(id, name, phone, avatar_url)
                 `,
-                )
-                .order('created_at', { ascending: false });
+            );
+
+            // Apply date range filter
+            if (dateRange.length === 2) {
+                query = query.gte('created_at', dateRange[0].toISOString()).lte('created_at', dateRange[1].toISOString());
+            }
+
+            // Apply delivery type filter - only delivery orders
+            // shipping_method is stored as a JSON string "delivery"
+            query = query.eq('shipping_method', '"delivery"');
+
+            const { data, error } = await query.order('created_at', { ascending: false });
 
             if (error) throw error;
+
+            // Debug: show what orders were fetched
+            console.log('Fetched orders:', data?.length || 0);
+            if (data && data.length > 0) {
+                const statusCounts = data.reduce((acc: any, order: any) => {
+                    acc[order.status] = (acc[order.status] || 0) + 1;
+                    return acc;
+                }, {});
+                console.log('Status counts:', statusCounts);
+            }
 
             setItems(data as OrderData[]);
 
@@ -1125,6 +1136,18 @@ const DeliveryOrdersList = () => {
                         }
                     }}
                 />
+                {/* Complete Order Modal */}
+                <ConfirmModal
+                    isOpen={showCompleteModal}
+                    title="Complete Order"
+                    message="Are you sure you want to mark this order as completed? This action cannot be undone."
+                    onConfirm={() => handleCompleteOrder(orderToComplete)}
+                    onCancel={() => {
+                        setShowCompleteModal(false);
+                        setOrderToComplete(null);
+                    }}
+                    confirmLabel="Yes, Complete Order"
+                />
                 {/* Comment Modal */}
                 <CommentModal
                     order={selectedOrderForComment}
@@ -1134,6 +1157,7 @@ const DeliveryOrdersList = () => {
                         setSelectedOrderForComment(null);
                     }}
                     onSave={handleCommentSave}
+                    onRefreshComments={fetchOrdersWithComments}
                 />
                 {/* Alert */}
                 {alert.visible && (
@@ -1146,49 +1170,128 @@ const DeliveryOrdersList = () => {
                         />
                     </div>
                 )}
+                {/* Filters Panel */}
+                <div className="panel mb-6 w-full max-w-none">
+                    <div className="mb-4 flex items-center gap-2">
+                        <IconSettings className="h-5 w-5 text-primary" />
+                        <h3 className="text-lg font-semibold text-black dark:text-white-light">Filters</h3>
+                    </div>
+
+                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+                        {/* Date Range Filter */}
+                        <div>
+                            <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Date Range</label>
+                            <DateRangeSelector value={dateRange} onChange={setDateRange} placeholder="Select date range" isRtl={false} />
+                        </div>
+
+                        {/* Shop Filter */}
+                        <div>
+                            <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Filter by Shops</label>
+                            <MultiSelect
+                                options={availableShops.map((shop) => ({ id: shop.id, name: shop.shop_name, logo_url: shop.logo_url }))}
+                                selectedValues={selectedShops}
+                                onChange={setSelectedShops}
+                                placeholder="Select shops"
+                                isRtl={false}
+                            />
+                        </div>
+
+                        {/* Driver Filter */}
+                        <div>
+                            <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Filter by Driver</label>
+                            <MultiSelect
+                                options={availableDrivers.map((driver) => ({ id: driver.id, name: `${driver.name} - ${driver.phone}`, logo_url: driver.avatar_url }))}
+                                selectedValues={selectedDrivers}
+                                onChange={setSelectedDrivers}
+                                placeholder="Select drivers"
+                                isRtl={false}
+                            />
+                        </div>
+
+                        {/* Clear Filters */}
+                        <div className="flex items-end">
+                            <button
+                                type="button"
+                                className="btn btn-outline-danger w-full"
+                                onClick={() => {
+                                    setDateRange([]);
+                                    setSelectedShops([]);
+                                    setSelectedDrivers([]);
+                                }}
+                            >
+                                <IconX className="h-4 w-4 mr-2" />
+                                Clear Filters
+                            </button>
+                        </div>
+                    </div>
+                </div>
+
                 <div className="invoice-table overflow-x-auto w-full max-w-none">
                     <div className="mb-4.5 flex flex-col gap-5 px-5 md:flex-row md:items-center">
-                        <div className="flex gap-2">
-                            <button
-                                type="button"
-                                onClick={() => setDeliveryFilter('processing')}
-                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
-                                    deliveryFilter === 'processing' ? 'bg-info text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-dark dark:text-gray-300 dark:hover:bg-gray-600'
-                                }`}
-                            >
-                                <IconSettings className={`h-4 w-4 ${deliveryFilter === 'processing' ? 'text-white' : 'text-info'}`} />
-                                Processing
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setDeliveryFilter('on_the_way')}
-                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
-                                    deliveryFilter === 'on_the_way' ? 'bg-warning text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-dark dark:text-gray-300 dark:hover:bg-gray-600'
-                                }`}
-                            >
-                                <IconTruck className={`h-4 w-4 ${deliveryFilter === 'on_the_way' ? 'text-white' : 'text-warning'}`} />
-                                On The Way
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setDeliveryFilter('completed')}
-                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
-                                    deliveryFilter === 'completed' ? 'bg-success text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-dark dark:text-gray-300 dark:hover:bg-gray-600'
-                                }`}
-                            >
-                                <IconCheck className={`h-4 w-4 ${deliveryFilter === 'completed' ? 'text-white' : 'text-success'}`} />
-                                Completed
-                            </button>
-                            <button
-                                type="button"
-                                onClick={() => setDeliveryFilter('archived')}
-                                className={`px-4 py-2 rounded-lg text-sm font-medium transition-colors flex items-center gap-2 ${
-                                    deliveryFilter === 'archived' ? 'bg-danger text-white' : 'bg-gray-100 text-gray-700 hover:bg-gray-200 dark:bg-dark dark:text-gray-300 dark:hover:bg-gray-600'
-                                }`}
-                            >
-                                <IconX className={`h-4 w-4 ${deliveryFilter === 'archived' ? 'text-white' : 'text-danger'}`} />
-                                Archived
-                            </button>
+                        <div className="flex flex-wrap gap-3">
+                            {/* Processing */}
+                            <div className="flex items-center">
+                                <button
+                                    type="button"
+                                    onClick={() => setDeliveryFilter('processing')}
+                                    className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 flex items-center gap-2 border-2 ${
+                                        deliveryFilter === 'processing'
+                                            ? 'bg-gradient-to-r from-info to-blue-500 text-white border-info shadow-lg'
+                                            : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:border-info hover:shadow-md'
+                                    }`}
+                                >
+                                    <IconSettings className={`h-4 w-4 ${deliveryFilter === 'processing' ? 'text-white' : 'text-info'}`} />
+                                    Processing
+                                </button>
+                            </div>
+
+                            {/* On The Way */}
+                            <div className="flex items-center">
+                                <button
+                                    type="button"
+                                    onClick={() => setDeliveryFilter('on_the_way')}
+                                    className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 flex items-center gap-2 border-2 ${
+                                        deliveryFilter === 'on_the_way'
+                                            ? 'bg-gradient-to-r from-warning to-orange-500 text-white border-warning shadow-lg'
+                                            : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:border-warning hover:shadow-md'
+                                    }`}
+                                >
+                                    <IconTruck className={`h-4 w-4 ${deliveryFilter === 'on_the_way' ? 'text-white' : 'text-warning'}`} />
+                                    On The Way
+                                </button>
+                            </div>
+
+                            {/* Completed */}
+                            <div className="flex items-center">
+                                <button
+                                    type="button"
+                                    onClick={() => setDeliveryFilter('completed')}
+                                    className={`px-4 py-2 rounded-xl text-sm font-medium transition-all duration-200 flex items-center gap-2 border-2 ${
+                                        deliveryFilter === 'completed'
+                                            ? 'bg-gradient-to-r from-success to-green-500 text-white border-success shadow-lg'
+                                            : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:border-success hover:shadow-md'
+                                    }`}
+                                >
+                                    <IconCheck className={`h-4 w-4 ${deliveryFilter === 'completed' ? 'text-white' : 'text-success'}`} />
+                                    Completed
+                                </button>
+                            </div>
+
+                            {/* Archived - Icon Only */}
+                            <div className="flex items-center">
+                                <button
+                                    type="button"
+                                    onClick={() => setDeliveryFilter('archived')}
+                                    className={`p-2 rounded-xl transition-all duration-200 border-2 ${
+                                        deliveryFilter === 'archived'
+                                            ? 'bg-gradient-to-r from-danger to-red-500 text-white border-danger shadow-lg'
+                                            : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:border-danger hover:shadow-md'
+                                    }`}
+                                    title="Archived Orders"
+                                >
+                                    <IconX className={`h-5 w-5 ${deliveryFilter === 'archived' ? 'text-white' : 'text-danger'}`} />
+                                </button>
+                            </div>
                         </div>
                         <div className="ltr:ml-auto rtl:mr-auto">
                             <input type="text" className="form-input w-auto" placeholder={t('search')} value={search} onChange={(e) => setSearch(e.target.value)} />
@@ -1205,7 +1308,7 @@ const DeliveryOrdersList = () => {
                             striped
                             highlightOnHover
                             onRowClick={(record) => {
-                                router.push(`/orders/preview/${record.id}`);
+                                router.push(`/delivery/orders/preview/${record.id}`);
                             }}
                             columns={[
                                 {
@@ -1261,129 +1364,207 @@ const DeliveryOrdersList = () => {
                                     render: ({ total }) => <span className="font-semibold text-success">{total}</span>,
                                 },
                                 {
+                                    accessor: 'payment_method',
+                                    title: 'Payment',
+                                    sortable: true,
+                                    width: 120,
+                                    render: ({ payment_method }) => {
+                                        if (!payment_method) return <span className="text-gray-500">-</span>;
+
+                                        const paymentType = payment_method.type || payment_method;
+                                        const getPaymentBadge = (type: string) => {
+                                            switch (type) {
+                                                case 'Credit Card':
+                                                    return (
+                                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary whitespace-nowrap">
+                                                            Credit Card
+                                                        </span>
+                                                    );
+                                                case 'Bank Transfer':
+                                                    return (
+                                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-info/10 text-info whitespace-nowrap">
+                                                            Bank Transfer
+                                                        </span>
+                                                    );
+                                                case 'Cash on Delivery':
+                                                    return (
+                                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-warning/10 text-warning whitespace-nowrap">
+                                                            Cash on Delivery
+                                                        </span>
+                                                    );
+                                                case 'In-store':
+                                                    return (
+                                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-success/10 text-success whitespace-nowrap">
+                                                            In-store
+                                                        </span>
+                                                    );
+                                                default:
+                                                    return (
+                                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-secondary/10 text-secondary whitespace-nowrap">
+                                                            {type}
+                                                        </span>
+                                                    );
+                                            }
+                                        };
+
+                                        return getPaymentBadge(paymentType);
+                                    },
+                                },
+                                {
                                     accessor: 'delivery_type',
                                     title: 'Type',
                                     sortable: true,
-                                    render: ({ delivery_type, id }) => <DeliveryTypeDropdown currentType={delivery_type} orderId={id} onTypeChange={handleTypeUpdate} />,
+                                    render: ({ delivery_type }) => (
+                                        <span
+                                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                                delivery_type === 'delivery' ? 'bg-primary/10 text-primary' : 'bg-secondary/10 text-secondary'
+                                            }`}
+                                        >
+                                            {delivery_type === 'delivery' ? 'Delivery' : 'Pickup'}
+                                        </span>
+                                    ),
                                 },
                                 {
                                     accessor: 'status',
                                     title: t('status'),
                                     sortable: true,
-                                    render: ({ status, id, assigned_driver }) => (
-                                        <StatusDropdown
-                                            currentStatus={status}
-                                            orderId={id}
-                                            onStatusChange={handleStatusUpdate}
-                                            hasAssignedDriver={!!assigned_driver}
-                                            onOpenCommentModal={() => {
-                                                const order = displayItems.find((d) => d.id === id);
-                                                setSelectedOrderForComment(order);
-                                                setShowCommentModal(true);
-                                            }}
-                                            onOpenDangerModal={() => {
-                                                const order = displayItems.find((d) => d.id === id);
-                                                setSelectedOrderForComment(order);
-                                                setShowDangerModal(true);
-                                            }}
-                                        />
-                                    ),
+                                    render: ({ status, id, assigned_driver }) => {
+                                        // Show Complete Order button for on_the_way status
+                                        if (status === 'on_the_way') {
+                                            return (
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-outline-success btn-sm"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        const order = displayItems.find((d) => d.id === id);
+                                                        setOrderToComplete(order);
+                                                        setShowCompleteModal(true);
+                                                    }}
+                                                >
+                                                    Complete Order
+                                                </button>
+                                            );
+                                        }
+
+                                        // Show status as label for other statuses
+                                        const statusConfig = {
+                                            processing: { color: 'bg-info/10 text-info', label: 'Processing' },
+                                            completed: { color: 'bg-success/10 text-success', label: 'Completed' },
+                                            cancelled: { color: 'bg-danger/10 text-danger', label: 'Cancelled' },
+                                            rejected: { color: 'bg-danger/10 text-danger', label: 'Rejected' },
+                                        };
+
+                                        const config = statusConfig[status as keyof typeof statusConfig] || { color: 'bg-gray-100 text-gray-800', label: status };
+
+                                        return <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color}`}>{config.label}</span>;
+                                    },
                                 },
                                 {
                                     accessor: 'assigned_driver',
                                     title: 'Driver',
                                     sortable: false,
-                                    render: ({ assigned_driver, id }) => {
+                                    render: ({ assigned_driver, id, status }) => {
                                         if (assigned_driver) {
                                             return (
-                                                <div className="flex items-center gap-2 group">
-                                                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                                        <IconUser className="h-4 w-4 text-primary" />
-                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                                            <IconUser className="h-4 w-4 text-primary" />
+                                                        </div>
                                                     <div className="flex-1">
-                                                        <div className="text-sm font-medium">{assigned_driver.name}</div>
-                                                        <div className="text-xs text-gray-500">{assigned_driver.phone}</div>
-                                                    </div>
+                                                            <div className="text-sm font-medium">{assigned_driver.name}</div>
+                                                            <div className="text-xs text-gray-500">{assigned_driver.phone}</div>
+                                                        </div>
+                                                    {/* Only show unassign button for processing status */}
+                                                    {status === 'processing' && (
                                                     <button
                                                         type="button"
-                                                        className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-red-100 rounded-full"
-                                                        title="Unassign Driver"
+                                                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-red-100 rounded-full"
+                                                            title="Unassign Driver"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             handleRemoveDriver(id);
                                                         }}
                                                     >
-                                                        <IconX className="h-4 w-4 text-red-500" />
+                                                            <IconX className="h-4 w-4 text-red-500" />
                                                     </button>
+                                                    )}
                                                 </div>
                                             );
                                         }
+                                        // Only show assign button for processing status
+                                        if (status === 'processing') {
                                         return (
-                                            <button
-                                                type="button"
-                                                className="btn btn-outline-success btn-sm"
-                                                title="Assign Driver"
-                                                onClick={(e) => {
-                                                    e.stopPropagation();
-                                                    const order = displayItems.find((d) => d.id === id);
-                                                    setSelectedOrder(order);
-                                                    setShowAssignModal(true);
-                                                }}
-                                            >
-                                                <IconUser className="h-4 w-4" />
-                                                <span className="ml-1">ASSIGN</span>
-                                            </button>
+                                                <button
+                                                    type="button"
+                                                    className="btn btn-outline-success btn-sm"
+                                                    title="Assign Driver"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        const order = displayItems.find((d) => d.id === id);
+                                                        setSelectedOrder(order);
+                                                        setShowAssignModal(true);
+                                                    }}
+                                                >
+                                                    <IconUser className="h-4 w-4" />
+                                                    <span className="ml-1">ASSIGN</span>
+                                                </button>
                                         );
+                                        }
+                                        // Show "Unassigned" for other statuses
+                                        return <span className="text-gray-500 text-sm">Unassigned</span>;
                                     },
                                 },
                                 {
                                     accessor: 'action',
                                     title: t('actions'),
                                     titleClassName: '!text-center',
-                                    render: ({ id }) => (
+                                    render: ({ id }) => {
+                                        const order = displayItems.find((d) => d.id === id);
+                                        const showDangerIcon = order?.status === 'processing' || order?.status === 'on_the_way';
+
+                                        return (
                                         <div className="flex items-center justify-center gap-2">
                                             <button
                                                 type="button"
-                                                className="hover:text-warning relative"
-                                                title="Add Comment"
+                                                    className="hover:text-warning relative"
+                                                    title="Add Comment"
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    const order = displayItems.find((d) => d.id === id);
-                                                    setSelectedOrderForComment(order);
-                                                    setShowCommentModal(true);
+                                                        setSelectedOrderForComment(order);
+                                                        setShowCommentModal(true);
                                                 }}
                                             >
-                                                <IconMessage className="h-5 w-5" />
-                                                {(() => {
-                                                    const order = displayItems.find((d) => d.id === id);
-                                                    return order?.comment ? <span className="absolute -top-1 -right-1 h-2 w-2 bg-warning rounded-full"></span> : null;
-                                                })()}
+                                                    <IconMessage className="h-5 w-5" />
+                                                    {ordersWithComments.has(id) ? <span className="absolute -top-1 -right-1 h-2 w-2 bg-warning rounded-full"></span> : null}
                                             </button>
+                                                {showDangerIcon && (
                                             <button
                                                 type="button"
                                                 className="hover:text-danger"
-                                                title="Cancel/Reject Order"
+                                                        title="Cancel/Reject Order"
                                                 onClick={(e) => {
                                                     e.stopPropagation();
-                                                    const order = displayItems.find((d) => d.id === id);
-                                                    setSelectedOrderForComment(order);
-                                                    setShowDangerModal(true);
-                                                }}
-                                            >
-                                                <IconAlertTriangle className="h-5 w-5" />
-                                            </button>
-                                            <ActionsMenu
-                                                orderId={id}
-                                                onView={() => router.push(`/delivery/orders/preview/${id}`)}
-                                                onDownload={() => handleDownloadOrderPDF(id)}
-                                                onDelete={() => {
+                                                            setSelectedOrderForComment(order);
+                                                            setShowDangerModal(true);
+                                                        }}
+                                                    >
+                                                        <IconAlertTriangle className="h-5 w-5" />
+                                                    </button>
+                                                )}
+                                                <ActionsMenu
+                                                    orderId={id}
+                                                    onView={() => router.push(`/delivery/orders/preview/${id}`)}
+                                                    onDownload={() => handleDownloadOrderPDF(id)}
+                                                    onDelete={() => {
                                                     const order = items.find((d) => d.id === id);
                                                     setOrderToDelete(order || null);
                                                     setShowConfirmModal(true);
                                                 }}
-                                            />
+                                                />
                                         </div>
-                                    ),
+                                        );
+                                    },
                                 },
                             ]}
                             totalRecords={initialRecords.length}
@@ -1411,6 +1592,7 @@ const DeliveryOrdersList = () => {
                     setSelectedOrderForComment(null);
                 }}
                 onSave={handleCommentSave}
+                onRefreshComments={fetchOrdersWithComments}
             />
             <DangerModal
                 order={selectedOrderForComment}

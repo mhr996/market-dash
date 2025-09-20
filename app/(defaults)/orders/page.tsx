@@ -30,6 +30,7 @@ import ConfirmModal from '@/components/modals/confirm-modal';
 import { getTranslation } from '@/i18n';
 import { generateOrderReceiptPDF } from '@/utils/pdf-generator';
 import supabase from '@/lib/supabase';
+import { updateShopBalance } from '@/lib/shop-balance';
 import DateRangeSelector from '@/components/date-range-selector';
 import MultiSelect from '@/components/multi-select';
 
@@ -1040,23 +1041,6 @@ const OrdersList = () => {
         }
     };
 
-    const addTrackingEntry = async (orderId: number, action: string) => {
-        if (!currentUser) return;
-        try {
-            const { error } = await supabase.from('order_tracking').insert({
-                order_id: orderId,
-                action,
-                user_id: currentUser.id,
-            });
-
-            if (error) {
-                console.error('Error inserting tracking entry:', error);
-            }
-        } catch (error) {
-            console.error('Error adding tracking entry:', error);
-        }
-    };
-
     const fetchCurrentUser = async () => {
         try {
             const {
@@ -1140,6 +1124,33 @@ const OrdersList = () => {
                 title: t('total'),
                 sortable: true,
                 render: ({ total }: { total: any }) => <span className="font-semibold text-success">{total}</span>,
+            },
+            {
+                accessor: 'payment_method',
+                title: 'Payment',
+                sortable: true,
+                width: 120,
+                render: ({ payment_method }: { payment_method: any }) => {
+                    if (!payment_method) return <span className="text-gray-500">-</span>;
+
+                    const paymentType = payment_method.type || payment_method;
+                    const getPaymentBadge = (type: string) => {
+                        switch (type) {
+                            case 'Credit Card':
+                                return <span className="badge badge-outline-primary whitespace-nowrap">Credit Card</span>;
+                            case 'Bank Transfer':
+                                return <span className="badge badge-outline-info whitespace-nowrap">Bank Transfer</span>;
+                            case 'Cash on Delivery':
+                                return <span className="badge badge-outline-warning whitespace-nowrap">Cash on Delivery</span>;
+                            case 'In-store':
+                                return <span className="badge badge-outline-success whitespace-nowrap">In-store</span>;
+                            default:
+                                return <span className="badge badge-outline-secondary whitespace-nowrap">{type}</span>;
+                        }
+                    };
+
+                    return getPaymentBadge(paymentType);
+                },
             },
             {
                 accessor: 'delivery_type',
@@ -1328,6 +1339,11 @@ const OrdersList = () => {
 
     const handleStatusUpdate = async (orderId: number, newStatus: string) => {
         try {
+            // Get the current order to check if status is changing to/from completed
+            const currentOrder = items.find((item) => item.id === orderId);
+            const wasCompleted = currentOrder?.status === 'completed';
+            const willBeCompleted = newStatus === 'completed';
+
             const { error } = await supabase.from('orders').update({ status: newStatus }).eq('id', orderId);
 
             if (error) throw error;
@@ -1340,6 +1356,17 @@ const OrdersList = () => {
 
             if (action) {
                 await addTrackingEntry(orderId, action);
+            }
+
+            // Update shop balance if status changed to/from completed
+            if ((!wasCompleted && willBeCompleted) || (wasCompleted && !willBeCompleted)) {
+                try {
+                    const shopId = currentOrder?.products?.shop || 0;
+                    await updateShopBalance(shopId);
+                } catch (balanceError) {
+                    console.error('Error updating shop balance:', balanceError);
+                    // Don't fail the entire operation if balance update fails
+                }
             }
 
             // Update local state immediately for better UX
@@ -1429,21 +1456,22 @@ const OrdersList = () => {
 
     const handleCancelOrder = async (orderId: number, comment: string) => {
         try {
-            const { error } = await supabase
-                .from('orders')
-                .update({
-                    status: 'cancelled',
-                    comment: comment,
-                })
-                .eq('id', orderId);
-
+            // Update order status
+            const { error } = await supabase.from('orders').update({ status: 'cancelled' }).eq('id', orderId);
             if (error) throw error;
 
-            // Update local state immediately for better UX
-            const updatedItems = items.map((item) => (item.id === orderId ? { ...item, status: 'cancelled', comment: comment } : item));
-            setItems(updatedItems);
+            // Add comment if provided
+            if (comment.trim()) {
+                await handleCommentSave(orderId, comment);
+            }
 
-            const updatedDisplayItems = displayItems.map((item) => (item.id === orderId ? { ...item, status: 'cancelled', comment: comment } : item));
+            // Add tracking entry
+            await addTrackingEntry(orderId, 'Order Cancelled');
+
+            // Update local state
+            const updatedItems = items.map((item) => (item.id === orderId ? { ...item, status: 'cancelled' } : item));
+            setItems(updatedItems);
+            const updatedDisplayItems = displayItems.map((item) => (item.id === orderId ? { ...item, status: 'cancelled' } : item));
             setDisplayItems(updatedDisplayItems);
 
             setAlert({ visible: true, message: 'Order cancelled successfully', type: 'success' });
@@ -1454,21 +1482,22 @@ const OrdersList = () => {
 
     const handleRejectOrder = async (orderId: number, comment: string) => {
         try {
-            const { error } = await supabase
-                .from('orders')
-                .update({
-                    status: 'rejected',
-                    comment: comment,
-                })
-                .eq('id', orderId);
-
+            // Update order status
+            const { error } = await supabase.from('orders').update({ status: 'rejected' }).eq('id', orderId);
             if (error) throw error;
 
-            // Update local state immediately for better UX
-            const updatedItems = items.map((item) => (item.id === orderId ? { ...item, status: 'rejected', comment: comment } : item));
-            setItems(updatedItems);
+            // Add comment if provided
+            if (comment.trim()) {
+                await handleCommentSave(orderId, comment);
+            }
 
-            const updatedDisplayItems = displayItems.map((item) => (item.id === orderId ? { ...item, status: 'rejected', comment: comment } : item));
+            // Add tracking entry
+            await addTrackingEntry(orderId, 'Order Rejected');
+
+            // Update local state
+            const updatedItems = items.map((item) => (item.id === orderId ? { ...item, status: 'rejected' } : item));
+            setItems(updatedItems);
+            const updatedDisplayItems = displayItems.map((item) => (item.id === orderId ? { ...item, status: 'rejected' } : item));
             setDisplayItems(updatedDisplayItems);
 
             setAlert({ visible: true, message: 'Order rejected successfully', type: 'success' });
@@ -1486,21 +1515,31 @@ const OrdersList = () => {
     };
 
     const handleCommentSave = async (orderId: number, comment: string) => {
+        if (!currentUser) return;
         try {
-            const { error } = await supabase.from('orders').update({ comment: comment }).eq('id', orderId);
-
+            const { error } = await supabase.from('order_comments').insert({
+                order_id: orderId,
+                comment,
+                user_id: currentUser.id,
+            });
             if (error) throw error;
-
-            // Update local state immediately for better UX
-            const updatedItems = items.map((item) => (item.id === orderId ? { ...item, comment: comment } : item));
-            setItems(updatedItems);
-
-            const updatedDisplayItems = displayItems.map((item) => (item.id === orderId ? { ...item, comment: comment } : item));
-            setDisplayItems(updatedDisplayItems);
-
             setAlert({ visible: true, message: 'Comment saved successfully', type: 'success' });
         } catch (error) {
             setAlert({ visible: true, message: 'Error saving comment', type: 'danger' });
+        }
+    };
+
+    const addTrackingEntry = async (orderId: number, action: string) => {
+        if (!currentUser) return;
+        try {
+            const { error } = await supabase.from('order_tracking').insert({
+                order_id: orderId,
+                action,
+                user_id: currentUser.id,
+            });
+            if (error) throw error;
+        } catch (error) {
+            console.error('Error adding tracking entry:', error);
         }
     };
 

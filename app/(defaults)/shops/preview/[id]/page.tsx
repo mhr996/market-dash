@@ -21,6 +21,7 @@ import IconBuilding from '@/components/icon/icon-building';
 import { DataTableSortStatus, DataTable } from 'mantine-datatable';
 import { sortBy } from 'lodash';
 import { getTranslation } from '@/i18n';
+import { updateShopBalance } from '@/lib/shop-balance';
 import 'leaflet/dist/leaflet.css';
 
 // Import the map component dynamically with no SSR
@@ -166,7 +167,7 @@ const ShopPreview = () => {
     const [paymentAmount, setPaymentAmount] = useState('');
     const [paymentDescription, setPaymentDescription] = useState('');
     const [sendingPayment, setSendingPayment] = useState(false);
-    const [platformBalance, setPlatformBalance] = useState(2450.75); // Dummy balance owed to shop
+    const [platformBalance, setPlatformBalance] = useState(0); // Shop balance from database
 
     // Format currency helper function
     const formatCurrency = (amount: number) => {
@@ -500,20 +501,31 @@ const ShopPreview = () => {
         });
     };
 
+    // Fetch shop balance
+    const fetchShopBalance = async () => {
+        if (!shop?.id) return;
+
+        try {
+            console.log('Updating shop balance for shop ID:', shop.id);
+            const balance = await updateShopBalance(shop.id);
+            console.log('Shop balance calculated:', balance);
+            setPlatformBalance(balance);
+        } catch (error) {
+            console.error('Error fetching shop balance:', error);
+        }
+    };
+
     // Handle shop transaction data when transactions tab is active
     useEffect(() => {
         if (shop && activeTab === 'transactions') {
-            // Calculate total commission from completed orders
-            const totalCommission = shopSales.reduce((sum, sale) => sum + sale.commission, 0);
+            fetchShopBalance();
 
             // Keep transaction table empty for now
             const basicTransactions: ShopTransaction[] = [];
-
             setShopTransactions(basicTransactions);
             setTransactionRecords(basicTransactions);
-            setPlatformBalance(totalCommission); // Use total commission as shop balance
         }
-    }, [shop, activeTab, shopSales]);
+    }, [shop, activeTab]);
 
     // Transaction search and pagination
     useEffect(() => {
@@ -558,7 +570,7 @@ const ShopPreview = () => {
                 transaction_id: `TXN-${Math.floor(100000 + Math.random() * 900000)}`,
                 amount: parseFloat(paymentAmount),
                 date: new Date().toISOString(),
-                status: 'pending',
+                status: 'completed', // Mark as completed for prototype
                 description: paymentDescription || 'Admin payment',
                 payment_method: 'Bank Transfer',
             };
@@ -567,8 +579,8 @@ const ShopPreview = () => {
             setShopTransactions(updatedTransactions);
             setTransactionRecords(updatedTransactions);
 
-            // Update platform balance
-            setPlatformBalance((prev) => prev - parseFloat(paymentAmount));
+            // Update platform balance (ADD the payment amount to the balance)
+            setPlatformBalance((prev) => prev + parseFloat(paymentAmount));
 
             setAlert({ visible: true, message: 'Payment sent successfully!', type: 'success' });
             setShowPaymentModal(false);
@@ -583,7 +595,7 @@ const ShopPreview = () => {
 
     // Handle send all balance
     const handleSendAllBalance = () => {
-        setPaymentAmount(platformBalance.toString());
+        setPaymentAmount(Math.abs(platformBalance).toString());
         setPaymentDescription('Complete balance payout');
     };
 
@@ -1301,15 +1313,30 @@ const ShopPreview = () => {
                         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6 w-full max-w-none">
                             {/* Platform Balance Card */}
                             <div className="lg:col-span-3 w-full max-w-none">
-                                <div className="panel bg-gradient-to-r from-blue-500 to-blue-600 text-white w-full max-w-none">
+                                <div
+                                    className={`panel text-white w-full max-w-none ${
+                                        platformBalance > 0
+                                            ? 'bg-gradient-to-r from-green-500 to-green-600'
+                                            : platformBalance < 0
+                                              ? 'bg-gradient-to-r from-red-500 to-red-600'
+                                              : 'bg-gradient-to-r from-blue-500 to-blue-600'
+                                    }`}
+                                >
                                     <div className="flex items-center justify-between">
                                         <div>
                                             <h5 className="text-lg font-semibold mb-2">{t('shop_balance')}</h5>
-                                            <p className="text-3xl font-bold">{formatCurrency(platformBalance)}</p>
-                                            <p className="text-blue-100 mt-1">{t('amount_owed_to_shop')}</p>
+                                            <p className={`text-3xl font-bold ${platformBalance > 0 ? 'text-green-100' : platformBalance < 0 ? 'text-red-100' : 'text-blue-100'}`}>
+                                                {formatCurrency(platformBalance)}
+                                            </p>
+                                            <p className={`mt-1 ${platformBalance > 0 ? 'text-green-100' : platformBalance < 0 ? 'text-red-100' : 'text-blue-100'}`}>
+                                                {platformBalance >= 0 ? t('amount_owed_to_shop') : 'Amount shop owes to platform'}
+                                            </p>
                                         </div>
                                         <div className="text-right">
-                                            <button className="btn btn-primary bg-white text-blue-600 hover:bg-gray-100 opacity-50 cursor-not-allowed" disabled>
+                                            <button
+                                                className={`btn bg-white hover:bg-gray-100 ${platformBalance > 0 ? 'text-green-600' : platformBalance < 0 ? 'text-red-600' : 'text-blue-600'}`}
+                                                onClick={() => setShowPaymentModal(true)}
+                                            >
                                                 {t('send_payment')}
                                             </button>
                                         </div>
@@ -1424,7 +1451,10 @@ const ShopPreview = () => {
                                         </div>
                                         <div className="bg-gray-50 dark:bg-gray-700 p-3 rounded">
                                             <p className="text-sm text-gray-600 dark:text-gray-400">
-                                                {t('current_balance')}: <span className="font-semibold">{formatCurrency(platformBalance)}</span>
+                                                {t('current_balance')}:{' '}
+                                                <span className={`font-semibold ${platformBalance > 0 ? 'text-green-600' : platformBalance < 0 ? 'text-red-600' : 'text-blue-600'}`}>
+                                                    {formatCurrency(platformBalance)}
+                                                </span>
                                             </p>
                                         </div>
                                         <div className="flex gap-3">
