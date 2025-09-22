@@ -9,6 +9,7 @@ import IconUser from '@/components/icon/icon-user';
 import IconBuilding from '@/components/icon/icon-building';
 import IconCar from '@/components/icon/icon-car';
 import IconCalendar from '@/components/icon/icon-calendar';
+import IconDollarSign from '@/components/icon/icon-dollar-sign';
 import { getTranslation } from '@/i18n';
 
 interface DeliveryDriver {
@@ -39,12 +40,18 @@ const PreviewDeliveryDriverPage = () => {
     const router = useRouter();
     const [driver, setDriver] = useState<DeliveryDriver | null>(null);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'details' | 'company' | 'cars'>('details');
+    const [activeTab, setActiveTab] = useState<'details' | 'company' | 'cars' | 'balance'>('details');
     const [alert, setAlert] = useState<{ visible: boolean; message: string; type: 'success' | 'danger' }>({
         visible: false,
         message: '',
         type: 'danger',
     });
+
+    // Balance UI state
+    const [balance, setBalance] = useState(0);
+    const [showPaymentModal, setShowPaymentModal] = useState(false);
+    const [paymentAmount, setPaymentAmount] = useState('');
+    const [paymentDescription, setPaymentDescription] = useState('');
 
     useEffect(() => {
         const fetchDriver = async () => {
@@ -178,6 +185,16 @@ const PreviewDeliveryDriverPage = () => {
                         <div className="flex items-center gap-2">
                             <IconCar className="h-5 w-5" />
                             {t('assigned_cars')}
+                        </div>
+                    </button>
+                    <button
+                        type="button"
+                        className={`p-4 border-b-2 ${activeTab === 'balance' ? 'border-primary text-primary' : 'border-transparent hover:border-gray-300'}`}
+                        onClick={() => setActiveTab('balance')}
+                    >
+                        <div className="flex items-center gap-2">
+                            <IconDollarSign className="h-5 w-5" />
+                            Balance
                         </div>
                     </button>
                 </div>
@@ -364,7 +381,166 @@ const PreviewDeliveryDriverPage = () => {
                         )}
                     </div>
                 )}
+
+                {activeTab === 'balance' && (
+                    <div className="lg:col-span-3">
+                        <div className="panel w-full max-w-none">
+                            <div className="mb-5">
+                                <h5 className="text-lg font-semibold dark:text-white-light">Balance</h5>
+                                <p className="text-gray-500 dark:text-gray-400 mt-1">Manage driver balance and payments</p>
+                            </div>
+
+                            {/* Balance Card */}
+                            <div
+                                className={`panel text-white w-full max-w-none ${
+                                    balance > 0
+                                        ? 'bg-gradient-to-r from-green-500 to-green-600'
+                                        : balance < 0
+                                          ? 'bg-gradient-to-r from-red-500 to-red-600'
+                                          : 'bg-gradient-to-r from-blue-500 to-blue-600'
+                                }`}
+                            >
+                                <div className="flex items-center justify-between">
+                                    <div>
+                                        <h5 className="text-lg font-semibold mb-2">Driver Balance</h5>
+                                        <p className={`text-3xl font-bold ${balance > 0 ? 'text-green-100' : balance < 0 ? 'text-red-100' : 'text-blue-100'}`}>${balance.toFixed(2)}</p>
+                                        <p className={`mt-1 ${balance > 0 ? 'text-green-100' : balance < 0 ? 'text-red-100' : 'text-blue-100'}`}>
+                                            {balance >= 0 ? 'Amount owed to driver' : 'Amount driver owes to platform'}
+                                        </p>
+                                    </div>
+                                    <div className="text-right">
+                                        <button
+                                            className={`btn bg-white hover:bg-gray-100 ${balance > 0 ? 'text-green-600' : balance < 0 ? 'text-red-600' : 'text-blue-600'}`}
+                                            onClick={() => setShowPaymentModal(true)}
+                                        >
+                                            Send Payment
+                                        </button>
+                                    </div>
+                                </div>
+                            </div>
+
+                            {/* Quick Actions */}
+                            <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
+                                <button
+                                    className="btn btn-outline-primary"
+                                    onClick={() => {
+                                        setBalance(0);
+                                        setAlert({ visible: true, message: 'Balance reset to $0.00', type: 'success' });
+                                    }}
+                                >
+                                    Reset to $0.00
+                                </button>
+                                <button
+                                    className="btn btn-outline-success"
+                                    onClick={() => {
+                                        setBalance((prev) => prev + 100);
+                                        setAlert({ visible: true, message: 'Added $100.00 to balance', type: 'success' });
+                                    }}
+                                >
+                                    Add $100.00
+                                </button>
+                                <button
+                                    className="btn btn-outline-danger"
+                                    onClick={() => {
+                                        setBalance((prev) => prev - 50);
+                                        setAlert({ visible: true, message: 'Subtracted $50.00 from balance', type: 'success' });
+                                    }}
+                                >
+                                    Subtract $50.00
+                                </button>
+                            </div>
+
+                            {/* Transaction History */}
+                            <div className="mt-8">
+                                <h6 className="text-lg font-semibold dark:text-white-light mb-4">Transaction History</h6>
+                                <div className="overflow-x-auto">
+                                    <table className="min-w-full">
+                                        <thead>
+                                            <tr className="border-b border-gray-200 dark:border-gray-700">
+                                                <th className="text-left py-3 px-4 font-semibold">Date</th>
+                                                <th className="text-left py-3 px-4 font-semibold">Type</th>
+                                                <th className="text-left py-3 px-4 font-semibold">Description</th>
+                                                <th className="text-left py-3 px-4 font-semibold">Amount</th>
+                                                <th className="text-left py-3 px-4 font-semibold">Status</th>
+                                            </tr>
+                                        </thead>
+                                        <tbody>
+                                            <tr>
+                                                <td colSpan={5} className="text-center py-8 text-gray-500 dark:text-gray-400">
+                                                    <div className="flex flex-col items-center">
+                                                        <div className="text-gray-400 mb-2">
+                                                            <svg className="w-12 h-12 mx-auto" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                                <path
+                                                                    strokeLinecap="round"
+                                                                    strokeLinejoin="round"
+                                                                    strokeWidth={1}
+                                                                    d="M9 12h6m-6 4h6m2 5H7a2 2 0 01-2-2V5a2 2 0 012-2h5.586a1 1 0 01.707.293l5.414 5.414a1 1 0 01.293.707V19a2 2 0 01-2 2z"
+                                                                />
+                                                            </svg>
+                                                        </div>
+                                                        <p className="text-sm">No transactions found</p>
+                                                        <p className="text-xs text-gray-400 mt-1">Transaction history will appear here</p>
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        </tbody>
+                                    </table>
+                                </div>
+                            </div>
+                        </div>
+                    </div>
+                )}
             </div>
+
+            {/* Payment Modal */}
+            {showPaymentModal && (
+                <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md">
+                        <h3 className="text-lg font-semibold mb-4">Send Payment</h3>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium mb-2">Amount</label>
+                                <input type="number" value={paymentAmount} onChange={(e) => setPaymentAmount(e.target.value)} className="form-input w-full" placeholder="0.00" />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-2">Description</label>
+                                <textarea
+                                    value={paymentDescription}
+                                    onChange={(e) => setPaymentDescription(e.target.value)}
+                                    className="form-textarea w-full"
+                                    placeholder="Payment description..."
+                                    rows={3}
+                                />
+                            </div>
+                        </div>
+                        <div className="flex gap-2 mt-6">
+                            <button
+                                className="btn btn-primary flex-1"
+                                onClick={() => {
+                                    const amount = parseFloat(paymentAmount) || 0;
+                                    setBalance((prev) => prev + amount);
+                                    setAlert({ visible: true, message: `Payment of $${amount.toFixed(2)} sent`, type: 'success' });
+                                    setShowPaymentModal(false);
+                                    setPaymentAmount('');
+                                    setPaymentDescription('');
+                                }}
+                            >
+                                Send Payment
+                            </button>
+                            <button
+                                className="btn btn-outline-secondary"
+                                onClick={() => {
+                                    setShowPaymentModal(false);
+                                    setPaymentAmount('');
+                                    setPaymentDescription('');
+                                }}
+                            >
+                                Cancel
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

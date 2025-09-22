@@ -3,14 +3,21 @@ import IconPlus from '@/components/icon/icon-plus';
 import IconTrashLines from '@/components/icon/icon-trash-lines';
 import { getTranslation } from '@/i18n';
 
-interface Feature {
+interface FeatureLabel {
+    id?: number;
     label: string;
+    values: FeatureValue[];
+}
+
+interface FeatureValue {
+    id?: number;
     value: string;
+    price_addition: number;
 }
 
 interface ProductFeaturesProps {
-    features: Feature[];
-    onChange: (features: Feature[]) => void;
+    features: FeatureLabel[];
+    onChange: (features: FeatureLabel[]) => void;
     disabled?: boolean;
 }
 
@@ -18,7 +25,7 @@ const ProductFeatures: React.FC<ProductFeaturesProps> = ({ features, onChange, d
     const { t } = getTranslation();
 
     const addFeature = () => {
-        const newFeatures = [...features, { label: '', value: '' }];
+        const newFeatures = [...features, { label: '', values: [{ value: '', price_addition: 0 }] }];
         onChange(newFeatures);
     };
 
@@ -27,8 +34,30 @@ const ProductFeatures: React.FC<ProductFeaturesProps> = ({ features, onChange, d
         onChange(newFeatures);
     };
 
-    const updateFeature = (index: number, field: 'label' | 'value', value: string) => {
-        const newFeatures = features.map((feature, i) => (i === index ? { ...feature, [field]: value } : feature));
+    const updateFeatureLabel = (index: number, value: string) => {
+        const newFeatures = features.map((feature, i) => (i === index ? { ...feature, label: value } : feature));
+        onChange(newFeatures);
+    };
+
+    const addFeatureValue = (featureIndex: number) => {
+        const newFeatures = features.map((feature, i) => (i === featureIndex ? { ...feature, values: [...feature.values, { value: '', price_addition: 0 }] } : feature));
+        onChange(newFeatures);
+    };
+
+    const removeFeatureValue = (featureIndex: number, valueIndex: number) => {
+        const newFeatures = features.map((feature, i) => (i === featureIndex ? { ...feature, values: feature.values.filter((_, j) => j !== valueIndex) } : feature));
+        onChange(newFeatures);
+    };
+
+    const updateFeatureValue = (featureIndex: number, valueIndex: number, field: 'value' | 'price_addition', value: string | number) => {
+        const newFeatures = features.map((feature, i) =>
+            i === featureIndex
+                ? {
+                      ...feature,
+                      values: feature.values.map((val, j) => (j === valueIndex ? { ...val, [field]: value } : val)),
+                  }
+                : feature,
+        );
         onChange(newFeatures);
     };
 
@@ -58,43 +87,77 @@ const ProductFeatures: React.FC<ProductFeaturesProps> = ({ features, onChange, d
                     <p className="text-xs mt-1">{t('click_add_feature_to_start')}</p>
                 </div>
             ) : (
-                <div className="space-y-4">
-                    {features.map((feature, index) => (
-                        <div key={index} className="grid grid-cols-1 md:grid-cols-2 gap-4 p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800/50">
-                            <div>
-                                <label htmlFor={`feature-label-${index}`} className="block text-sm font-medium mb-2">
-                                    {t('feature_label')} <span className="text-red-500">*</span>
-                                </label>
-                                <input
-                                    id={`feature-label-${index}`}
-                                    type="text"
-                                    className="form-input"
-                                    placeholder={t('feature_label_placeholder')}
-                                    value={feature.label}
-                                    onChange={(e) => updateFeature(index, 'label', e.target.value)}
-                                    disabled={disabled}
-                                />
-                            </div>
-                            <div className="flex gap-2">
-                                <div className="flex-1">
-                                    <label htmlFor={`feature-value-${index}`} className="block text-sm font-medium mb-2">
-                                        {t('feature_value')} <span className="text-red-500">*</span>
+                <div className="space-y-6">
+                    {features.map((feature, featureIndex) => (
+                        <div key={featureIndex} className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                            <div className="flex items-center justify-between mb-4">
+                                <div className="flex-1 mr-4">
+                                    <label htmlFor={`feature-label-${featureIndex}`} className="block text-sm font-medium mb-2">
+                                        {t('feature_label')} <span className="text-red-500">*</span>
                                     </label>
                                     <input
-                                        id={`feature-value-${index}`}
+                                        id={`feature-label-${featureIndex}`}
                                         type="text"
                                         className="form-input"
-                                        placeholder={t('feature_value_placeholder')}
-                                        value={feature.value}
-                                        onChange={(e) => updateFeature(index, 'value', e.target.value)}
+                                        placeholder="e.g., Storage, Color, Size"
+                                        value={feature.label}
+                                        onChange={(e) => updateFeatureLabel(featureIndex, e.target.value)}
                                         disabled={disabled}
                                     />
                                 </div>
-                                <div className="flex items-end">
-                                    <button type="button" onClick={() => removeFeature(index)} disabled={disabled} className="btn btn-outline-danger p-2" title={t('remove_feature')}>
-                                        <IconTrashLines className="w-4 h-4" />
+                                <button type="button" onClick={() => removeFeature(featureIndex)} disabled={disabled} className="btn btn-outline-danger p-2" title={t('remove_feature')}>
+                                    <IconTrashLines className="w-4 h-4" />
+                                </button>
+                            </div>
+
+                            <div className="space-y-3">
+                                <div className="flex items-center justify-between">
+                                    <h4 className="text-sm font-medium text-gray-700 dark:text-gray-300">Values</h4>
+                                    <button type="button" onClick={() => addFeatureValue(featureIndex)} disabled={disabled} className="btn btn-primary btn-sm gap-1">
+                                        <IconPlus className="w-3 h-3" />
+                                        Add Value
                                     </button>
                                 </div>
+
+                                {feature.values.map((value, valueIndex) => (
+                                    <div key={valueIndex} className="grid grid-cols-1 md:grid-cols-3 gap-3 p-3 bg-white dark:bg-gray-900 rounded border">
+                                        <div>
+                                            <label className="block text-xs font-medium mb-1">Value</label>
+                                            <input
+                                                type="text"
+                                                className="form-input text-sm"
+                                                placeholder="e.g., 64GB, Red, Large"
+                                                value={value.value}
+                                                onChange={(e) => updateFeatureValue(featureIndex, valueIndex, 'value', e.target.value)}
+                                                disabled={disabled}
+                                            />
+                                        </div>
+                                        <div>
+                                            <label className="block text-xs font-medium mb-1">Price Addition ($)</label>
+                                            <input
+                                                type="number"
+                                                step="0.01"
+                                                min="0"
+                                                className="form-input text-sm"
+                                                placeholder="0.00"
+                                                value={value.price_addition}
+                                                onChange={(e) => updateFeatureValue(featureIndex, valueIndex, 'price_addition', parseFloat(e.target.value) || 0)}
+                                                disabled={disabled}
+                                            />
+                                        </div>
+                                        <div className="flex items-end">
+                                            <button
+                                                type="button"
+                                                onClick={() => removeFeatureValue(featureIndex, valueIndex)}
+                                                disabled={disabled}
+                                                className="btn btn-outline-danger btn-sm p-2"
+                                                title="Remove Value"
+                                            >
+                                                <IconTrashLines className="w-3 h-3" />
+                                            </button>
+                                        </div>
+                                    </div>
+                                ))}
                             </div>
                         </div>
                     ))}

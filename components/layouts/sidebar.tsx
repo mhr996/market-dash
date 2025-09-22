@@ -156,12 +156,74 @@ const Sidebar = () => {
                                         </Link>
                                     </li>
                                     <li className="nav-item">
-                                        <Link href="/categories" className="group">
+                                        <button type="button" className={`${currentMenu === 'categories' ? 'active' : ''} nav-link group w-full`} onClick={() => toggleMenu('categories')}>
                                             <div className="flex items-center">
                                                 <IconMenuTables className="shrink-0 group-hover:!text-primary" />
-                                                <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">{t('categories')}</span>
+                                                <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Categories</span>
                                             </div>
-                                        </Link>
+                                            <div className={`${currentMenu !== 'categories' ? 'rotate-90' : ''} ltr:ml-auto rtl:mr-auto`}>
+                                                <IconCaretDown className="w-4 h-4" />
+                                            </div>
+                                        </button>
+                                        <AnimateHeight duration={300} height={currentMenu === 'categories' ? 'auto' : 0}>
+                                            <ul className="sub-menu [&>li>a]:before:content-none [&>li>button]:before:content-none">
+                                                <li>
+                                                    <Link href="/categories" className="group nav-link">
+                                                        <div className="flex items-center">
+                                                            <IconMenuTables className="shrink-0 group-hover:!text-primary" />
+                                                            <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Categories</span>
+                                                        </div>
+                                                    </Link>
+                                                </li>
+                                                <li>
+                                                    <Link href="/categories/subcategories" className="group nav-link">
+                                                        <div className="flex items-center">
+                                                            <IconMenuTables className="shrink-0 group-hover:!text-primary" />
+                                                            <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Sub Categories</span>
+                                                        </div>
+                                                    </Link>
+                                                </li>
+                                            </ul>
+                                        </AnimateHeight>
+                                    </li>
+                                    <li className="nav-item">
+                                        <button type="button" className={`${currentMenu === 'accounting' ? 'active' : ''} nav-link group w-full`} onClick={() => toggleMenu('accounting')}>
+                                            <div className="flex items-center">
+                                                <IconMenuTables className="shrink-0 group-hover:!text-primary" />
+                                                <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Accounting</span>
+                                            </div>
+                                            <div className={`${currentMenu !== 'accounting' ? 'rotate-90' : ''} ltr:ml-auto rtl:mr-auto`}>
+                                                <IconCaretDown className="w-4 h-4" />
+                                            </div>
+                                        </button>
+                                        <AnimateHeight duration={300} height={currentMenu === 'accounting' ? 'auto' : 0}>
+                                            <ul className="sub-menu [&>li>a]:before:content-none [&>li>button]:before:content-none">
+                                                <li>
+                                                    <Link href="/accounting/receipts" className="group nav-link">
+                                                        <div className="flex items-center">
+                                                            <IconMenuTables className="shrink-0 group-hover:!text-primary" />
+                                                            <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Receipts</span>
+                                                        </div>
+                                                    </Link>
+                                                </li>
+                                                <li>
+                                                    <Link href="/accounting/invoices" className="group nav-link">
+                                                        <div className="flex items-center">
+                                                            <IconMenuTables className="shrink-0 group-hover:!text-primary" />
+                                                            <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Invoices</span>
+                                                        </div>
+                                                    </Link>
+                                                </li>
+                                                <li>
+                                                    <Link href="/accounting/statements" className="group nav-link">
+                                                        <div className="flex items-center">
+                                                            <IconMenuTables className="shrink-0 group-hover:!text-primary" />
+                                                            <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Statements</span>
+                                                        </div>
+                                                    </Link>
+                                                </li>
+                                            </ul>
+                                        </AnimateHeight>
                                     </li>
                                     <li className="nav-item">
                                         <Link href="/orders" className="group">

@@ -29,9 +29,16 @@ interface Category {
     desc: string;
 }
 
-interface Feature {
+interface FeatureLabel {
+    id?: number;
     label: string;
+    values: FeatureValue[];
+}
+
+interface FeatureValue {
+    id?: number;
     value: string;
+    price_addition: number;
 }
 
 interface ProductFormProps {
@@ -52,7 +59,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
     const [activeTab, setActiveTab] = useState(0);
 
     // Features state
-    const [features, setFeatures] = useState<Feature[]>([]);
+    const [features, setFeatures] = useState<FeatureLabel[]>([]);
 
     // Temporary file storage for product images when creating new products
     const [tempImageFiles, setTempImageFiles] = useState<File[]>([]);
@@ -88,6 +95,89 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
         desc: '',
     });
     const [showNewCategoryForm, setShowNewCategoryForm] = useState(false);
+
+    // Save product features to new tables
+    const saveProductFeatures = async (productId: number, features: FeatureLabel[]) => {
+        try {
+            // Delete existing features for this product
+            await supabase
+                .from('products_features_values')
+                .delete()
+                .in('feature_label_id', (await supabase.from('products_features_labels').select('id').eq('product_id', productId)).data?.map((l) => l.id) || []);
+            await supabase.from('products_features_labels').delete().eq('product_id', productId);
+
+            // Insert new features
+            for (const feature of features) {
+                if (feature.label.trim()) {
+                    // Insert label
+                    const { data: labelData, error: labelError } = await supabase
+                        .from('products_features_labels')
+                        .insert([
+                            {
+                                product_id: productId,
+                                label: feature.label.trim(),
+                            },
+                        ])
+                        .select()
+                        .single();
+
+                    if (labelError) throw labelError;
+
+                    // Insert values for this label
+                    if (feature.values && feature.values.length > 0) {
+                        const valuesToInsert = feature.values
+                            .filter((value) => value.value.trim())
+                            .map((value) => ({
+                                feature_label_id: labelData.id,
+                                value: value.value.trim(),
+                                price_addition: value.price_addition || 0,
+                            }));
+
+                        if (valuesToInsert.length > 0) {
+                            const { error: valuesError } = await supabase.from('products_features_values').insert(valuesToInsert);
+
+                            if (valuesError) throw valuesError;
+                        }
+                    }
+                }
+            }
+        } catch (error) {
+            console.error('Error saving product features:', error);
+            throw error;
+        }
+    };
+
+    // Load product features from new tables
+    const loadProductFeatures = async (productId: number) => {
+        try {
+            // Get feature labels for this product
+            const { data: labels, error: labelsError } = await supabase.from('products_features_labels').select('*').eq('product_id', productId).order('created_at', { ascending: true });
+
+            if (labelsError) throw labelsError;
+
+            if (labels && labels.length > 0) {
+                // Get values for each label
+                const labelIds = labels.map((label) => label.id);
+                const { data: values, error: valuesError } = await supabase.from('products_features_values').select('*').in('feature_label_id', labelIds).order('created_at', { ascending: true });
+
+                if (valuesError) throw valuesError;
+
+                // Group values by label
+                const featuresWithValues = labels.map((label) => ({
+                    id: label.id,
+                    label: label.label,
+                    values: values?.filter((value) => value.feature_label_id === label.id) || [],
+                }));
+
+                setFeatures(featuresWithValues);
+            } else {
+                setFeatures([]);
+            }
+        } catch (error) {
+            console.error('Error loading product features:', error);
+            setFeatures([]);
+        }
+    };
 
     // Cleanup blob URLs on component unmount
     useEffect(() => {
@@ -140,8 +230,8 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                         });
                         setPreviewUrls(product.images || []);
 
-                        // Load features
-                        setFeatures(product.features || []);
+                        // Load features from new tables
+                        await loadProductFeatures(parseInt(productId));
 
                         // Set sale price state if available
                         if (product.sale_price) {
@@ -314,7 +404,6 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                         shop: formData.shop,
                         category: formData.category ? parseInt(formData.category) : null,
                         images: [], // Empty initially
-                        features: features,
                         sale_price: hasSalePrice && finalPrice ? finalPrice : null,
                         discount_type: hasSalePrice ? discountType : null,
                         discount_value: hasSalePrice && discountValue ? parseFloat(discountValue) : null,
@@ -342,6 +431,9 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                     const { error: updateError } = await supabase.from('products').update({ images: finalImageUrls }).eq('id', newProduct.id);
 
                     if (updateError) throw updateError;
+
+                    // Save features to new tables
+                    await saveProductFeatures(newProduct.id, features);
 
                     setAlert({ type: 'success', message: t('product_created_successfully') });
 
@@ -386,6 +478,9 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                     const { error } = await supabase.from('products').insert([productDataNoImages]);
                     if (error) throw error;
 
+                    // Save features to new tables
+                    await saveProductFeatures(parseInt(formData.shop), features);
+
                     setAlert({ type: 'success', message: t('product_created_successfully') });
 
                     // Reset form
@@ -421,7 +516,6 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                     shop: formData.shop,
                     category: formData.category ? parseInt(formData.category) : null,
                     images: finalImageUrls,
-                    features: features,
                     sale_price: hasSalePrice && finalPrice ? finalPrice : null,
                     discount_type: hasSalePrice ? discountType : null,
                     discount_value: hasSalePrice && discountValue ? parseFloat(discountValue) : null,
@@ -434,6 +528,9 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                     const { error } = await supabase.from('products').update(productData).eq('id', productId);
 
                     if (error) throw error;
+
+                    // Save features to new tables
+                    await saveProductFeatures(parseInt(productId), features);
 
                     // Wait a moment to ensure the update is processed
                     await new Promise((resolve) => setTimeout(resolve, 500));

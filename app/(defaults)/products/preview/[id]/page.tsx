@@ -15,7 +15,6 @@ interface Product {
     price: string;
     images: string[];
     category: number | null;
-    features?: { label: string; value: string }[];
     shops: {
         shop_name: string;
         owner: string;
@@ -31,6 +30,18 @@ interface Product {
     discount_end?: string | null;
 }
 
+interface FeatureLabel {
+    id: number;
+    label: string;
+    values: FeatureValue[];
+}
+
+interface FeatureValue {
+    id: number;
+    value: string;
+    price_addition: number;
+}
+
 interface ProductDetailsPageProps {
     params: {
         id: string;
@@ -40,6 +51,7 @@ interface ProductDetailsPageProps {
 const ProductDetailsPage = ({ params }: ProductDetailsPageProps) => {
     const router = useRouter();
     const [product, setProduct] = useState<Product | null>(null);
+    const [features, setFeatures] = useState<FeatureLabel[]>([]);
     const [loading, setLoading] = useState(true);
     const [currentImageIndex, setCurrentImageIndex] = useState(0);
     const { t } = getTranslation();
@@ -51,6 +63,9 @@ const ProductDetailsPage = ({ params }: ProductDetailsPageProps) => {
 
                 if (error) throw error;
                 setProduct(data);
+
+                // Fetch features from new tables
+                await fetchProductFeatures(parseInt(params.id));
             } catch (error) {
             } finally {
                 setLoading(false);
@@ -59,6 +74,37 @@ const ProductDetailsPage = ({ params }: ProductDetailsPageProps) => {
 
         fetchProduct();
     }, [params.id]);
+
+    const fetchProductFeatures = async (productId: number) => {
+        try {
+            // Get feature labels for this product
+            const { data: labels, error: labelsError } = await supabase.from('products_features_labels').select('*').eq('product_id', productId).order('created_at', { ascending: true });
+
+            if (labelsError) throw labelsError;
+
+            if (labels && labels.length > 0) {
+                // Get values for each label
+                const labelIds = labels.map((label) => label.id);
+                const { data: values, error: valuesError } = await supabase.from('products_features_values').select('*').in('feature_label_id', labelIds).order('created_at', { ascending: true });
+
+                if (valuesError) throw valuesError;
+
+                // Group values by label
+                const featuresWithValues = labels.map((label) => ({
+                    id: label.id,
+                    label: label.label,
+                    values: values?.filter((value) => value.feature_label_id === label.id) || [],
+                }));
+
+                setFeatures(featuresWithValues);
+            } else {
+                setFeatures([]);
+            }
+        } catch (error) {
+            console.error('Error loading product features:', error);
+            setFeatures([]);
+        }
+    };
 
     if (loading) {
         return (
@@ -109,7 +155,7 @@ const ProductDetailsPage = ({ params }: ProductDetailsPageProps) => {
                 </ul>
             </div>
 
-            <div className="panel">
+            <div className="panel w-full max-w-none">
                 <div className="mb-5 flex justify-between">
                     <h2 className="text-2xl font-bold">{product.title}</h2>
                     <Link href={`/products/edit/${product.id}`} className="btn btn-primary gap-2">
@@ -203,14 +249,21 @@ const ProductDetailsPage = ({ params }: ProductDetailsPageProps) => {
                             </div>
                         )}
 
-                        {product.features && product.features.length > 0 && (
+                        {features && features.length > 0 && (
                             <div>
                                 <h3 className="text-lg font-semibold">{t('product_features')}</h3>
-                                <div className="mt-3 space-y-2">
-                                    {product.features.map((feature, index) => (
-                                        <div key={index} className="flex justify-between items-center py-2 px-3 bg-gray-50 dark:bg-gray-800 rounded-lg">
-                                            <span className="font-medium text-gray-700 dark:text-gray-300">{feature.label}</span>
-                                            <span className="text-gray-600 dark:text-gray-400">{feature.value}</span>
+                                <div className="mt-3 space-y-4">
+                                    {features.map((feature, featureIndex) => (
+                                        <div key={featureIndex} className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                                            <h4 className="font-medium text-gray-700 dark:text-gray-300 mb-3">{feature.label}</h4>
+                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                                {feature.values.map((value, valueIndex) => (
+                                                    <div key={valueIndex} className="flex justify-between items-center py-2 px-3 bg-white dark:bg-gray-900 rounded border">
+                                                        <span className="text-gray-600 dark:text-gray-400">{value.value}</span>
+                                                        {value.price_addition > 0 && <span className="text-success font-medium text-sm">+${value.price_addition.toFixed(2)}</span>}
+                                                    </div>
+                                                ))}
+                                            </div>
                                         </div>
                                     ))}
                                 </div>

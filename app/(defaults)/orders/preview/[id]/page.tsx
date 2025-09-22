@@ -1,6 +1,6 @@
 'use client';
 import Link from 'next/link';
-import { useParams } from 'next/navigation';
+import { useParams, useSearchParams } from 'next/navigation';
 import React, { useEffect, useState, useRef } from 'react';
 import { getTranslation } from '@/i18n';
 import IconPrinter from '@/components/icon/icon-printer';
@@ -423,7 +423,13 @@ interface Order {
 const PreviewOrder = () => {
     const { t } = getTranslation();
     const params = useParams();
+    const searchParams = useSearchParams();
     const id = params?.id as string;
+
+    // Check if accessed from accounting pages via URL parameter
+    const type = searchParams?.get('type');
+    const isFromAccounting = type === 'receipt' || type === 'invoice';
+    const accountingType = type as 'receipt' | 'invoice' | null;
 
     const [order, setOrder] = useState<any | null>(null);
     const [loading, setLoading] = useState(true);
@@ -894,27 +900,30 @@ const PreviewOrder = () => {
                     <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 19l-7-7m0 0l7-7m-7 7h18" />
                 </svg>
             </div>
-            <ul className="flex space-x-2 rtl:space-x-reverse print:hidden">
-                <li>
-                    <Link href="/" className="text-primary hover:underline">
-                        {t('home')}
-                    </Link>
-                </li>
-                <li className="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
-                    <Link href="/orders" className="text-primary hover:underline">
-                        {t('orders')}
-                    </Link>
-                </li>
-                <li className="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
-                    <span>
-                        {t('order_details')} #{order.id}
-                    </span>
-                </li>
-            </ul>
+            {/* Only show breadcrumbs if not from accounting pages */}
+            {!isFromAccounting && (
+                <ul className="flex space-x-2 rtl:space-x-reverse print:hidden">
+                    <li>
+                        <Link href="/" className="text-primary hover:underline">
+                            {t('home')}
+                        </Link>
+                    </li>
+                    <li className="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
+                        <Link href="/orders" className="text-primary hover:underline">
+                            {t('orders')}
+                        </Link>
+                    </li>
+                    <li className="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
+                        <span>
+                            {t('order_details')} #{order.id}
+                        </span>
+                    </li>
+                </ul>
+            )}
 
             <div className="pt-5 w-full max-w-none">
                 <div className="mb-6 flex items-center justify-between print:hidden">
-                    <h5 className="text-xl font-semibold dark:text-white-light">{t('order_details')}</h5>
+                    <h5 className="text-xl font-semibold dark:text-white-light">{isFromAccounting ? (accountingType === 'receipt' ? 'Receipt Details' : 'Invoice Details') : t('order_details')}</h5>
                     <div className="flex gap-2">
                         {/* PDF/Print buttons - only show for confirmed orders with valid status */}
                         {order?.confirmed && ['processing', 'on_the_way', 'completed'].includes(order.status) && (
@@ -937,8 +946,8 @@ const PreviewOrder = () => {
                     <div className="flex flex-wrap justify-between gap-4 px-6 py-6">
                         <div className="flex-1">
                             <div className="mb-6">
-                                <h1 className="text-2xl font-bold text-primary">{t('order_invoice')}</h1>
-                                <p className="text-sm text-gray-500">#{order.id}</p>
+                                <h1 className="text-2xl font-bold text-primary">{isFromAccounting ? (accountingType === 'receipt' ? 'Receipt' : 'Invoice') : t('order_invoice')}</h1>
+                                <p className="text-sm text-gray-500">{isFromAccounting ? (accountingType === 'receipt' ? `RCP-${order.id}` : `INV-${order.id}`) : `#${order.id}`}</p>
                             </div>
 
                             <div className="space-y-1 text-white-dark">
