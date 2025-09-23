@@ -13,18 +13,22 @@ import { Alert } from '@/components/elements/alerts/elements-alerts-default';
 import ConfirmModal from '@/components/modals/confirm-modal';
 import { getTranslation } from '@/i18n';
 
-// Updated delivery company type reflecting the join with delivery_prices.
+// Updated delivery company type reflecting the join with delivery_methods.
+interface DeliveryMethod {
+    id: number;
+    label: string;
+    delivery_time: string;
+    price: number;
+    is_active: boolean;
+}
+
 interface DeliveryCompany {
     id: number;
     company_name: string;
     logo_url: string | null;
     owner_name: string;
     created_at?: string;
-    delivery_prices?: {
-        express_price: number;
-        fast_price: number;
-        standard_price: number;
-    };
+    delivery_methods?: DeliveryMethod[];
 }
 
 const DeliveryCompaniesList = () => {
@@ -58,16 +62,18 @@ const DeliveryCompaniesList = () => {
     useEffect(() => {
         const fetchCompanies = async () => {
             try {
-                // Join the delivery_prices table to fetch pricing information.
+                // Join the delivery_methods table to fetch pricing information.
                 const { data, error } = await supabase
                     .from('delivery_companies')
                     .select(
                         `
                         *,
-                        delivery_prices(
-                            express_price, 
-                            fast_price, 
-                            standard_price
+                        delivery_methods(
+                            id,
+                            label,
+                            delivery_time,
+                            price,
+                            is_active
                         )
                     `,
                     )
@@ -75,7 +81,7 @@ const DeliveryCompaniesList = () => {
                 if (error) throw error;
                 setItems(data as DeliveryCompany[]);
             } catch (error) {
-                // Error fetching delivery companies
+                console.error('Error fetching delivery companies:', error);
             } finally {
                 setLoading(false);
             }
@@ -205,30 +211,32 @@ const DeliveryCompaniesList = () => {
                                 render: ({ created_at }) => (created_at ? <span>{new Date(created_at).toLocaleDateString('TR')}</span> : ''),
                             },
                             {
-                                accessor: 'express_price',
-                                title: t('express_same_day'),
-                                sortable: true,
-                                render: ({ delivery_prices }) => {
-                                    const prices = Array.isArray(delivery_prices) ? delivery_prices[0] : delivery_prices;
-                                    return <span className="font-semibold text-danger">${prices?.express_price || 'N/A'}</span>;
-                                },
-                            },
-                            {
-                                accessor: 'fast_price',
-                                title: t('fast_2_3_days'),
-                                sortable: true,
-                                render: ({ delivery_prices }) => {
-                                    const prices = Array.isArray(delivery_prices) ? delivery_prices[0] : delivery_prices;
-                                    return <span className="font-semibold text-warning">${prices?.fast_price || 'N/A'}</span>;
-                                },
-                            },
-                            {
-                                accessor: 'standard_price',
-                                title: t('standard_3_5_days'),
-                                sortable: true,
-                                render: ({ delivery_prices }) => {
-                                    const prices = Array.isArray(delivery_prices) ? delivery_prices[0] : delivery_prices;
-                                    return <span className="font-semibold text-success">${prices?.standard_price || 'N/A'}</span>;
+                                accessor: 'delivery_methods',
+                                title: 'Delivery Methods',
+                                sortable: false,
+                                render: ({ delivery_methods }) => {
+                                    if (!delivery_methods || delivery_methods.length === 0) {
+                                        return <span className="text-gray-400">No methods</span>;
+                                    }
+
+                                    const activeMethods = delivery_methods.filter((method) => method.is_active);
+
+                                    if (activeMethods.length === 0) {
+                                        return <span className="text-gray-400">No active methods</span>;
+                                    }
+
+                                    return (
+                                        <div className="space-y-1">
+                                            {activeMethods.slice(0, 2).map((method, index) => (
+                                                <div key={method.id} className="text-xs">
+                                                    <span className="font-medium text-gray-700 dark:text-gray-300">{method.label}</span>
+                                                    <span className="text-gray-500 dark:text-gray-400 ml-1">({method.delivery_time})</span>
+                                                    <span className="font-semibold text-primary ml-1">${method.price}</span>
+                                                </div>
+                                            ))}
+                                            {activeMethods.length > 2 && <div className="text-xs text-gray-500">+{activeMethods.length - 2} more</div>}
+                                        </div>
+                                    );
                                 },
                             },
                             {

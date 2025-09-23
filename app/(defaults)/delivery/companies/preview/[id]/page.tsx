@@ -23,6 +23,20 @@ const InteractiveMap = dynamic(() => import('@/components/map/interactive-map'),
     ssr: false, // This will prevent the component from being rendered on the server
 });
 
+interface DeliveryMethod {
+    id: number;
+    label: string;
+    delivery_time: string;
+    price: number;
+    is_active: boolean;
+    delivery_location_methods?: Array<{
+        id: number;
+        location_name: string;
+        price_addition: number;
+        is_active: boolean;
+    }>;
+}
+
 interface DeliveryCompany {
     id: number;
     company_name: string;
@@ -37,18 +51,7 @@ interface DeliveryCompany {
     latitude: number | null;
     longitude: number | null;
     created_at: string;
-    delivery_prices?: {
-        express_price: number;
-        fast_price: number;
-        standard_price: number;
-    };
-    delivery_location_prices?: Array<{
-        id: number;
-        delivery_location: string;
-        express_price: number;
-        fast_price: number;
-        standard_price: number;
-    }>;
+    delivery_methods?: DeliveryMethod[];
 }
 
 interface Order {
@@ -121,17 +124,18 @@ const DeliveryCompanyPreview = () => {
                 .select(
                     `
                     *,
-                    delivery_prices(
-                        express_price,
-                        fast_price,
-                        standard_price
-                    ),
-                    delivery_location_prices(
+                    delivery_methods(
                         id,
-                        delivery_location,
-                        express_price,
-                        fast_price,
-                        standard_price
+                        label,
+                        delivery_time,
+                        price,
+                        is_active,
+                        delivery_location_methods(
+                            id,
+                            location_name,
+                            price_addition,
+                            is_active
+                        )
                     )
                 `,
                 )
@@ -142,12 +146,7 @@ const DeliveryCompanyPreview = () => {
 
             setCompany({
                 ...data,
-                delivery_prices: data.delivery_prices?.[0] || {
-                    standard_price: 0,
-                    express_price: 0,
-                    overnight_price: 0,
-                },
-                delivery_location_prices: data.delivery_location_prices || [],
+                delivery_methods: data.delivery_methods || [],
             });
 
             // Fetch drivers and cars for this company
@@ -538,62 +537,65 @@ const DeliveryCompanyPreview = () => {
 
                 {activeTab === 'pricing' && (
                     <div className="lg:col-span-3">
-                        {/* Base Pricing */}
-                        <div className="panel mb-5 w-full max-w-none">
-                            <div className="mb-5">
-                                <h5 className="text-lg font-semibold dark:text-white-light">{t('base_delivery_prices')}</h5>
-                                <p className="text-gray-500 dark:text-gray-400 mt-1">{t('standard_pricing_for_all_locations')}</p>
-                            </div>
-                            <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
-                                <div className="text-center p-4 bg-danger/10 rounded-lg">
-                                    <h6 className="text-sm font-semibold text-gray-700 dark:text-white mb-2">Express (Same Day)</h6>
-                                    <p className="text-2xl font-bold text-danger">${company.delivery_prices?.express_price || 0}</p>
-                                </div>
-                                <div className="text-center p-4 bg-warning/10 rounded-lg">
-                                    <h6 className="text-sm font-semibold text-gray-700 dark:text-white mb-2">Fast (2-3 Days)</h6>
-                                    <p className="text-2xl font-bold text-warning">${company.delivery_prices?.fast_price || 0}</p>
-                                </div>
-                                <div className="text-center p-4 bg-success/10 rounded-lg">
-                                    <h6 className="text-sm font-semibold text-gray-700 dark:text-white mb-2">Standard (3-5 Days)</h6>
-                                    <p className="text-2xl font-bold text-success">${company.delivery_prices?.standard_price || 0}</p>
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Location Based Prices */}
                         <div className="panel w-full max-w-none">
                             <div className="mb-5">
-                                <h5 className="text-lg font-semibold dark:text-white-light">{t('location_based_prices')}</h5>
-                                <p className="text-gray-500 dark:text-gray-400 mt-1">{t('specific_pricing_for_different_locations')}</p>
+                                <h5 className="text-lg font-semibold dark:text-white-light">Delivery Methods & Pricing</h5>
+                                <p className="text-gray-500 dark:text-gray-400 mt-1">Flexible pricing structure with location-based options</p>
                             </div>
-                            {company.delivery_location_prices && company.delivery_location_prices.length > 0 ? (
-                                <div className="grid grid-cols-1 gap-6">
-                                    {company.delivery_location_prices.map((locationPrice, index) => (
-                                        <div key={locationPrice.id} className="border border-gray-200 dark:border-gray-700 rounded-md p-4">
-                                            <div className="flex items-center justify-between mb-4">
-                                                <h6 className="text-lg font-semibold">{locationPrice.delivery_location}</h6>
+
+                            {company.delivery_methods && company.delivery_methods.length > 0 ? (
+                                <div className="space-y-6">
+                                    {company.delivery_methods
+                                        .filter((method) => method.is_active)
+                                        .map((method, methodIndex) => (
+                                            <div key={method.id} className="p-4 border border-gray-200 dark:border-gray-700 rounded-lg bg-gray-50 dark:bg-gray-800/50">
+                                                <div className="flex items-center justify-between mb-4">
+                                                    <h6 className="text-lg font-semibold text-gray-700 dark:text-gray-300">{method.label}</h6>
+                                                    <span className="text-2xl font-bold text-primary">${method.price}</span>
+                                                </div>
+
+                                                <div className="mb-3">
+                                                    <span className="text-sm text-gray-600 dark:text-gray-400">
+                                                        Delivery Time: <strong>{method.delivery_time}</strong>
+                                                    </span>
+                                                </div>
+
+                                                {/* Location-based Pricing */}
+                                                {method.delivery_location_methods && method.delivery_location_methods.length > 0 && (
+                                                    <div className="mt-4">
+                                                        <h6 className="text-sm font-medium text-gray-700 dark:text-gray-300 mb-3 block">Location-based Pricing</h6>
+                                                        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-3">
+                                                            {method.delivery_location_methods
+                                                                .filter((loc) => loc.is_active)
+                                                                .map((location, locationIndex) => (
+                                                                    <div key={location.id} className="p-3 bg-white dark:bg-gray-900 rounded border">
+                                                                        <div className="flex items-center justify-between">
+                                                                            <span className="text-sm font-medium text-gray-700 dark:text-gray-300">{location.location_name}</span>
+                                                                            <span className="text-sm font-semibold text-primary">+${location.price_addition}</span>
+                                                                        </div>
+                                                                        <div className="text-xs text-gray-500 mt-1">Total: ${method.price + location.price_addition}</div>
+                                                                    </div>
+                                                                ))}
+                                                        </div>
+                                                    </div>
+                                                )}
                                             </div>
-                                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                                                <div className="text-center p-3 bg-danger/10 rounded-lg">
-                                                    <h6 className="text-sm font-semibold text-gray-700 dark:text-white mb-1">Express (Same Day)</h6>
-                                                    <p className="text-xl font-bold text-danger">${locationPrice.express_price}</p>
-                                                </div>
-                                                <div className="text-center p-3 bg-warning/10 rounded-lg">
-                                                    <h6 className="text-sm font-semibold text-gray-700 dark:text-white mb-1">Fast (2-3 Days)</h6>
-                                                    <p className="text-xl font-bold text-warning">${locationPrice.fast_price}</p>
-                                                </div>
-                                                <div className="text-center p-3 bg-success/10 rounded-lg">
-                                                    <h6 className="text-sm font-semibold text-gray-700 dark:text-white mb-1">Standard (3-5 Days)</h6>
-                                                    <p className="text-xl font-bold text-success">${locationPrice.standard_price}</p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    ))}
+                                        ))}
                                 </div>
                             ) : (
                                 <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                                    <IconLocation className="h-12 w-12 mx-auto mb-4 text-gray-300" />
-                                    <p>{t('no_location_prices_set')}</p>
+                                    <div className="mb-4">
+                                        <svg className="w-16 h-16 mx-auto text-gray-300 dark:text-gray-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth={1}
+                                                d="M8 7V3m8 4V3m-9 8h10M5 21h14a2 2 0 002-2V7a2 2 0 00-2-2H5a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                            />
+                                        </svg>
+                                    </div>
+                                    <p className="text-sm">No delivery methods configured</p>
+                                    <p className="text-xs mt-1">Delivery methods will appear here when added</p>
                                 </div>
                             )}
                         </div>

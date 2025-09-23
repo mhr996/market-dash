@@ -35,6 +35,10 @@ const SubCategoryForm: React.FC<SubCategoryFormProps> = ({ subCategoryId }) => {
         category: '',
     });
 
+    // Image state
+    const [imageFile, setImageFile] = useState<File | null>(null);
+    const [previewUrl, setPreviewUrl] = useState<string | null>(null);
+
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (categoryRef.current && !categoryRef.current.contains(event.target as Node)) {
@@ -63,6 +67,11 @@ const SubCategoryForm: React.FC<SubCategoryFormProps> = ({ subCategoryId }) => {
                             desc: subCategory.desc,
                             category: subCategory.category_id?.toString() || '',
                         });
+
+                        // Set existing image if available
+                        if (subCategory.image) {
+                            setPreviewUrl(subCategory.image);
+                        }
                     }
                 }
             } catch (error) {
@@ -92,10 +101,37 @@ const SubCategoryForm: React.FC<SubCategoryFormProps> = ({ subCategoryId }) => {
 
         setLoading(true);
         try {
+            let imageUrl = null;
+
+            // Upload image if provided (only if bucket exists)
+            if (imageFile) {
+                try {
+                    const fileExt = imageFile.name.split('.').pop();
+                    const fileName = `${Date.now()}.${fileExt}`;
+                    const filePath = `subcategory-images/${fileName}`;
+
+                    const { error: uploadError } = await supabase.storage.from('subcategory-images').upload(filePath, imageFile);
+
+                    if (uploadError) {
+                        console.warn('Image upload failed, continuing without image:', uploadError);
+                        imageUrl = null;
+                    } else {
+                        const {
+                            data: { publicUrl },
+                        } = supabase.storage.from('subcategory-images').getPublicUrl(filePath);
+                        imageUrl = publicUrl;
+                    }
+                } catch (error) {
+                    console.warn('Image upload failed, continuing without image:', error);
+                    imageUrl = null;
+                }
+            }
+
             const subCategoryData = {
                 title: formData.title.trim(),
                 desc: formData.desc.trim(),
                 category_id: parseInt(formData.category),
+                image: imageUrl,
             };
 
             if (subCategoryId) {
@@ -115,6 +151,8 @@ const SubCategoryForm: React.FC<SubCategoryFormProps> = ({ subCategoryId }) => {
                     desc: '',
                     category: '',
                 });
+                setImageFile(null);
+                setPreviewUrl(null);
 
                 // Redirect to subcategories page after creating
                 setTimeout(() => {
@@ -159,6 +197,58 @@ const SubCategoryForm: React.FC<SubCategoryFormProps> = ({ subCategoryId }) => {
                                 value={formData.desc}
                                 onChange={(e) => setFormData((prev) => ({ ...prev, desc: e.target.value }))}
                             />
+                        </div>
+
+                        {/* Image Upload */}
+                        <div>
+                            <label className="mb-3 block">Subcategory Image</label>
+                            <div className="space-y-4">
+                                {/* Image Preview */}
+                                {previewUrl && (
+                                    <div className="relative w-32 h-32">
+                                        <img src={previewUrl} alt="Preview" className="w-full h-full object-cover rounded-lg border" />
+                                        <button
+                                            type="button"
+                                            className="absolute -top-2 -right-2 bg-red-500 text-white rounded-full w-6 h-6 flex items-center justify-center text-sm hover:bg-red-600"
+                                            onClick={() => {
+                                                setImageFile(null);
+                                                setPreviewUrl(null);
+                                            }}
+                                        >
+                                            ×
+                                        </button>
+                                    </div>
+                                )}
+
+                                {/* Upload Button */}
+                                <div className="flex h-32 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 hover:border-primary hover:bg-gray-100 dark:border-[#1b2e4b] dark:bg-black dark:hover:border-primary dark:hover:bg-[#1b2e4b]">
+                                    <input
+                                        type="file"
+                                        accept="image/*"
+                                        onChange={(e) => {
+                                            if (e.target.files && e.target.files[0]) {
+                                                const file = e.target.files[0];
+                                                setImageFile(file);
+                                                setPreviewUrl(URL.createObjectURL(file));
+                                            }
+                                        }}
+                                        className="hidden"
+                                        id="subcategory-image-upload"
+                                    />
+                                    <label htmlFor="subcategory-image-upload" className="flex h-full w-full cursor-pointer flex-col items-center justify-center">
+                                        <svg className="mb-2 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                            <path
+                                                strokeLinecap="round"
+                                                strokeLinejoin="round"
+                                                strokeWidth={2}
+                                                d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                            />
+                                        </svg>
+                                        <p className="text-sm text-gray-600 dark:text-gray-400">Click to upload image</p>
+                                        <p className="text-[10px] text-gray-500 dark:text-gray-500">PNG, JPG, GIF up to 10MB</p>
+                                    </label>
+                                </div>
+                            </div>
                         </div>
                     </div>
 
@@ -208,7 +298,7 @@ const SubCategoryForm: React.FC<SubCategoryFormProps> = ({ subCategoryId }) => {
                 </div>
 
                 <div className="mt-8 flex justify-end gap-4">
-                    <button type="button" className="btn btn-outline-danger" onClick={() => router.push('/subcategories')} disabled={loading}>
+                    <button type="button" className="btn btn-outline-danger" onClick={() => router.push('/categories/subcategories')} disabled={loading}>
                         {t('cancel')}
                     </button>
                     <button type="submit" className="btn btn-primary" disabled={loading}>

@@ -535,6 +535,12 @@ const PreviewOrder = () => {
                         ),
                         assigned_driver:delivery_drivers(
                             id, name, phone, avatar_url
+                        ),
+                        delivery_methods(
+                            id, label, delivery_time, price,
+                            delivery_location_methods(
+                                id, location_name, price_addition
+                            )
                         )
                     `,
                     )
@@ -542,6 +548,30 @@ const PreviewOrder = () => {
                     .single();
 
                 if (error) throw error;
+
+                // Fetch selected features if any
+                let selectedFeatures: Array<{ label: string; value: string; price_addition: number }> = [];
+                if (data.selected_feature_value_ids && data.selected_feature_value_ids.length > 0) {
+                    const { data: featuresData, error: featuresError } = await supabase
+                        .from('products_features_values')
+                        .select(
+                            `
+                            id, value, price_addition,
+                            products_features_labels!inner(
+                                label
+                            )
+                        `,
+                        )
+                        .in('id', data.selected_feature_value_ids);
+
+                    if (!featuresError && featuresData) {
+                        selectedFeatures = featuresData.map((feature: any) => ({
+                            label: feature.products_features_labels.label,
+                            value: feature.value,
+                            price_addition: feature.price_addition,
+                        }));
+                    }
+                }
 
                 // Format the order data for display
                 const shippingAddress = parseJsonField(data.shipping_address);
@@ -624,6 +654,8 @@ const PreviewOrder = () => {
                         price: data.products?.price,
                         images: data.products?.images,
                     },
+                    // Features and delivery data
+                    selected_features: selectedFeatures,
                 };
 
                 setOrder(formattedOrder);
@@ -671,12 +703,20 @@ const PreviewOrder = () => {
         return order.items.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0);
     };
 
-    const calculateTax = () => {
-        return calculateSubtotal() * 0.1; // 10% tax
+    const calculateDeliveryFee = () => {
+        if (!order?.delivery_methods) return 0;
+        const basePrice = order.delivery_methods.price || 0;
+        const locationAddition = order.delivery_methods.delivery_location_methods?.price_addition || 0;
+        return basePrice + locationAddition;
+    };
+
+    const calculateFeaturesTotal = () => {
+        if (!order?.selected_features) return 0;
+        return order.selected_features.reduce((sum: number, feature: any) => sum + (feature.price_addition || 0), 0);
     };
 
     const calculateTotal = () => {
-        return calculateSubtotal() + calculateTax();
+        return calculateSubtotal() + calculateDeliveryFee() + calculateFeaturesTotal();
     };
 
     // Handler functions for editor functionality
@@ -1318,10 +1358,38 @@ const PreviewOrder = () => {
                                     <span>{t('subtotal')}:</span>
                                     <span>${calculateSubtotal().toFixed(2)}</span>
                                 </div>
-                                <div className="flex justify-between">
-                                    <span>{t('tax')} (10%):</span>
-                                    <span>${calculateTax().toFixed(2)}</span>
-                                </div>
+
+                                {/* Delivery Details */}
+                                {order?.delivery_methods && (
+                                    <>
+                                        <div className="flex justify-between text-sm text-gray-600">
+                                            <span>Delivery ({order.delivery_methods.label}):</span>
+                                            <span>${order.delivery_methods.price?.toFixed(2) || '0.00'}</span>
+                                        </div>
+                                        {order.delivery_methods.delivery_location_methods && (
+                                            <div className="flex justify-between text-sm text-gray-600">
+                                                <span>Location ({order.delivery_methods.delivery_location_methods.location_name}):</span>
+                                                <span>+${order.delivery_methods.delivery_location_methods.price_addition?.toFixed(2) || '0.00'}</span>
+                                            </div>
+                                        )}
+                                    </>
+                                )}
+
+                                {/* Features Details */}
+                                {order?.selected_features && order.selected_features.length > 0 && (
+                                    <div className="space-y-1">
+                                        <div className="text-sm font-medium text-gray-700">Features:</div>
+                                        {order.selected_features.map((feature: any, index: number) => (
+                                            <div key={index} className="flex justify-between text-sm text-gray-600">
+                                                <span>
+                                                    {feature.label}: {feature.value}
+                                                </span>
+                                                <span>+${(feature.price_addition || 0).toFixed(2)}</span>
+                                            </div>
+                                        ))}
+                                    </div>
+                                )}
+
                                 <div className="flex justify-between border-t pt-2 font-semibold">
                                     <span>{t('total')}:</span>
                                     <span className="text-success">${calculateTotal().toFixed(2)}</span>

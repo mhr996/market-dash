@@ -21,6 +21,14 @@ interface Category {
     created_at: string;
 }
 
+interface SubCategory {
+    id: number;
+    title: string;
+    desc: string;
+    category_id: number;
+    created_at: string;
+}
+
 interface Product {
     id: string;
     created_at: string;
@@ -30,10 +38,12 @@ interface Product {
     price: string;
     images: string[];
     category: number | null;
+    subcategory_id: number | null;
     shops?: {
         shop_name: string;
     };
     categories?: Category;
+    categories_sub?: SubCategory;
     sale_price?: number | null;
     discount_type?: 'percentage' | 'fixed' | null;
     discount_value?: number | null;
@@ -73,12 +83,13 @@ const ProductsList = () => {
     useEffect(() => {
         const fetchProducts = async () => {
             try {
-                const { data, error } = await supabase.from('products').select('*, shops(shop_name), categories(*)').order('created_at', { ascending: false });
+                const { data, error } = await supabase.from('products').select('*, shops(shop_name), categories(*), categories_sub(*)').order('created_at', { ascending: false });
                 if (error) throw error;
 
                 setItems(data as Product[]);
             } catch (error) {
-                // Error fetching products
+                console.error('Error fetching products:', error);
+                setAlert({ visible: true, message: `Error fetching products: ${error}`, type: 'danger' });
             } finally {
                 setLoading(false);
             }
@@ -256,6 +267,12 @@ const ProductsList = () => {
                                 title: t('category'),
                                 sortable: true,
                                 render: ({ categories }) => <span>{categories?.title || 'N/A'}</span>,
+                            },
+                            {
+                                accessor: 'categories_sub.title',
+                                title: 'Subcategory',
+                                sortable: true,
+                                render: ({ categories_sub }) => <span>{categories_sub?.title || 'N/A'}</span>,
                             },
                             {
                                 accessor: 'created_at',

@@ -29,6 +29,13 @@ interface Category {
     desc: string;
 }
 
+interface SubCategory {
+    id: number;
+    title: string;
+    desc: string;
+    category_id: number;
+}
+
 interface FeatureLabel {
     id?: number;
     label: string;
@@ -52,6 +59,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
     const [loading, setLoading] = useState(false);
     const [shops, setShops] = useState<Shop[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
+    const [subcategories, setSubcategories] = useState<SubCategory[]>([]);
     const [previewUrls, setPreviewUrls] = useState<string[]>([]);
     const [alert, setAlert] = useState<{ type: 'success' | 'danger'; message: string } | null>(null);
 
@@ -75,9 +83,11 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
     // Dropdown states
     const [isShopDropdownOpen, setIsShopDropdownOpen] = useState(false);
     const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
-    const [searchTerm, setSearchTerm] = useState({ shop: '', category: '' });
+    const [isSubcategoryDropdownOpen, setIsSubcategoryDropdownOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState({ shop: '', category: '', subcategory: '' });
     const shopRef = useRef<HTMLDivElement>(null);
     const categoryRef = useRef<HTMLDivElement>(null);
+    const subcategoryRef = useRef<HTMLDivElement>(null);
 
     // Form state
     const [formData, setFormData] = useState({
@@ -86,6 +96,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
         price: '',
         shop: '',
         category: '',
+        subcategory: '',
         active: true, // Default to active
     });
 
@@ -198,6 +209,9 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
             if (categoryRef.current && !categoryRef.current.contains(event.target as Node)) {
                 setIsCategoryDropdownOpen(false);
             }
+            if (subcategoryRef.current && !subcategoryRef.current.contains(event.target as Node)) {
+                setIsSubcategoryDropdownOpen(false);
+            }
         };
 
         document.addEventListener('mousedown', handleClickOutside);
@@ -215,6 +229,10 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                 const { data: categoriesData } = await supabase.from('categories').select('*').order('title', { ascending: true });
                 if (categoriesData) setCategories(categoriesData);
 
+                // Fetch subcategories
+                const { data: subcategoriesData } = await supabase.from('categories_sub').select('*').order('title', { ascending: true });
+                if (subcategoriesData) setSubcategories(subcategoriesData);
+
                 // If editing, fetch product data
                 if (productId) {
                     const { data: product } = await supabase.from('products').select('*').eq('id', productId).single();
@@ -226,6 +244,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                             price: product.price,
                             shop: product.shop,
                             category: product.category?.toString() || '',
+                            subcategory: product.subcategory_id?.toString() || '',
                             active: product.active !== undefined ? product.active : true,
                         });
                         setPreviewUrls(product.images || []);
@@ -292,6 +311,13 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
         }
     }, [hasSalePrice, formData.price, discountType, discountValue]);
 
+    // Clear subcategory when category changes
+    useEffect(() => {
+        if (!formData.category) {
+            setFormData((prev) => ({ ...prev, subcategory: '' }));
+        }
+    }, [formData.category]);
+
     // Handle image uploads for both add and edit modes
     const handleImagesUploaded = (url: string | string[]) => {
         if (Array.isArray(url)) {
@@ -325,6 +351,10 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
     const filteredShops = shops.filter((shop) => shop.shop_name.toLowerCase().includes(searchTerm.shop.toLowerCase()));
 
     const filteredCategories = categories.filter((category) => category.title.toLowerCase().includes(searchTerm.category.toLowerCase()));
+
+    const filteredSubcategories = subcategories.filter(
+        (subcategory) => subcategory.title.toLowerCase().includes(searchTerm.subcategory.toLowerCase()) && (!formData.category || subcategory.category_id.toString() === formData.category),
+    );
 
     const handleCreateCategory = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -403,6 +433,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                         price: parseFloat(formData.price),
                         shop: formData.shop,
                         category: formData.category ? parseInt(formData.category) : null,
+                        subcategory_id: formData.subcategory ? parseInt(formData.subcategory) : null,
                         images: [], // Empty initially
                         sale_price: hasSalePrice && finalPrice ? finalPrice : null,
                         discount_type: hasSalePrice ? discountType : null,
@@ -444,6 +475,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                         price: '',
                         shop: '',
                         category: '',
+                        subcategory: '',
                         active: true,
                     });
                     setPreviewUrls([]);
@@ -466,6 +498,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                         price: parseFloat(formData.price),
                         shop: formData.shop,
                         category: formData.category ? parseInt(formData.category) : null,
+                        subcategory_id: formData.subcategory ? parseInt(formData.subcategory) : null,
                         images: [],
                         sale_price: hasSalePrice && finalPrice ? finalPrice : null,
                         discount_type: hasSalePrice ? discountType : null,
@@ -490,6 +523,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                         price: '',
                         shop: '',
                         category: '',
+                        subcategory: '',
                         active: true,
                     });
                     setPreviewUrls([]);
@@ -515,6 +549,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                     price: parseFloat(formData.price),
                     shop: formData.shop,
                     category: formData.category ? parseInt(formData.category) : null,
+                    subcategory_id: formData.subcategory ? parseInt(formData.subcategory) : null,
                     images: finalImageUrls,
                     sale_price: hasSalePrice && finalPrice ? finalPrice : null,
                     discount_type: hasSalePrice ? discountType : null,
@@ -566,6 +601,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                             price: upsertedProduct.price.toString(),
                             shop: upsertedProduct.shop,
                             category: upsertedProduct.category?.toString() || '',
+                            subcategory: upsertedProduct.subcategory_id?.toString() || '',
                             active: upsertedProduct.active,
                         });
                         setPreviewUrls(upsertedProduct.images || []);
@@ -589,6 +625,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                             price: updatedProduct.price.toString(),
                             shop: updatedProduct.shop,
                             category: updatedProduct.category?.toString() || '',
+                            subcategory: updatedProduct.subcategory_id?.toString() || '',
                             active: updatedProduct.active,
                         });
                         setPreviewUrls(updatedProduct.images || []);
@@ -837,6 +874,16 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                                                 />
                                             </div>
                                             <div className="max-h-64 overflow-y-auto">
+                                                {/* Unselect option */}
+                                                <div
+                                                    className="cursor-pointer px-4 py-2 hover:bg-gray-100 dark:text-white-dark dark:hover:bg-[#191e3a] text-gray-500 italic"
+                                                    onClick={() => {
+                                                        setFormData((prev) => ({ ...prev, shop: '' }));
+                                                        setIsShopDropdownOpen(false);
+                                                    }}
+                                                >
+                                                    -- No Shop --
+                                                </div>
                                                 {filteredShops.map((shop) => (
                                                     <div
                                                         key={shop.id}
@@ -880,12 +927,22 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                                                     />
                                                 </div>
                                                 <div className="max-h-64 overflow-y-auto">
+                                                    {/* Unselect option */}
+                                                    <div
+                                                        className="cursor-pointer px-4 py-2 hover:bg-gray-100 dark:text-white-dark dark:hover:bg-[#191e3a] text-gray-500 italic"
+                                                        onClick={() => {
+                                                            setFormData((prev) => ({ ...prev, category: '', subcategory: '' }));
+                                                            setIsCategoryDropdownOpen(false);
+                                                        }}
+                                                    >
+                                                        -- No Category --
+                                                    </div>
                                                     {filteredCategories.map((category) => (
                                                         <div
                                                             key={category.id}
                                                             className={`cursor-pointer px-4 py-2 hover:bg-gray-100 dark:text-white-dark dark:hover:bg-[#191e3a]`}
                                                             onClick={() => {
-                                                                setFormData((prev) => ({ ...prev, category: category.id.toString() }));
+                                                                setFormData((prev) => ({ ...prev, category: category.id.toString(), subcategory: '' }));
                                                                 setIsCategoryDropdownOpen(false);
                                                             }}
                                                         >
@@ -948,6 +1005,62 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                                     </div>
                                 )}
                             </AnimateHeight>
+
+                            {/* Subcategory Selection - Only show if subcategories are available and category is selected */}
+                            {subcategories.length > 0 && formData.category && (
+                                <div ref={subcategoryRef} className="relative">
+                                    <label htmlFor="subcategory">Subcategory</label>
+                                    <div className="relative">
+                                        <div
+                                            className={`cursor-pointer rounded border border-[#e0e6ed] bg-white p-2.5 text-dark dark:border-[#191e3a] dark:bg-black dark:text-white-dark flex items-center justify-between ${
+                                                !formData.category ? 'opacity-50 cursor-not-allowed' : ''
+                                            }`}
+                                            onClick={() => formData.category && setIsSubcategoryDropdownOpen(!isSubcategoryDropdownOpen)}
+                                        >
+                                            <span>{formData.subcategory ? subcategories.find((s) => s.id.toString() === formData.subcategory)?.title : 'Select Subcategory'}</span>
+                                            <IconCaretDown className={`h-4 w-4 transition-transform duration-300 ${isSubcategoryDropdownOpen ? 'rotate-180' : ''}`} />
+                                        </div>
+
+                                        {isSubcategoryDropdownOpen && formData.category && (
+                                            <div className="absolute z-50 mt-1 w-full rounded-md border border-[#e0e6ed] bg-white shadow-lg dark:border-[#191e3a] dark:bg-black">
+                                                <div className="p-2">
+                                                    <input
+                                                        type="text"
+                                                        className="w-full rounded border border-[#e0e6ed] p-2 focus:border-primary focus:outline-none dark:border-[#191e3a] dark:bg-black dark:text-white-dark"
+                                                        placeholder="Search subcategories..."
+                                                        value={searchTerm.subcategory}
+                                                        onChange={(e) => setSearchTerm((prev) => ({ ...prev, subcategory: e.target.value }))}
+                                                    />
+                                                </div>
+                                                <div className="max-h-64 overflow-y-auto">
+                                                    {/* Unselect option */}
+                                                    <div
+                                                        className="cursor-pointer px-4 py-2 hover:bg-gray-100 dark:text-white-dark dark:hover:bg-[#191e3a] text-gray-500 italic"
+                                                        onClick={() => {
+                                                            setFormData((prev) => ({ ...prev, subcategory: '' }));
+                                                            setIsSubcategoryDropdownOpen(false);
+                                                        }}
+                                                    >
+                                                        -- No Subcategory --
+                                                    </div>
+                                                    {filteredSubcategories.map((subcategory) => (
+                                                        <div
+                                                            key={subcategory.id}
+                                                            className="cursor-pointer px-4 py-2 hover:bg-gray-100 dark:text-white-dark dark:hover:bg-[#191e3a]"
+                                                            onClick={() => {
+                                                                setFormData((prev) => ({ ...prev, subcategory: subcategory.id.toString() }));
+                                                                setIsSubcategoryDropdownOpen(false);
+                                                            }}
+                                                        >
+                                                            {subcategory.title}
+                                                        </div>
+                                                    ))}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
 
                             {/* Image Upload */}
                             <div>

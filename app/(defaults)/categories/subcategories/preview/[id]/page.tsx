@@ -13,6 +13,7 @@ interface SubCategory {
     title: string;
     desc: string;
     category_id: number;
+    image: string | null;
     created_at: string;
     categories?: {
         id: number;
@@ -61,11 +62,8 @@ const SubCategoryPreview = () => {
     if (!subCategory) {
         return (
             <div className="panel border-white-light px-0 dark:border-[#1b2e4b] w-full max-w-none">
-                <div className="text-center py-8">
-                    <p className="text-gray-500">Sub Category not found</p>
-                    <button onClick={() => router.push('/categories/subcategories')} className="btn btn-primary mt-4">
-                        Back to Sub Categories
-                    </button>
+                <div className="flex items-center justify-center h-64">
+                    <p className="text-gray-500">Subcategory not found</p>
                 </div>
             </div>
         );
@@ -73,9 +71,9 @@ const SubCategoryPreview = () => {
 
     return (
         <div className="panel border-white-light px-0 dark:border-[#1b2e4b] w-full max-w-none">
-            <div className="space-y-6 p-6">
+            <div className="px-5 py-4">
                 {/* Header */}
-                <div className="flex items-center justify-between">
+                <div className="flex items-center justify-between mb-6">
                     <div className="flex items-center gap-4">
                         <button onClick={() => router.back()} className="btn btn-outline-primary btn-sm">
                             <IconArrowLeft className="w-4 h-4" />
@@ -91,6 +89,16 @@ const SubCategoryPreview = () => {
 
                 {/* SubCategory Details */}
                 <div className="space-y-6">
+                    {/* Image */}
+                    {subCategory.image && (
+                        <div>
+                            <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">Image</h3>
+                            <div className="w-48 h-48">
+                                <img src={subCategory.image} alt={subCategory.title} className="w-full h-full object-cover rounded-lg border" />
+                            </div>
+                        </div>
+                    )}
+
                     <div>
                         <h3 className="text-lg font-semibold text-gray-700 dark:text-gray-300 mb-2">Sub Category Name</h3>
                         <p className="text-gray-900 dark:text-white">{subCategory.title}</p>

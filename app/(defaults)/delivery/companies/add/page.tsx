@@ -15,6 +15,7 @@ import Tabs from '@/components/tabs';
 import dynamic from 'next/dynamic';
 import 'leaflet/dist/leaflet.css';
 import { getTranslation } from '@/i18n';
+import DeliveryPricing from '@/components/delivery/delivery-pricing';
 
 // Import the map component dynamically with no SSR
 const MapSelector = dynamic(() => import('@/components/map/map-selector'), {
@@ -42,17 +43,17 @@ const AddDeliveryCompanyPage = () => {
         details: '',
         latitude: null as number | null,
         longitude: null as number | null,
-        // Pricing fields
-        express_price: '',
-        fast_price: '',
-        standard_price: '',
-        // Location based pricing
-        location_prices: [] as Array<{
-            id: number;
-            location: string;
-            express_price: string;
-            fast_price: string;
-            standard_price: string;
+        // New flexible pricing system
+        delivery_methods: [] as Array<{
+            label: string;
+            delivery_time: string;
+            price: number;
+            is_active: boolean;
+            location_prices: Array<{
+                location_name: string;
+                price_addition: number;
+                is_active: boolean;
+            }>;
         }>,
     });
 
@@ -118,31 +119,10 @@ const AddDeliveryCompanyPage = () => {
         }));
     };
 
-    const addLocationPrice = () => {
-        const newLocationPrice = {
-            id: Date.now(),
-            location: '',
-            express_price: '',
-            fast_price: '',
-            standard_price: '',
-        };
+    const handleDeliveryMethodsChange = (methods: any[]) => {
         setForm((prev) => ({
             ...prev,
-            location_prices: [...prev.location_prices, newLocationPrice],
-        }));
-    };
-
-    const removeLocationPrice = (id: number) => {
-        setForm((prev) => ({
-            ...prev,
-            location_prices: prev.location_prices.filter((lp) => lp.id !== id),
-        }));
-    };
-
-    const handleLocationPriceChange = (id: number, field: string, value: string) => {
-        setForm((prev) => ({
-            ...prev,
-            location_prices: prev.location_prices.map((lp) => (lp.id === id ? { ...lp, [field]: value } : lp)),
+            delivery_methods: methods,
         }));
     };
 
@@ -220,34 +200,45 @@ const AddDeliveryCompanyPage = () => {
                     .eq('id', newCompany.id);
             }
 
-            // Create delivery prices entry
-            if (form.express_price || form.fast_price || form.standard_price) {
-                const pricesPayload = {
-                    delivery_companies_id: newCompany.id,
-                    express_price: parseFloat(form.express_price) || 0,
-                    fast_price: parseFloat(form.fast_price) || 0,
-                    standard_price: parseFloat(form.standard_price) || 0,
-                };
+            // Create delivery methods and location pricing
+            if (form.delivery_methods.length > 0) {
+                for (const method of form.delivery_methods) {
+                    if (method.label.trim() && method.delivery_time.trim()) {
+                        // Insert delivery method
+                        const { data: methodData, error: methodError } = await supabase
+                            .from('delivery_methods')
+                            .insert([
+                                {
+                                    delivery_company_id: newCompany.id,
+                                    label: method.label.trim(),
+                                    delivery_time: method.delivery_time.trim(),
+                                    price: method.price || 0,
+                                    is_active: method.is_active !== false,
+                                },
+                            ])
+                            .select()
+                            .single();
 
-                const { error: pricesError } = await supabase.from('delivery_prices').insert([pricesPayload]);
-                if (pricesError) throw pricesError;
-            }
+                        if (methodError) throw methodError;
 
-            // Create location-based prices entries
-            if (form.location_prices.length > 0) {
-                const locationPricesPayload = form.location_prices
-                    .filter((lp) => lp.location.trim() !== '')
-                    .map((lp) => ({
-                        delivery_companies_id: newCompany.id,
-                        delivery_location: lp.location,
-                        express_price: parseFloat(lp.express_price) || 0,
-                        fast_price: parseFloat(lp.fast_price) || 0,
-                        standard_price: parseFloat(lp.standard_price) || 0,
-                    }));
+                        // Insert location prices for this method
+                        if (method.location_prices && method.location_prices.length > 0) {
+                            const locationPricesPayload = method.location_prices
+                                .filter((lp) => lp.location_name.trim() !== '')
+                                .map((lp) => ({
+                                    delivery_company_id: newCompany.id,
+                                    delivery_method_id: methodData.id,
+                                    location_name: lp.location_name.trim(),
+                                    price_addition: lp.price_addition || 0,
+                                    is_active: lp.is_active !== false,
+                                }));
 
-                if (locationPricesPayload.length > 0) {
-                    const { error: locationPricesError } = await supabase.from('delivery_location_prices').insert(locationPricesPayload);
-                    if (locationPricesError) throw locationPricesError;
+                            if (locationPricesPayload.length > 0) {
+                                const { error: locationError } = await supabase.from('delivery_location_methods').insert(locationPricesPayload);
+                                if (locationError) throw locationError;
+                            }
+                        }
+                    }
                 }
             }
 
@@ -495,159 +486,7 @@ const AddDeliveryCompanyPage = () => {
 
                 {activeTab === 2 && (
                     <div className="panel mb-5 w-full max-w-none">
-                        <div className="mb-5">
-                            <h5 className="text-lg font-semibold dark:text-white-light">{t('delivery_pricing')}</h5>
-                            <p className="text-gray-500 dark:text-gray-400 mt-1">{t('set_base_delivery_prices')}</p>
-                        </div>
-                        <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
-                            <div>
-                                <label htmlFor="express_price" className="block text-sm font-bold text-gray-700 dark:text-white">
-                                    {t('express_same_day')} <span className="text-red-500">*</span>
-                                </label>
-                                <div className="relative">
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
-                                    <input
-                                        type="number"
-                                        id="express_price"
-                                        name="express_price"
-                                        value={form.express_price}
-                                        onChange={handleInputChange}
-                                        className="form-input pl-8"
-                                        placeholder="0.00"
-                                        step="0.01"
-                                        min="0"
-                                        required
-                                    />
-                                </div>
-                            </div>
-                            <div>
-                                <label htmlFor="fast_price" className="block text-sm font-bold text-gray-700 dark:text-white">
-                                    {t('fast_2_3_days')} <span className="text-red-500">*</span>
-                                </label>
-                                <div className="relative">
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
-                                    <input
-                                        type="number"
-                                        id="fast_price"
-                                        name="fast_price"
-                                        value={form.fast_price}
-                                        onChange={handleInputChange}
-                                        className="form-input pl-8"
-                                        placeholder="0.00"
-                                        step="0.01"
-                                        min="0"
-                                        required
-                                    />
-                                </div>
-                            </div>
-                            <div>
-                                <label htmlFor="standard_price" className="block text-sm font-bold text-gray-700 dark:text-white">
-                                    {t('standard_3_5_days')} <span className="text-red-500">*</span>
-                                </label>
-                                <div className="relative">
-                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
-                                    <input
-                                        type="number"
-                                        id="standard_price"
-                                        name="standard_price"
-                                        value={form.standard_price}
-                                        onChange={handleInputChange}
-                                        className="form-input pl-8"
-                                        placeholder="0.00"
-                                        step="0.01"
-                                        min="0"
-                                        required
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                        <div className="mt-4 p-4 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
-                            <p className="text-sm text-blue-700 dark:text-blue-300">
-                                <strong>{t('note')}:</strong> {t('pricing_note')}
-                            </p>
-                        </div>
-
-                        {/* Location Based Prices Section */}
-                        <div className="mt-8">
-                            <div className="mb-5">
-                                <h5 className="text-lg font-semibold dark:text-white-light">{t('location_based_prices')}</h5>
-                                <p className="text-gray-500 dark:text-gray-400 mt-1">{t('set_specific_prices_for_locations')}</p>
-                            </div>
-                            <div className="grid grid-cols-1 gap-6">
-                                {form.location_prices.map((locationPrice, index) => (
-                                    <div key={locationPrice.id} className="border border-gray-200 dark:border-gray-700 rounded-md p-4">
-                                        <div className="flex flex-wrap items-center justify-between gap-4">
-                                            <div className="flex items-center flex-1">
-                                                <h6 className="text-lg font-semibold min-w-[120px]">
-                                                    {t('location')} {index + 1}
-                                                </h6>
-                                                <input
-                                                    type="text"
-                                                    className="form-input flex-1 ml-4"
-                                                    placeholder={t('enter_location_name')}
-                                                    value={locationPrice.location}
-                                                    onChange={(e) => handleLocationPriceChange(locationPrice.id, 'location', e.target.value)}
-                                                />
-                                            </div>
-                                            <button type="button" className="btn btn-outline-danger btn-sm" onClick={() => removeLocationPrice(locationPrice.id)}>
-                                                <IconX className="h-4 w-4" />
-                                            </button>
-                                        </div>
-                                        <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-3">
-                                            <div>
-                                                <label className="block text-sm font-bold text-gray-700 dark:text-white mb-2">{t('express_same_day')}</label>
-                                                <div className="relative">
-                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
-                                                    <input
-                                                        type="number"
-                                                        className="form-input pl-8"
-                                                        placeholder="0.00"
-                                                        step="0.01"
-                                                        min="0"
-                                                        value={locationPrice.express_price}
-                                                        onChange={(e) => handleLocationPriceChange(locationPrice.id, 'express_price', e.target.value)}
-                                                    />
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-bold text-gray-700 dark:text-white mb-2">{t('fast_2_3_days')}</label>
-                                                <div className="relative">
-                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
-                                                    <input
-                                                        type="number"
-                                                        className="form-input pl-8"
-                                                        placeholder="0.00"
-                                                        step="0.01"
-                                                        min="0"
-                                                        value={locationPrice.fast_price}
-                                                        onChange={(e) => handleLocationPriceChange(locationPrice.id, 'fast_price', e.target.value)}
-                                                    />
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <label className="block text-sm font-bold text-gray-700 dark:text-white mb-2">{t('standard_3_5_days')}</label>
-                                                <div className="relative">
-                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
-                                                    <input
-                                                        type="number"
-                                                        className="form-input pl-8"
-                                                        placeholder="0.00"
-                                                        step="0.01"
-                                                        min="0"
-                                                        value={locationPrice.standard_price}
-                                                        onChange={(e) => handleLocationPriceChange(locationPrice.id, 'standard_price', e.target.value)}
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ))}
-                                <button type="button" className="btn btn-outline-primary btn-sm mt-2" onClick={addLocationPrice}>
-                                    <IconPlus className="h-4 w-4 mr-2" />
-                                    {t('add_location_price')}
-                                </button>
-                            </div>
-                        </div>
+                        <DeliveryPricing methods={form.delivery_methods} onChange={handleDeliveryMethodsChange} disabled={loading} />
                     </div>
                 )}
 

@@ -15,11 +15,16 @@ interface Product {
     price: string;
     images: string[];
     category: number | null;
+    subcategory_id: number | null;
     shops: {
         shop_name: string;
         owner: string;
     };
     categories?: {
+        title: string;
+        desc: string;
+    };
+    categories_sub?: {
         title: string;
         desc: string;
     };
@@ -59,7 +64,7 @@ const ProductDetailsPage = ({ params }: ProductDetailsPageProps) => {
     useEffect(() => {
         const fetchProduct = async () => {
             try {
-                const { data, error } = await supabase.from('products').select('*, shops(shop_name, owner), categories(title, desc)').eq('id', params.id).single();
+                const { data, error } = await supabase.from('products').select('*, shops(shop_name, owner), categories(title, desc), categories_sub(title, desc)').eq('id', params.id).single();
 
                 if (error) throw error;
                 setProduct(data);
@@ -245,6 +250,16 @@ const ProductDetailsPage = ({ params }: ProductDetailsPageProps) => {
                                 <div className="mt-2">
                                     <h4 className="font-medium">{product.categories.title}</h4>
                                     <p className="text-gray-600 dark:text-gray-400">{product.categories.desc}</p>
+                                </div>
+                            </div>
+                        )}
+
+                        {product.categories_sub && (
+                            <div>
+                                <h3 className="text-lg font-semibold">Subcategory</h3>
+                                <div className="mt-2">
+                                    <h4 className="font-medium">{product.categories_sub.title}</h4>
+                                    <p className="text-gray-600 dark:text-gray-400">{product.categories_sub.desc}</p>
                                 </div>
                             </div>
                         )}
