@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import supabase from '@/lib/supabase';
+import { calculateOrderTotal } from '@/utils/order-calculations';
 import { Alert } from '@/components/elements/alerts/elements-alerts-default';
 import IconEdit from '@/components/icon/icon-edit';
 import IconPhone from '@/components/icon/icon-phone';
@@ -205,12 +206,59 @@ const DeliveryCompanyPreview = () => {
         try {
             setOrdersLoading(true);
             // First, get all orders with basic data
-            const { data: ordersData, error: ordersError } = await supabase.from('orders').select('*').order('created_at', { ascending: false });
+            const { data: ordersData, error: ordersError } = await supabase
+                .from('orders')
+                .select(
+                    `
+                    *,
+                    delivery_methods(id, label, delivery_time, price),
+                    delivery_location_methods(id, location_name, price_addition),
+                    selected_feature_value_ids
+                `,
+                )
+                .order('created_at', { ascending: false });
             if (ordersError) throw ordersError;
 
             if (!ordersData || ordersData.length === 0) {
                 setOrders([]);
                 return;
+            }
+
+            // Fetch selected features for orders that have them
+            const ordersWithFeatures = ordersData.filter((order) => order.selected_feature_value_ids && order.selected_feature_value_ids.length > 0);
+
+            if (ordersWithFeatures.length > 0) {
+                const allFeatureValueIds = ordersWithFeatures.flatMap((order) => order.selected_feature_value_ids);
+
+                const { data: featuresData, error: featuresError } = await supabase
+                    .from('products_features_values')
+                    .select(
+                        `
+                        id, value, price_addition,
+                        products_features_labels!inner(label)
+                    `,
+                    )
+                    .in('id', allFeatureValueIds);
+
+                if (!featuresError && featuresData) {
+                    // Add features to orders
+                    ordersData.forEach((order) => {
+                        if (order.selected_feature_value_ids && order.selected_feature_value_ids.length > 0) {
+                            order.selected_features = order.selected_feature_value_ids
+                                .map((id: number) => {
+                                    const feature = featuresData.find((f: any) => f.id === id);
+                                    return feature
+                                        ? {
+                                              label: feature.products_features_labels[0].label,
+                                              value: feature.value,
+                                              price_addition: feature.price_addition,
+                                          }
+                                        : null;
+                                })
+                                .filter(Boolean);
+                        }
+                    });
+                }
             }
 
             // Get all product IDs from orders
@@ -743,7 +791,7 @@ const DeliveryCompanyPreview = () => {
                                                             )}
                                                             <div>
                                                                 <div className="font-medium">{order.products?.title || 'N/A'}</div>
-                                                                <div className="text-sm text-gray-500">${order.products?.price || 0}</div>
+                                                                <div className="text-sm text-gray-500">${calculateOrderTotal(order).toFixed(2)}</div>
                                                             </div>
                                                         </div>
                                                     </td>

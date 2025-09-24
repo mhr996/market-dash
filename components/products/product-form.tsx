@@ -46,6 +46,15 @@ interface FeatureValue {
     id?: number;
     value: string;
     price_addition: number;
+    image?: string | null;
+    options?: FeatureValueOption[];
+}
+
+interface FeatureValueOption {
+    id?: number;
+    option_name: string;
+    image?: string | null;
+    is_active?: boolean;
 }
 
 interface ProductFormProps {
@@ -111,11 +120,23 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
     const saveProductFeatures = async (productId: number, features: FeatureLabel[]) => {
         try {
             // Delete existing features for this product
-            await supabase
-                .from('products_features_values')
-                .delete()
-                .in('feature_label_id', (await supabase.from('products_features_labels').select('id').eq('product_id', productId)).data?.map((l) => l.id) || []);
-            await supabase.from('products_features_labels').delete().eq('product_id', productId);
+            const { data: existingLabels } = await supabase.from('products_features_labels').select('id').eq('product_id', productId);
+
+            if (existingLabels && existingLabels.length > 0) {
+                const labelIds = existingLabels.map((l) => l.id);
+
+                // Delete options first
+                await supabase
+                    .from('products_features_value_options')
+                    .delete()
+                    .in('feature_value_id', (await supabase.from('products_features_values').select('id').in('feature_label_id', labelIds)).data?.map((v) => v.id) || []);
+
+                // Delete values
+                await supabase.from('products_features_values').delete().in('feature_label_id', labelIds);
+
+                // Delete labels
+                await supabase.from('products_features_labels').delete().eq('product_id', productId);
+            }
 
             // Insert new features
             for (const feature of features) {
@@ -136,18 +157,42 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
 
                     // Insert values for this label
                     if (feature.values && feature.values.length > 0) {
-                        const valuesToInsert = feature.values
-                            .filter((value) => value.value.trim())
-                            .map((value) => ({
-                                feature_label_id: labelData.id,
-                                value: value.value.trim(),
-                                price_addition: value.price_addition || 0,
-                            }));
+                        for (const value of feature.values) {
+                            if (value.value.trim()) {
+                                // Insert value
+                                const { data: valueData, error: valueError } = await supabase
+                                    .from('products_features_values')
+                                    .insert([
+                                        {
+                                            feature_label_id: labelData.id,
+                                            value: value.value.trim(),
+                                            price_addition: value.price_addition || 0,
+                                            image: value.image || null,
+                                        },
+                                    ])
+                                    .select()
+                                    .single();
 
-                        if (valuesToInsert.length > 0) {
-                            const { error: valuesError } = await supabase.from('products_features_values').insert(valuesToInsert);
+                                if (valueError) throw valueError;
 
-                            if (valuesError) throw valuesError;
+                                // Insert options for this value
+                                if (value.options && value.options.length > 0) {
+                                    const optionsToInsert = value.options
+                                        .filter((option) => option.option_name.trim())
+                                        .map((option) => ({
+                                            feature_value_id: valueData.id,
+                                            option_name: option.option_name.trim(),
+                                            image: option.image || null,
+                                            is_active: option.is_active !== false,
+                                        }));
+
+                                    if (optionsToInsert.length > 0) {
+                                        const { error: optionsError } = await supabase.from('products_features_value_options').insert(optionsToInsert);
+
+                                        if (optionsError) throw optionsError;
+                                    }
+                                }
+                            }
                         }
                     }
                 }
@@ -173,14 +218,43 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
 
                 if (valuesError) throw valuesError;
 
-                // Group values by label
-                const featuresWithValues = labels.map((label) => ({
-                    id: label.id,
-                    label: label.label,
-                    values: values?.filter((value) => value.feature_label_id === label.id) || [],
-                }));
+                if (values && values.length > 0) {
+                    // Get options for each value
+                    const valueIds = values.map((value) => value.id);
+                    const { data: options, error: optionsError } = await supabase
+                        .from('products_features_value_options')
+                        .select('*')
+                        .in('feature_value_id', valueIds)
+                        .order('created_at', { ascending: true });
 
-                setFeatures(featuresWithValues);
+                    if (optionsError) throw optionsError;
+
+                    // Group values by label and add options to each value
+                    const featuresWithValues = labels.map((label) => ({
+                        id: label.id,
+                        label: label.label,
+                        values: values
+                            .filter((value) => value.feature_label_id === label.id)
+                            .map((value) => ({
+                                id: value.id,
+                                value: value.value,
+                                price_addition: value.price_addition,
+                                image: value.image,
+                                options: options?.filter((option) => option.feature_value_id === value.id) || [],
+                            })),
+                    }));
+
+                    setFeatures(featuresWithValues);
+                } else {
+                    // No values, just labels
+                    const featuresWithValues = labels.map((label) => ({
+                        id: label.id,
+                        label: label.label,
+                        values: [],
+                    }));
+
+                    setFeatures(featuresWithValues);
+                }
             } else {
                 setFeatures([]);
             }

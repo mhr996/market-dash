@@ -45,6 +45,15 @@ interface FeatureValue {
     id: number;
     value: string;
     price_addition: number;
+    image?: string | null;
+    options?: FeatureValueOption[];
+}
+
+interface FeatureValueOption {
+    id: number;
+    option_name: string;
+    image?: string | null;
+    is_active?: boolean;
 }
 
 interface ProductDetailsPageProps {
@@ -94,14 +103,43 @@ const ProductDetailsPage = ({ params }: ProductDetailsPageProps) => {
 
                 if (valuesError) throw valuesError;
 
-                // Group values by label
-                const featuresWithValues = labels.map((label) => ({
-                    id: label.id,
-                    label: label.label,
-                    values: values?.filter((value) => value.feature_label_id === label.id) || [],
-                }));
+                if (values && values.length > 0) {
+                    // Get options for each value
+                    const valueIds = values.map((value) => value.id);
+                    const { data: options, error: optionsError } = await supabase
+                        .from('products_features_value_options')
+                        .select('*')
+                        .in('feature_value_id', valueIds)
+                        .order('created_at', { ascending: true });
 
-                setFeatures(featuresWithValues);
+                    if (optionsError) throw optionsError;
+
+                    // Group values by label and add options to each value
+                    const featuresWithValues = labels.map((label) => ({
+                        id: label.id,
+                        label: label.label,
+                        values: values
+                            .filter((value) => value.feature_label_id === label.id)
+                            .map((value) => ({
+                                id: value.id,
+                                value: value.value,
+                                price_addition: value.price_addition,
+                                image: value.image,
+                                options: options?.filter((option) => option.feature_value_id === value.id) || [],
+                            })),
+                    }));
+
+                    setFeatures(featuresWithValues);
+                } else {
+                    // No values, just labels
+                    const featuresWithValues = labels.map((label) => ({
+                        id: label.id,
+                        label: label.label,
+                        values: [],
+                    }));
+
+                    setFeatures(featuresWithValues);
+                }
             } else {
                 setFeatures([]);
             }
@@ -169,9 +207,9 @@ const ProductDetailsPage = ({ params }: ProductDetailsPageProps) => {
                     </Link>
                 </div>
 
-                <div className="grid grid-cols-1 gap-6 lg:grid-cols-2">
+                <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
                     {/* Image Gallery */}
-                    <div className="space-y-4">
+                    <div className="lg:col-span-1 space-y-4">
                         <div className="relative h-96 w-full overflow-hidden rounded-lg bg-gray-100">
                             <img src={product.images?.[currentImageIndex] || '/assets/images/product-placeholder.jpg'} alt={product.title} className="h-full w-full object-cover" />
                         </div>
@@ -191,7 +229,7 @@ const ProductDetailsPage = ({ params }: ProductDetailsPageProps) => {
                     </div>
 
                     {/* Product Details */}
-                    <div className="space-y-6">
+                    <div className="lg:col-span-2 space-y-6">
                         <div>
                             <h3 className="text-lg font-semibold">{t('description')}</h3>
                             <p className="mt-2 text-gray-600 dark:text-gray-400">{product.desc}</p>
@@ -266,16 +304,39 @@ const ProductDetailsPage = ({ params }: ProductDetailsPageProps) => {
 
                         {features && features.length > 0 && (
                             <div>
-                                <h3 className="text-lg font-semibold">{t('product_features')}</h3>
-                                <div className="mt-3 space-y-4">
+                                <h3 className="text-lg font-semibold mb-4">{t('product_features')}</h3>
+                                <div className="space-y-6">
                                     {features.map((feature, featureIndex) => (
-                                        <div key={featureIndex} className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
-                                            <h4 className="font-medium text-gray-700 dark:text-gray-300 mb-3">{feature.label}</h4>
-                                            <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-3">
+                                        <div key={featureIndex} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                                            <h4 className="font-medium text-gray-800 dark:text-gray-200 mb-4 text-lg">{feature.label}</h4>
+                                            <div className="space-y-4">
                                                 {feature.values.map((value, valueIndex) => (
-                                                    <div key={valueIndex} className="flex justify-between items-center py-2 px-3 bg-white dark:bg-gray-900 rounded border">
-                                                        <span className="text-gray-600 dark:text-gray-400">{value.value}</span>
-                                                        {value.price_addition > 0 && <span className="text-success font-medium text-sm">+${value.price_addition.toFixed(2)}</span>}
+                                                    <div key={valueIndex} className="bg-gray-50 dark:bg-gray-800 rounded-lg p-4">
+                                                        <div className="flex items-center gap-3 mb-3">
+                                                            {value.image && <img src={value.image} alt={value.value} className="w-12 h-12 rounded-lg object-cover" />}
+                                                            <div>
+                                                                <div className="font-medium text-gray-800 dark:text-gray-200 text-lg">{value.value}</div>
+                                                                {value.price_addition > 0 && <div className="text-success text-sm">+${value.price_addition.toFixed(2)}</div>}
+                                                            </div>
+                                                        </div>
+
+                                                        {/* Show Options */}
+                                                        {value.options && value.options.length > 0 && (
+                                                            <div className="border-t border-gray-200 dark:border-gray-600 pt-3">
+                                                                <div className="text-sm font-medium text-gray-600 dark:text-gray-400 mb-2">Options:</div>
+                                                                <div className="flex flex-wrap gap-2">
+                                                                    {value.options.map((option, optionIndex) => (
+                                                                        <div
+                                                                            key={optionIndex}
+                                                                            className="flex items-center gap-2 px-3 py-1 bg-white dark:bg-gray-900 rounded-full border border-gray-200 dark:border-gray-600"
+                                                                        >
+                                                                            {option.image && <img src={option.image} alt={option.option_name} className="w-6 h-6 rounded-full object-cover" />}
+                                                                            <span className="text-sm text-gray-700 dark:text-gray-300">{option.option_name}</span>
+                                                                        </div>
+                                                                    ))}
+                                                                </div>
+                                                            </div>
+                                                        )}
                                                     </div>
                                                 ))}
                                             </div>

@@ -7,6 +7,7 @@ import React, { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { IRootState } from '@/store';
 import supabase from '@/lib/supabase';
+import { calculateOrderTotal } from '@/utils/order-calculations';
 import { getTranslation } from '@/i18n';
 import { DataTableSortStatus, DataTable } from 'mantine-datatable';
 import { sortBy } from 'lodash';
@@ -120,12 +121,52 @@ const RevenuePage = () => {
                     .select(
                         `
                         *,
-                        products(id, title, price, sale_price, shop, shops(id, shop_name, balance, owner, profiles(full_name)))
+                        products(id, title, price, sale_price, shop, shops(id, shop_name, balance, owner, profiles(full_name))),
+                        delivery_methods(id, label, delivery_time, price),
+                        delivery_location_methods(id, location_name, price_addition),
+                        selected_feature_value_ids
                     `,
                     )
                     .eq('status', 'completed');
 
                 if (ordersError) throw ordersError;
+
+                // Fetch selected features for orders that have them
+                const ordersWithFeatures = orders.filter((order) => order.selected_feature_value_ids && order.selected_feature_value_ids.length > 0);
+
+                if (ordersWithFeatures.length > 0) {
+                    const allFeatureValueIds = ordersWithFeatures.flatMap((order) => order.selected_feature_value_ids);
+
+                    const { data: featuresData, error: featuresError } = await supabase
+                        .from('products_features_values')
+                        .select(
+                            `
+                            id, value, price_addition,
+                            products_features_labels!inner(label)
+                        `,
+                        )
+                        .in('id', allFeatureValueIds);
+
+                    if (!featuresError && featuresData) {
+                        // Add features to orders
+                        orders.forEach((order) => {
+                            if (order.selected_feature_value_ids && order.selected_feature_value_ids.length > 0) {
+                                order.selected_features = order.selected_feature_value_ids
+                                    .map((id: number) => {
+                                        const feature = featuresData.find((f: any) => f.id === id);
+                                        return feature
+                                            ? {
+                                                  label: feature.products_features_labels[0].label,
+                                                  value: feature.value,
+                                                  price_addition: feature.price_addition,
+                                              }
+                                            : null;
+                                    })
+                                    .filter(Boolean);
+                            }
+                        });
+                    }
+                }
 
                 // Get all licenses for commission rates
                 const { data: licenses, error: licensesError } = await supabase.from('licenses').select('*');
@@ -143,8 +184,8 @@ const RevenuePage = () => {
                 const lastYearOrders = orders?.filter((order) => new Date(order.created_at).getFullYear() === lastYear) || [];
 
                 // Calculate total revenue and commissions
-                const currentRevenue = currentYearOrders.reduce((sum, order) => sum + (order.products?.sale_price || order.products?.price || 0), 0);
-                const lastRevenue = lastYearOrders.reduce((sum, order) => sum + (order.products?.sale_price || order.products?.price || 0), 0);
+                const currentRevenue = currentYearOrders.reduce((sum, order) => sum + calculateOrderTotal(order), 0);
+                const lastRevenue = lastYearOrders.reduce((sum, order) => sum + calculateOrderTotal(order), 0);
 
                 // Assume 10% commission rate as default (can be made dynamic based on license)
                 const defaultCommissionRate = 0.1;
@@ -162,7 +203,7 @@ const RevenuePage = () => {
 
                 currentYearOrders.forEach((order) => {
                     const month = new Date(order.created_at).getMonth();
-                    const revenue = order.products?.sale_price || order.products?.price || 0;
+                    const revenue = calculateOrderTotal(order);
                     monthlyRevenue[month] += revenue;
                     monthlyCommissions[month] += revenue * defaultCommissionRate;
                 });
@@ -200,7 +241,7 @@ const RevenuePage = () => {
                     if (order.products?.shops) {
                         const shopId = order.products.shop;
                         const shop = order.products.shops;
-                        const revenue = order.products.sale_price || order.products.price || 0;
+                        const revenue = calculateOrderTotal(order);
                         const commission = revenue * defaultCommissionRate;
 
                         if (shopRevenueMap.has(shopId)) {

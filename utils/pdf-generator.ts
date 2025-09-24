@@ -1,5 +1,6 @@
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
+import { calculateOrderSubtotal, calculateOrderDeliveryFee, calculateOrderFeaturesTotal, calculateOrderTotal } from './order-calculations';
 
 interface PDFOptions {
     filename?: string;
@@ -152,19 +153,54 @@ export const generateOrderReceiptPDF = async (orderData: any, options: PDFOption
                 </div>
 
                 <!-- Totals -->
-                <div style="margin-left: auto; width: 300px;">
+                <div style="margin-left: auto; width: 350px;">
                     <div style="border: 1px solid #ddd; padding: 20px; background-color: #f8f9fa;">
                         <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
                             <span style="color: #666;">Subtotal:</span>
-                            <span style="color: #666;">$${orderData.items.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0).toFixed(2)}</span>
+                            <span style="color: #666;">$${calculateOrderSubtotal(orderData).toFixed(2)}</span>
                         </div>
+                        ${
+                            orderData.delivery_methods
+                                ? `
                         <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
-                            <span style="color: #666;">Tax (10%):</span>
-                            <span style="color: #666;">$${(orderData.items.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0) * 0.1).toFixed(2)}</span>
+                            <span style="color: #666;">Delivery (${orderData.delivery_methods.label}):</span>
+                            <span style="color: #666;">$${orderData.delivery_methods.price?.toFixed(2) || '0.00'}</span>
                         </div>
+                        ${
+                            orderData.delivery_location_methods && orderData.delivery_location_methods.location_name && orderData.delivery_location_methods.price_addition > 0
+                                ? `
+                        <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
+                            <span style="color: #666;">Location (${orderData.delivery_location_methods.location_name}):</span>
+                            <span style="color: #666;">+$${orderData.delivery_location_methods.price_addition.toFixed(2)}</span>
+                        </div>
+                        `
+                                : ''
+                        }
+                        `
+                                : ''
+                        }
+                        ${
+                            orderData.selected_features && orderData.selected_features.length > 0
+                                ? `
+                        <div style="margin-bottom: 10px;">
+                            <div style="color: #666; font-weight: bold; margin-bottom: 5px;">Features:</div>
+                            ${orderData.selected_features
+                                .map(
+                                    (feature: any) => `
+                            <div style="display: flex; justify-content: space-between; margin-bottom: 3px; padding-left: 10px;">
+                                <span style="color: #666; font-size: 14px;">${feature.label}: ${feature.value}</span>
+                                <span style="color: #666; font-size: 14px;">+$${(feature.price_addition || 0).toFixed(2)}</span>
+                            </div>
+                            `,
+                                )
+                                .join('')}
+                        </div>
+                        `
+                                : ''
+                        }
                         <div style="display: flex; justify-content: space-between; padding-top: 10px; border-top: 2px solid #4f46e5; font-weight: bold; font-size: 18px;">
                             <span style="color: #333;">Total:</span>
-                            <span style="color: #4f46e5;">$${(orderData.items.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0) * 1.1).toFixed(2)}</span>
+                            <span style="color: #4f46e5;">$${calculateOrderTotal(orderData).toFixed(2)}</span>
                         </div>
                     </div>
                 </div>

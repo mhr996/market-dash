@@ -14,6 +14,7 @@ import IconUser from '@/components/icon/icon-user';
 import { generateOrderReceiptPDF } from '@/utils/pdf-generator';
 import { useRouter } from 'next/navigation';
 import supabase from '@/lib/supabase';
+import { calculateOrderTotal } from '@/utils/order-calculations';
 import { createPortal } from 'react-dom';
 
 // Interfaces for Supabase order data
@@ -537,10 +538,10 @@ const PreviewOrder = () => {
                             id, name, phone, avatar_url
                         ),
                         delivery_methods(
-                            id, label, delivery_time, price,
-                            delivery_location_methods(
-                                id, location_name, price_addition
-                            )
+                            id, label, delivery_time, price
+                        ),
+                        delivery_location_methods(
+                            id, location_name, price_addition
                         )
                     `,
                     )
@@ -606,7 +607,7 @@ const PreviewOrder = () => {
                     image: data.products?.images?.[0] || null,
                     buyer: data.profiles?.full_name || shippingAddress.name || 'Unknown Customer',
                     date: data.created_at,
-                    total: `$${(data.products?.price || 0).toFixed(2)}`,
+                    total: `$${calculateOrderTotal(data).toFixed(2)}`,
                     status: statusMap[data.status] || 'processing',
                     address: `${shippingAddress.address || ''}, ${shippingAddress.city || ''}, ${shippingAddress.zip || ''}`.trim(),
                     confirmed: data.confirmed || false,
@@ -656,6 +657,8 @@ const PreviewOrder = () => {
                     },
                     // Features and delivery data
                     selected_features: selectedFeatures,
+                    delivery_methods: data.delivery_methods,
+                    delivery_location_methods: data.delivery_location_methods,
                 };
 
                 setOrder(formattedOrder);
@@ -706,7 +709,7 @@ const PreviewOrder = () => {
     const calculateDeliveryFee = () => {
         if (!order?.delivery_methods) return 0;
         const basePrice = order.delivery_methods.price || 0;
-        const locationAddition = order.delivery_methods.delivery_location_methods?.price_addition || 0;
+        const locationAddition = order.delivery_location_methods?.price_addition || 0;
         return basePrice + locationAddition;
     };
 
@@ -1366,10 +1369,10 @@ const PreviewOrder = () => {
                                             <span>Delivery ({order.delivery_methods.label}):</span>
                                             <span>${order.delivery_methods.price?.toFixed(2) || '0.00'}</span>
                                         </div>
-                                        {order.delivery_methods.delivery_location_methods && (
+                                        {order?.delivery_location_methods && order.delivery_location_methods.location_name && order.delivery_location_methods.price_addition > 0 && (
                                             <div className="flex justify-between text-sm text-gray-600">
-                                                <span>Location ({order.delivery_methods.delivery_location_methods.location_name}):</span>
-                                                <span>+${order.delivery_methods.delivery_location_methods.price_addition?.toFixed(2) || '0.00'}</span>
+                                                <span>Location ({order.delivery_location_methods.location_name}):</span>
+                                                <span>+${order.delivery_location_methods.price_addition.toFixed(2)}</span>
                                             </div>
                                         )}
                                     </>

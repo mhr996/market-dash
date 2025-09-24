@@ -19,6 +19,7 @@ import IconCalendar from '@/components/icon/icon-calendar';
 import IconPackage from '@/components/icon/icon-package';
 import IconChevronDown from '@/components/icon/icon-chevron-down';
 import IconChevronUp from '@/components/icon/icon-chevron-up';
+import IconInfoCircle from '@/components/icon/icon-info-circle';
 import { sortBy } from 'lodash';
 import { DataTableSortStatus, DataTable } from 'mantine-datatable';
 import Link from 'next/link';
@@ -33,6 +34,120 @@ import supabase from '@/lib/supabase';
 import { updateShopBalance } from '@/lib/shop-balance';
 import DateRangeSelector from '@/components/date-range-selector';
 import MultiSelect from '@/components/multi-select';
+
+// Tooltip Component for Order Total Breakdown
+const OrderTotalTooltip = ({ order }: { order: any }) => {
+    const [isVisible, setIsVisible] = useState(false);
+    const [position, setPosition] = useState({ top: 0, left: 0 });
+    const iconRef = useRef<HTMLDivElement>(null);
+
+    const calculateSubtotal = () => {
+        if (!order) return 0;
+        return order.items.reduce((sum: number, item: any) => sum + item.price * item.quantity, 0);
+    };
+
+    const calculateDeliveryFee = () => {
+        if (!order?.delivery_methods) return 0;
+        const basePrice = order.delivery_methods.price || 0;
+        const locationAddition = order.delivery_location_methods?.price_addition || 0;
+        return basePrice + locationAddition;
+    };
+
+    const calculateFeaturesTotal = () => {
+        if (!order?.selected_features) return 0;
+        return order.selected_features.reduce((sum: number, feature: any) => sum + (feature.price_addition || 0), 0);
+    };
+
+    const calculateTotal = () => {
+        return calculateSubtotal() + calculateDeliveryFee() + calculateFeaturesTotal();
+    };
+
+    const hasDeliveryOrFeatures = order?.delivery_methods || (order?.selected_features && order.selected_features.length > 0);
+
+    console.log('OrderTotalTooltip - hasDeliveryOrFeatures:', hasDeliveryOrFeatures, 'order:', order);
+    console.log('OrderTotalTooltip - delivery_methods:', order?.delivery_methods);
+    console.log('OrderTotalTooltip - selected_features:', order?.selected_features);
+    console.log('OrderTotalTooltip - selected_feature_value_ids:', order?.selected_feature_value_ids);
+
+    if (!hasDeliveryOrFeatures) return null;
+
+    return (
+        <div
+            ref={iconRef}
+            className="relative inline-block"
+            onMouseEnter={() => {
+                console.log('Mouse enter - showing tooltip');
+                if (iconRef.current) {
+                    const rect = iconRef.current.getBoundingClientRect();
+                    setPosition({
+                        top: rect.top - 10,
+                        left: rect.left + rect.width / 2,
+                    });
+                }
+                setIsVisible(true);
+            }}
+            onMouseLeave={() => {
+                console.log('Mouse leave - hiding tooltip');
+                setIsVisible(false);
+            }}
+        >
+            <IconInfoCircle className="h-4 w-4 text-blue-500 hover:text-blue-700 cursor-pointer ml-1" />
+            {isVisible &&
+                createPortal(
+                    <div
+                        className="fixed z-[9999] w-56 p-3 bg-white dark:bg-gray-800 border border-gray-300 dark:border-gray-600 rounded-lg shadow-lg"
+                        style={{
+                            top: `${position.top}px`,
+                            left: `${position.left}px`,
+                            transform: 'translateX(-50%)',
+                        }}
+                    >
+                        <div className="space-y-1 text-xs">
+                            <div className="flex justify-between">
+                                <span>Subtotal:</span>
+                                <span>${calculateSubtotal().toFixed(2)}</span>
+                            </div>
+
+                            {order?.delivery_methods && (
+                                <>
+                                    <div className="flex justify-between">
+                                        <span>Delivery ({order.delivery_methods.label}):</span>
+                                        <span>${order.delivery_methods.price?.toFixed(2) || '0.00'}</span>
+                                    </div>
+                                    {order?.delivery_location_methods && order.delivery_location_methods.location_name && order.delivery_location_methods.price_addition > 0 && (
+                                        <div className="flex justify-between">
+                                            <span>Location ({order.delivery_location_methods.location_name}):</span>
+                                            <span>+${order.delivery_location_methods.price_addition.toFixed(2)}</span>
+                                        </div>
+                                    )}
+                                </>
+                            )}
+
+                            {order?.selected_features && order.selected_features.length > 0 && (
+                                <div className="space-y-1">
+                                    <div className="font-medium">Features:</div>
+                                    {order.selected_features.map((feature: any, index: number) => (
+                                        <div key={index} className="flex justify-between">
+                                            <span>
+                                                {feature.label}: {feature.value}
+                                            </span>
+                                            <span>+${(feature.price_addition || 0).toFixed(2)}</span>
+                                        </div>
+                                    ))}
+                                </div>
+                            )}
+
+                            <div className="flex justify-between border-t border-gray-300 dark:border-gray-600 pt-1 font-bold">
+                                <span>Total:</span>
+                                <span className="text-green-600 dark:text-green-400">${calculateTotal().toFixed(2)}</span>
+                            </div>
+                        </div>
+                    </div>,
+                    document.body,
+                )}
+        </div>
+    );
+};
 
 // Delivery Type Dropdown Component
 const DeliveryTypeDropdown = ({
@@ -694,6 +809,7 @@ interface OrderData {
     assigned_driver_id?: number;
     confirmed?: boolean;
     comment?: string;
+    selected_feature_value_ids?: number[];
     // Joined data
     products?: {
         id: number;
@@ -717,6 +833,22 @@ interface OrderData {
         phone: string;
         avatar_url?: string;
     };
+    delivery_methods?: {
+        id: number;
+        label: string;
+        delivery_time: string;
+        price: number;
+    };
+    delivery_location_methods?: {
+        id: number;
+        location_name: string;
+        price_addition: number;
+    };
+    selected_features?: Array<{
+        label: string;
+        value: string;
+        price_addition: number;
+    }>;
 }
 
 // Helper functions to parse JSON fields
@@ -770,6 +902,14 @@ const formatOrderForDisplay = (order: OrderData) => {
         Shipped: 'shipped',
     };
 
+    // Calculate total including delivery and features
+    const calculateOrderTotal = (order: any) => {
+        const subtotal = order.products?.price || 0;
+        const deliveryFee = order.delivery_methods ? (order.delivery_methods.price || 0) + (order.delivery_location_methods?.price_addition || 0) : 0;
+        const featuresTotal = order.selected_features ? order.selected_features.reduce((sum: number, feature: any) => sum + (feature.price_addition || 0), 0) : 0;
+        return subtotal + deliveryFee + featuresTotal;
+    };
+
     return {
         id: order.id,
         name: order.products?.title || 'Product',
@@ -779,7 +919,7 @@ const formatOrderForDisplay = (order: OrderData) => {
         delivery_status: deliveryStatusMap[order.status] || 'pending',
         city: shippingAddress.city || 'Unknown City',
         date: order.created_at,
-        total: `$${(order.products?.price || 0).toFixed(2)}`,
+        total: `$${calculateOrderTotal(order).toFixed(2)}`,
         status: statusMap[order.status] || 'processing',
         address: `${shippingAddress.address || ''}, ${shippingAddress.city || ''}, ${shippingAddress.zip || ''}`.trim(),
         items: [
@@ -800,6 +940,10 @@ const formatOrderForDisplay = (order: OrderData) => {
         delivery_company_id: order.products?.shops?.[0]?.delivery_companies_id,
         confirmed: order.confirmed || false,
         comment: order.comment || '',
+        // Delivery and features data
+        delivery_methods: order.delivery_methods,
+        delivery_location_methods: order.delivery_location_methods,
+        selected_features: order.selected_features || [],
     };
 };
 
@@ -1123,7 +1267,12 @@ const OrdersList = () => {
                 accessor: 'total',
                 title: t('total'),
                 sortable: true,
-                render: ({ total }: { total: any }) => <span className="font-semibold text-success">{total}</span>,
+                render: (record: any) => (
+                    <div className="flex items-center">
+                        <span className="font-semibold text-success">{record.total}</span>
+                        <OrderTotalTooltip order={record} />
+                    </div>
+                ),
             },
             {
                 accessor: 'payment_method',
@@ -1562,7 +1711,9 @@ const OrdersList = () => {
                     *,
                     products(id, title, price, images, shop),
                     profiles(id, full_name, email),
-                    assigned_driver:delivery_drivers(id, name, phone, avatar_url)
+                    assigned_driver:delivery_drivers(id, name, phone, avatar_url),
+                    delivery_methods(id, label, delivery_time, price),
+                    delivery_location_methods(id, location_name, price_addition)
                 `,
             );
 
@@ -1574,6 +1725,43 @@ const OrdersList = () => {
             const { data, error } = await query.order('created_at', { ascending: false });
 
             if (error) throw error;
+
+            // Fetch selected features for orders that have them
+            const ordersWithFeatures = data.filter((order) => order.selected_feature_value_ids && order.selected_feature_value_ids.length > 0);
+
+            if (ordersWithFeatures.length > 0) {
+                const allFeatureValueIds = ordersWithFeatures.flatMap((order) => order.selected_feature_value_ids);
+
+                const { data: featuresData, error: featuresError } = await supabase
+                    .from('products_features_values')
+                    .select(
+                        `
+                        id, value, price_addition,
+                        products_features_labels!inner(label)
+                    `,
+                    )
+                    .in('id', allFeatureValueIds);
+
+                if (!featuresError && featuresData) {
+                    // Add features to orders
+                    data.forEach((order) => {
+                        if (order.selected_feature_value_ids && order.selected_feature_value_ids.length > 0) {
+                            order.selected_features = order.selected_feature_value_ids
+                                .map((id: number) => {
+                                    const feature = featuresData.find((f: any) => f.id === id);
+                                    return feature
+                                        ? {
+                                              label: feature.products_features_labels[0].label,
+                                              value: feature.value,
+                                              price_addition: feature.price_addition,
+                                          }
+                                        : null;
+                                })
+                                .filter(Boolean);
+                        }
+                    });
+                }
+            }
 
             setItems(data as OrderData[]);
 

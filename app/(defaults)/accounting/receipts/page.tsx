@@ -6,6 +6,7 @@ import React, { useEffect, useState } from 'react';
 import { Alert } from '@/components/elements/alerts/elements-alerts-default';
 import { getTranslation } from '@/i18n';
 import supabase from '@/lib/supabase';
+import { calculateOrderTotal } from '@/utils/order-calculations';
 
 // Receipt interface - based on completed orders
 interface Receipt {
@@ -58,7 +59,14 @@ const ReceiptsList = () => {
                                 ),
                                 profiles (
                                     full_name
-                                )
+                                ),
+                                delivery_methods (
+                                    id, label, delivery_time, price
+                                ),
+                                delivery_location_methods (
+                                    id, location_name, price_addition
+                                ),
+                                selected_feature_value_ids
                             `,
                     )
                     .eq('status', 'completed')
@@ -66,12 +74,49 @@ const ReceiptsList = () => {
 
                 if (error) throw error;
 
+                // Fetch selected features for orders that have them
+                const ordersWithFeatures = data.filter((order) => order.selected_feature_value_ids && order.selected_feature_value_ids.length > 0);
+
+                if (ordersWithFeatures.length > 0) {
+                    const allFeatureValueIds = ordersWithFeatures.flatMap((order) => order.selected_feature_value_ids);
+
+                    const { data: featuresData, error: featuresError } = await supabase
+                        .from('products_features_values')
+                        .select(
+                            `
+                            id, value, price_addition,
+                            products_features_labels!inner(label)
+                        `,
+                        )
+                        .in('id', allFeatureValueIds);
+
+                    if (!featuresError && featuresData) {
+                        // Add features to orders
+                        data.forEach((order: any) => {
+                            if (order.selected_feature_value_ids && order.selected_feature_value_ids.length > 0) {
+                                order.selected_features = order.selected_feature_value_ids
+                                    .map((id: number) => {
+                                        const feature = featuresData.find((f: any) => f.id === id);
+                                        return feature
+                                            ? {
+                                                  label: feature.products_features_labels[0].label,
+                                                  value: feature.value,
+                                                  price_addition: feature.price_addition,
+                                              }
+                                            : null;
+                                    })
+                                    .filter(Boolean);
+                            }
+                        });
+                    }
+                }
+
                 const receipts: Receipt[] =
                     data?.map((order: any) => ({
                         id: order.id,
                         invoice_number: `RCP-${order.id}`,
                         customer: order.profiles?.full_name || 'Unknown Customer',
-                        total_amount: order.products?.price || 0,
+                        total_amount: calculateOrderTotal(order),
                         created_at: order.created_at,
                         order_id: order.id,
                     })) || [];

@@ -19,6 +19,7 @@ import IconBox from '@/components/icon/icon-box';
 import IconArrowForward from '@/components/icon/icon-arrow-forward';
 import IconCaretDown from '@/components/icon/icon-caret-down';
 import supabase from '@/lib/supabase';
+import { calculateOrderTotal } from '@/utils/order-calculations';
 import SafeApexChart from '@/components/charts/safe-apex-chart';
 import MultiSelect from '@/components/multi-select';
 import DateRangeSelector from '@/components/date-range-selector';
@@ -190,12 +191,52 @@ const Reports = () => {
             // Fetch orders data with product information for revenue calculation
             let ordersQuery = supabase.from('orders').select(`
                     *,
-                    products(id, title, price, shop, shops(id, shop_name))
+                    products(id, title, price, shop, shops(id, shop_name)),
+                    delivery_methods(id, label, delivery_time, price),
+                    delivery_location_methods(id, location_name, price_addition),
+                    selected_feature_value_ids
                 `);
             if (startDate) ordersQuery = ordersQuery.gte('created_at', startDate);
             if (endDate) ordersQuery = ordersQuery.lte('created_at', endDate);
 
             const { data: orders } = await ordersQuery;
+
+            // Fetch selected features for orders that have them
+            const ordersWithFeatures = orders?.filter((order) => order.selected_feature_value_ids && order.selected_feature_value_ids.length > 0) || [];
+
+            if (ordersWithFeatures.length > 0) {
+                const allFeatureValueIds = ordersWithFeatures.flatMap((order) => order.selected_feature_value_ids);
+
+                const { data: featuresData, error: featuresError } = await supabase
+                    .from('products_features_values')
+                    .select(
+                        `
+                        id, value, price_addition,
+                        products_features_labels!inner(label)
+                    `,
+                    )
+                    .in('id', allFeatureValueIds);
+
+                if (!featuresError && featuresData) {
+                    // Add features to orders
+                    orders?.forEach((order: any) => {
+                        if (order.selected_feature_value_ids && order.selected_feature_value_ids.length > 0) {
+                            order.selected_features = order.selected_feature_value_ids
+                                .map((id: number) => {
+                                    const feature = featuresData.find((f: any) => f.id === id);
+                                    return feature
+                                        ? {
+                                              label: feature.products_features_labels[0].label,
+                                              value: feature.value,
+                                              price_addition: feature.price_addition,
+                                          }
+                                        : null;
+                                })
+                                .filter(Boolean);
+                        }
+                    });
+                }
+            }
 
             // Fetch shops data
             let shopsQuery = supabase.from('shops').select('*, profiles(full_name)');
@@ -232,7 +273,7 @@ const Reports = () => {
 
     const processReportData = (orders: any[], shops: any[], products: any[], users: any[], categories: any[]): ReportData => {
         // Calculate sales metrics using product prices
-        const totalRevenue = orders.reduce((sum, order) => sum + (order.products?.price || 0), 0);
+        const totalRevenue = orders.reduce((sum, order) => sum + calculateOrderTotal(order), 0);
         const totalOrders = orders.length;
         const averageOrderValue = totalOrders > 0 ? totalRevenue / totalOrders : 0;
 
@@ -246,7 +287,7 @@ const Reports = () => {
             return orderDate >= previousPeriodStart && orderDate < currentDate;
         });
 
-        const previousRevenue = previousPeriodOrders.reduce((sum, order) => sum + (order.products?.price || 0), 0);
+        const previousRevenue = previousPeriodOrders.reduce((sum, order) => sum + calculateOrderTotal(order), 0);
         const growthRate = previousRevenue > 0 ? ((totalRevenue - previousRevenue) / previousRevenue) * 100 : 0;
 
         // Calculate monthly revenue trend
@@ -261,7 +302,7 @@ const Reports = () => {
                 return orderDate.getMonth() === month.getMonth() && orderDate.getFullYear() === month.getFullYear();
             });
 
-            const revenue = monthlyOrders.reduce((sum, order) => sum + (order.products?.price || 0), 0);
+            const revenue = monthlyOrders.reduce((sum, order) => sum + calculateOrderTotal(order), 0);
             return { month: monthName, revenue };
         });
 
@@ -269,12 +310,12 @@ const Reports = () => {
         const shopEarnings: ShopEarning[] = shops
             .map((shop) => {
                 const shopOrders = orders.filter((order) => order.products?.shop === shop.id);
-                const revenue = shopOrders.reduce((sum, order) => sum + (order.products?.price || 0), 0);
+                const revenue = shopOrders.reduce((sum, order) => sum + calculateOrderTotal(order), 0);
                 const commission = revenue * 0.1; // Assuming 10% commission
 
                 // Calculate growth for this shop
                 const previousShopOrders = previousPeriodOrders.filter((order) => order.products?.shop === shop.id);
-                const previousShopRevenue = previousShopOrders.reduce((sum, order) => sum + (order.products?.price || 0), 0);
+                const previousShopRevenue = previousShopOrders.reduce((sum, order) => sum + calculateOrderTotal(order), 0);
                 const shopGrowthRate = previousShopRevenue > 0 ? ((revenue - previousShopRevenue) / previousShopRevenue) * 100 : 0;
 
                 return {
@@ -311,12 +352,12 @@ const Reports = () => {
                 if (productSalesMap.has(productId)) {
                     const existing = productSalesMap.get(productId);
                     existing.sales += 1;
-                    existing.revenue += order.products.price || 0;
+                    existing.revenue += calculateOrderTotal(order);
                 } else {
                     productSalesMap.set(productId, {
                         product: order.products,
                         sales: 1,
-                        revenue: order.products.price || 0,
+                        revenue: calculateOrderTotal(order),
                     });
                 }
             }
@@ -350,7 +391,7 @@ const Reports = () => {
                 categoryProducts.forEach((product) => {
                     const productOrders = orders.filter((order) => order.products?.id === product.id);
                     totalSales += productOrders.length;
-                    revenue += productOrders.reduce((sum, order) => sum + (order.products?.price || 0), 0);
+                    revenue += productOrders.reduce((sum, order) => sum + calculateOrderTotal(order), 0);
                 });
 
                 return {
