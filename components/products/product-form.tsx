@@ -182,7 +182,6 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                                         .map((option) => ({
                                             feature_value_id: valueData.id,
                                             option_name: option.option_name.trim(),
-                                            image: option.image || null,
                                             is_active: option.is_active !== false,
                                         }));
 
@@ -582,11 +581,11 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                         active: formData.active,
                     };
 
-                    const { error } = await supabase.from('products').insert([productDataNoImages]);
+                    const { data: insertedProduct, error } = await supabase.from('products').insert([productDataNoImages]).select().single();
                     if (error) throw error;
 
                     // Save features to new tables
-                    await saveProductFeatures(parseInt(formData.shop), features);
+                    await saveProductFeatures(insertedProduct.id, features);
 
                     setAlert({ type: 'success', message: t('product_created_successfully') });
 
@@ -639,7 +638,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                     if (error) throw error;
 
                     // Save features to new tables
-                    await saveProductFeatures(parseInt(productId), features);
+                    await saveProductFeatures(parseInt(productId as string), features);
 
                     // Wait a moment to ensure the update is processed
                     await new Promise((resolve) => setTimeout(resolve, 500));
