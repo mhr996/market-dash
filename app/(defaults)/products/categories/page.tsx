@@ -147,7 +147,7 @@ const CategoriesList = () => {
                             <IconTrashLines />
                             {t('delete')}
                         </button>
-                        <Link href="/categories/add" className="btn btn-primary gap-2">
+                        <Link href="/products/categories/add" className="btn btn-primary gap-2">
                             <IconPlus />
                             {t('add_new')}
                         </Link>
@@ -162,7 +162,7 @@ const CategoriesList = () => {
                         className={`${loading ? 'filter blur-sm pointer-events-none' : 'table-hover whitespace-nowrap cursor-pointer'}`}
                         records={records}
                         onRowClick={(record) => {
-                            router.push(`/categories/preview/${record.id}`);
+                            router.push(`/products/categories/preview/${record.id}`);
                         }}
                         columns={[
                             {
@@ -172,27 +172,30 @@ const CategoriesList = () => {
                                 render: ({ id }) => <strong className="text-info">#{id}</strong>,
                             },
                             {
-                                accessor: 'image_url',
-                                title: t('image'),
-                                sortable: false,
-                                render: ({ image_url }) => (
-                                    <div className="flex justify-center">
-                                        {image_url ? (
-                                            <img src={image_url} alt="Category" className="w-12 h-12 object-cover rounded-lg border border-gray-200 dark:border-gray-700" />
-                                        ) : (
-                                            <img
-                                                src="/assets/images/img-placeholder-fallback.webp"
-                                                alt="Placeholder"
-                                                className="w-10 aspect-square object-cover rounded-lg border border-gray-200 dark:border-gray-700"
-                                            />
-                                        )}
+                                accessor: 'title',
+                                title: t('category'),
+                                sortable: true,
+                                render: ({ title, image_url }) => (
+                                    <div className="flex items-center font-semibold">
+                                        <div className="w-max rounded-full ltr:mr-2 rtl:ml-2">
+                                            {image_url ? (
+                                                <img className="h-8 w-8 rounded-md object-cover" src={image_url} alt={title} />
+                                            ) : (
+                                                <div className="h-8 w-8 rounded-md bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                                                    <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                            strokeWidth={2}
+                                                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                                        />
+                                                    </svg>
+                                                </div>
+                                            )}
+                                        </div>
+                                        <div>{title}</div>
                                     </div>
                                 ),
-                            },
-                            {
-                                accessor: 'title',
-                                title: t('title'),
-                                sortable: true,
                             },
                             {
                                 accessor: 'desc',
@@ -213,7 +216,7 @@ const CategoriesList = () => {
                                 textAlignment: 'center',
                                 render: ({ id }) => (
                                     <div className="mx-auto flex w-max items-center gap-4">
-                                        <Link href={`/categories/edit/${id}`} className="flex hover:text-info" onClick={(e) => e.stopPropagation()}>
+                                        <Link href={`/products/categories/edit/${id}`} className="flex hover:text-info" onClick={(e) => e.stopPropagation()}>
                                             <IconEdit className="h-4.5 w-4.5" />
                                         </Link>
                                         <button

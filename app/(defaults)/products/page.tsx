@@ -53,6 +53,7 @@ interface Product {
     discount_value?: number | null;
     discount_start?: string | null;
     discount_end?: string | null;
+    onSale?: boolean;
     active: boolean;
 }
 
@@ -168,15 +169,15 @@ const ProductsList = () => {
                     matchesFilters = matchesFilters && selectedShops.includes(parseInt(item.shop));
                 }
 
-                    // Apply category filter
-                    if (selectedCategories.length > 0) {
-                        matchesFilters = matchesFilters && item.category !== null && selectedCategories.includes(item.category);
-                    }
+                // Apply category filter
+                if (selectedCategories.length > 0) {
+                    matchesFilters = matchesFilters && item.category !== null && selectedCategories.includes(item.category);
+                }
 
-                    // Apply subcategory filter
-                    if (selectedSubcategories.length > 0) {
-                        matchesFilters = matchesFilters && item.subcategory_id !== null && selectedSubcategories.includes(item.subcategory_id);
-                    }
+                // Apply subcategory filter
+                if (selectedSubcategories.length > 0) {
+                    matchesFilters = matchesFilters && item.subcategory_id !== null && selectedSubcategories.includes(item.subcategory_id);
+                }
 
                 return matchesSearch && matchesFilters;
             }),
@@ -360,11 +361,14 @@ const ProductsList = () => {
                                 accessor: 'price',
                                 title: t('price'),
                                 sortable: true,
-                                render: ({ price, sale_price, discount_type, discount_value, discount_start, discount_end }) => (
+                                render: ({ price, sale_price, discount_type, discount_value, discount_start, discount_end, onSale }) => (
                                     <div>
                                         {sale_price ? (
                                             <div className="flex flex-col">
-                                                <span className="line-through text-gray-500">${parseFloat(price).toFixed(2)}</span>
+                                                <div className="flex items-center gap-2">
+                                                    <span className="line-through text-gray-500">${parseFloat(price).toFixed(2)}</span>
+                                                    {onSale && <span className="text-xs bg-orange-500 text-white px-2 py-0.5 rounded-full font-medium">ON SALE</span>}
+                                                </div>
                                                 <span className="text-success font-bold">${sale_price.toFixed(2)}</span>
                                                 {discount_type === 'percentage' && discount_value && (
                                                     <span className="text-xs bg-success/20 text-success px-1.5 py-0.5 rounded-full w-fit mt-1">{discount_value}% OFF</span>
@@ -376,7 +380,10 @@ const ProductsList = () => {
                                                 )}
                                             </div>
                                         ) : (
-                                            <span>${parseFloat(price).toFixed(2)}</span>
+                                            <div className="flex items-center gap-2">
+                                                <span>${parseFloat(price).toFixed(2)}</span>
+                                                {onSale && <span className="text-xs bg-orange-500 text-white px-2 py-0.5 rounded-full font-medium">ON SALE</span>}
+                                            </div>
                                         )}
                                     </div>
                                 ),

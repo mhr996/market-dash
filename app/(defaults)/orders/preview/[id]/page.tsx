@@ -14,7 +14,7 @@ import IconUser from '@/components/icon/icon-user';
 import { generateOrderReceiptPDF } from '@/utils/pdf-generator';
 import { useRouter } from 'next/navigation';
 import supabase from '@/lib/supabase';
-import { calculateOrderTotal } from '@/utils/order-calculations';
+// Removed calculateOrderTotal import - using database total directly
 import { createPortal } from 'react-dom';
 
 // Interfaces for Supabase order data
@@ -607,7 +607,7 @@ const PreviewOrder = () => {
                     image: data.products?.images?.[0] || null,
                     buyer: data.profiles?.full_name || shippingAddress.name || 'Unknown Customer',
                     date: data.created_at,
-                    total: `$${calculateOrderTotal(data).toFixed(2)}`,
+                    total: `$${(data.total || 0).toFixed(2)}`,
                     status: statusMap[data.status] || 'processing',
                     address: `${shippingAddress.address || ''}, ${shippingAddress.city || ''}, ${shippingAddress.zip || ''}`.trim(),
                     confirmed: data.confirmed || false,
@@ -719,7 +719,7 @@ const PreviewOrder = () => {
     };
 
     const calculateTotal = () => {
-        return calculateSubtotal() + calculateDeliveryFee() + calculateFeaturesTotal();
+        return parseFloat(order?.total) || 0;
     };
 
     // Handler functions for editor functionality

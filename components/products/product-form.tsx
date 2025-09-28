@@ -107,6 +107,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
         category: '',
         subcategory: '',
         active: true, // Default to active
+        onsale: false, // Default to not on sale
     });
 
     // New category form state
@@ -319,6 +320,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                             category: product.category?.toString() || '',
                             subcategory: product.subcategory_id?.toString() || '',
                             active: product.active !== undefined ? product.active : true,
+                            onsale: product.onsale || false,
                         });
                         setPreviewUrls(product.images || []);
 
@@ -358,6 +360,11 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
 
         fetchData();
     }, [productId]);
+
+    // Sync onsale field with hasSalePrice state
+    useEffect(() => {
+        setFormData((prev) => ({ ...prev, onsale: hasSalePrice }));
+    }, [hasSalePrice]);
 
     // Calculate discount price whenever price or discount changes
     useEffect(() => {
@@ -514,6 +521,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                         discount_start: hasSalePrice && discountStart ? discountStart.toISOString() : null,
                         discount_end: hasSalePrice && discountEnd ? discountEnd.toISOString() : null,
                         active: formData.active,
+                        onsale: formData.onsale,
                     };
 
                     // Insert product first to get ID
@@ -550,6 +558,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                         category: '',
                         subcategory: '',
                         active: true,
+                        onsale: false,
                     });
                     setPreviewUrls([]);
                     setTempImageFiles([]);
@@ -579,6 +588,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                         discount_start: hasSalePrice && discountStart ? discountStart.toISOString() : null,
                         discount_end: hasSalePrice && discountEnd ? discountEnd.toISOString() : null,
                         active: formData.active,
+                        onsale: formData.onsale,
                     };
 
                     const { data: insertedProduct, error } = await supabase.from('products').insert([productDataNoImages]).select().single();
@@ -598,6 +608,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                         category: '',
                         subcategory: '',
                         active: true,
+                        onsale: false,
                     });
                     setPreviewUrls([]);
                     setTempImageFiles([]);
@@ -630,7 +641,9 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                     discount_start: hasSalePrice && discountStart ? discountStart.toISOString() : null,
                     discount_end: hasSalePrice && discountEnd ? discountEnd.toISOString() : null,
                     active: formData.active,
+                    onsale: formData.onsale,
                 };
+
                 try {
                     // First try with a direct update
                     const { error } = await supabase.from('products').update(productData).eq('id', productId);
@@ -676,6 +689,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                             category: upsertedProduct.category?.toString() || '',
                             subcategory: upsertedProduct.subcategory_id?.toString() || '',
                             active: upsertedProduct.active,
+                            onsale: upsertedProduct.onsale || false,
                         });
                         setPreviewUrls(upsertedProduct.images || []);
                         setFeatures(upsertedProduct.features || []);
@@ -700,6 +714,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                             category: updatedProduct.category?.toString() || '',
                             subcategory: updatedProduct.subcategory_id?.toString() || '',
                             active: updatedProduct.active,
+                            onsale: updatedProduct.onsale || false,
                         });
                         setPreviewUrls(updatedProduct.images || []);
                         setFeatures(updatedProduct.features || []);

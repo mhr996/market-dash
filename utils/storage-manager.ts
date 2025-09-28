@@ -52,6 +52,30 @@ class StorageManager {
     }
 
     /**
+     * Generic file upload method
+     */
+    static async uploadFile(file: File, path: string, bucket: string = this.BUCKET_NAME): Promise<UploadResult> {
+        try {
+            const fileExt = file.name.split('.').pop()?.toLowerCase();
+            const timestamp = Date.now();
+            const randomId = Math.random().toString(36).substring(2, 8);
+            const fileName = `${timestamp}-${randomId}.${fileExt}`;
+            const fullPath = `${path}/${fileName}`;
+
+            const { data, error } = await supabase.storage.from(bucket).upload(fullPath, file);
+
+            if (error) {
+                return { success: false, error: error.message };
+            }
+
+            const { data: publicUrl } = supabase.storage.from(bucket).getPublicUrl(fullPath);
+            return { success: true, url: publicUrl.publicUrl };
+        } catch (error) {
+            return { success: false, error: error instanceof Error ? error.message : 'Unknown error' };
+        }
+    }
+
+    /**
      * Uploads shop logo
      */
     static async uploadShopLogo(shopId: number, file: File): Promise<UploadResult> {

@@ -21,7 +21,7 @@ import IconBuilding from '@/components/icon/icon-building';
 import { DataTableSortStatus, DataTable } from 'mantine-datatable';
 import { sortBy } from 'lodash';
 import { getTranslation } from '@/i18n';
-import { updateShopBalance } from '@/lib/shop-balance';
+// Removed updateShopBalance import - using frontend-only balance now
 import 'leaflet/dist/leaflet.css';
 
 // Import the map component dynamically with no SSR
@@ -36,10 +36,17 @@ interface WorkHours {
     endTime: string;
 }
 
-interface Category {
+interface ShopCategory {
     id: number;
     title: string;
-    desc: string;
+    description: string;
+}
+
+interface ShopSubCategory {
+    id: number;
+    title: string;
+    description: string;
+    category_id: number;
 }
 
 interface DeliveryCompany {
@@ -63,12 +70,12 @@ interface ShopSale {
 
 interface ShopTransaction {
     id: number;
-    transaction_id: string;
+    shop_id: number;
+    type: 'recharge' | 'withdraw';
     amount: number;
-    date: string;
-    status: 'pending' | 'completed' | 'failed';
-    description: string;
-    payment_method: string;
+    description: string | null;
+    created_at: string;
+    created_by: string | null;
 }
 
 interface Shop {
@@ -84,7 +91,8 @@ interface Shop {
     address?: string;
     work_hours?: WorkHours[];
     phone_numbers?: string[];
-    category_id?: number | null;
+    category_shop_id?: number | null;
+    subcategory_shop_id?: number | null;
     delivery_companies_id?: number | null;
     gallery?: string[] | null;
     latitude?: number | null; // Geographical location data
@@ -98,7 +106,8 @@ interface Shop {
         email?: string | null;
         phone?: string | null;
     };
-    categories?: Category;
+    categories_shop?: ShopCategory;
+    categories_sub_shop?: ShopSubCategory;
 }
 
 const ShopPreview = () => {
@@ -110,7 +119,8 @@ const ShopPreview = () => {
     const [shop, setShop] = useState<Shop | null>(null);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'owner' | 'details' | 'revenue' | 'transactions' | 'delivery'>('owner');
-    const [categories, setCategories] = useState<Category[]>([]);
+    const [shopCategories, setShopCategories] = useState<ShopCategory[]>([]);
+    const [shopSubCategories, setShopSubCategories] = useState<ShopSubCategory[]>([]);
     const [unauthorized, setUnauthorized] = useState(false);
 
     // Delivery company and drivers/cars data
@@ -167,7 +177,7 @@ const ShopPreview = () => {
     const [paymentAmount, setPaymentAmount] = useState('');
     const [paymentDescription, setPaymentDescription] = useState('');
     const [sendingPayment, setSendingPayment] = useState(false);
-    const [platformBalance, setPlatformBalance] = useState(0); // Shop balance from database
+    const [platformBalance, setPlatformBalance] = useState(0);
 
     // Format currency helper function
     const formatCurrency = (amount: number) => {
@@ -197,14 +207,15 @@ const ShopPreview = () => {
 
                 const isAdmin = profileData?.role === 1;
 
-                // Updated query to fetch category details and commission info from licenses
+                // Updated query to fetch shop category details
                 const { data, error } = await supabase
                     .from('shops')
                     .select(
                         `
                         *, 
                         profiles(id, full_name, avatar_url, email, phone), 
-                        categories(*)
+                        categories_shop(*),
+                        categories_sub_shop(*)
                     `,
                     )
                     .eq('id', id)
@@ -252,11 +263,14 @@ const ShopPreview = () => {
 
                 setShop(shopWithCommission);
 
-                // Also fetch all categories for reference
-                const { data: categoriesData, error: categoriesError } = await supabase.from('categories').select('*').order('title', { ascending: true });
+                // Also fetch all shop categories for reference
+                const { data: shopCategoriesData, error: shopCategoriesError } = await supabase.from('categories_shop').select('*').order('title', { ascending: true });
+                const { data: shopSubCategoriesData, error: shopSubCategoriesError } = await supabase.from('categories_sub_shop').select('*').order('title', { ascending: true });
 
-                if (categoriesError) throw categoriesError;
-                setCategories(categoriesData || []);
+                if (shopCategoriesError) throw shopCategoriesError;
+                if (shopSubCategoriesError) throw shopSubCategoriesError;
+                setShopCategories(shopCategoriesData || []);
+                setShopSubCategories(shopSubCategoriesData || []);
 
                 // Fetch delivery company data if shop has one
                 if (data.delivery_companies_id) {
@@ -501,17 +515,30 @@ const ShopPreview = () => {
         });
     };
 
-    // Fetch shop balance
+    // Fetch shop balance from database
     const fetchShopBalance = async () => {
-        if (!shop?.id) return;
-
         try {
-            console.log('Updating shop balance for shop ID:', shop.id);
-            const balance = await updateShopBalance(shop.id);
-            console.log('Shop balance calculated:', balance);
-            setPlatformBalance(balance);
+            const { data, error } = await supabase.rpc('calculate_shop_balance', {
+                shop_id_param: shop?.id,
+            });
+            if (error) throw error;
+            setPlatformBalance(data || 0);
         } catch (error) {
             console.error('Error fetching shop balance:', error);
+            setAlert({ visible: true, message: 'Error fetching balance', type: 'danger' });
+        }
+    };
+
+    // Fetch shop transactions
+    const fetchShopTransactions = async () => {
+        try {
+            const { data, error } = await supabase.from('shop_transactions').select('*').eq('shop_id', shop?.id).order('created_at', { ascending: false });
+
+            if (error) throw error;
+            setShopTransactions(data || []);
+        } catch (error) {
+            console.error('Error fetching transactions:', error);
+            setAlert({ visible: true, message: 'Error fetching transactions', type: 'danger' });
         }
     };
 
@@ -519,11 +546,7 @@ const ShopPreview = () => {
     useEffect(() => {
         if (shop && activeTab === 'transactions') {
             fetchShopBalance();
-
-            // Keep transaction table empty for now
-            const basicTransactions: ShopTransaction[] = [];
-            setShopTransactions(basicTransactions);
-            setTransactionRecords(basicTransactions);
+            fetchShopTransactions();
         }
     }, [shop, activeTab]);
 
@@ -541,10 +564,9 @@ const ShopPreview = () => {
     useEffect(() => {
         const filteredTransactions = shopTransactions.filter((item) => {
             return (
-                item.transaction_id.toLowerCase().includes(transactionSearch.toLowerCase()) ||
-                item.description.toLowerCase().includes(transactionSearch.toLowerCase()) ||
-                item.payment_method.toLowerCase().includes(transactionSearch.toLowerCase()) ||
-                item.status.toLowerCase().includes(transactionSearch.toLowerCase())
+                item.id.toString().includes(transactionSearch.toLowerCase()) ||
+                (item.description && item.description.toLowerCase().includes(transactionSearch.toLowerCase())) ||
+                item.type.toLowerCase().includes(transactionSearch.toLowerCase())
             );
         });
 
@@ -552,48 +574,80 @@ const ShopPreview = () => {
         setTransactionRecords(transactionSortStatus.direction === 'desc' ? sortedTransactions.reverse() : sortedTransactions);
     }, [transactionSearch, transactionSortStatus, shopTransactions]);
 
-    // Handle sending payment
-    const handleSendPayment = async () => {
+    // Handle recharge transaction
+    const handleRecharge = async () => {
         if (!paymentAmount || parseFloat(paymentAmount) <= 0) {
-            setAlert({ visible: true, message: 'Please enter a valid payment amount', type: 'danger' });
+            setAlert({ visible: true, message: 'Please enter a valid amount', type: 'danger' });
             return;
         }
 
         setSendingPayment(true);
 
         try {
-            // Simulate API call delay
-            await new Promise((resolve) => setTimeout(resolve, 2000));
+            const { data, error } = await supabase.rpc('add_shop_transaction', {
+                shop_id_param: shop?.id,
+                type_param: 'recharge',
+                amount_param: parseFloat(paymentAmount),
+                description_param: paymentDescription || 'Recharge transaction',
+            });
 
-            const newTransaction: ShopTransaction = {
-                id: shopTransactions.length + 1,
-                transaction_id: `TXN-${Math.floor(100000 + Math.random() * 900000)}`,
-                amount: parseFloat(paymentAmount),
-                date: new Date().toISOString(),
-                status: 'completed', // Mark as completed for prototype
-                description: paymentDescription || 'Admin payment',
-                payment_method: 'Bank Transfer',
-            };
+            if (error) throw error;
 
-            const updatedTransactions = [newTransaction, ...shopTransactions];
-            setShopTransactions(updatedTransactions);
-            setTransactionRecords(updatedTransactions);
-
-            // Update platform balance (ADD the payment amount to the balance)
-            setPlatformBalance((prev) => prev + parseFloat(paymentAmount));
-
-            setAlert({ visible: true, message: 'Payment sent successfully!', type: 'success' });
+            setAlert({ visible: true, message: 'Recharge successful!', type: 'success' });
             setShowPaymentModal(false);
             setPaymentAmount('');
             setPaymentDescription('');
+
+            // Refresh data
+            fetchShopBalance();
+            fetchShopTransactions();
         } catch (error) {
-            setAlert({ visible: true, message: 'Failed to send payment', type: 'danger' });
+            setAlert({ visible: true, message: 'Failed to recharge', type: 'danger' });
         } finally {
             setSendingPayment(false);
         }
     };
 
-    // Handle send all balance
+    // Handle withdraw transaction
+    const handleWithdraw = async () => {
+        if (!paymentAmount || parseFloat(paymentAmount) <= 0) {
+            setAlert({ visible: true, message: 'Please enter a valid amount', type: 'danger' });
+            return;
+        }
+
+        if (parseFloat(paymentAmount) > platformBalance) {
+            setAlert({ visible: true, message: 'Insufficient balance', type: 'danger' });
+            return;
+        }
+
+        setSendingPayment(true);
+
+        try {
+            const { data, error } = await supabase.rpc('add_shop_transaction', {
+                shop_id_param: shop?.id,
+                type_param: 'withdraw',
+                amount_param: parseFloat(paymentAmount),
+                description_param: paymentDescription || 'Withdraw transaction',
+            });
+
+            if (error) throw error;
+
+            setAlert({ visible: true, message: 'Withdraw successful!', type: 'success' });
+            setShowPaymentModal(false);
+            setPaymentAmount('');
+            setPaymentDescription('');
+
+            // Refresh data
+            fetchShopBalance();
+            fetchShopTransactions();
+        } catch (error) {
+            setAlert({ visible: true, message: 'Failed to withdraw', type: 'danger' });
+        } finally {
+            setSendingPayment(false);
+        }
+    };
+
+    // Handle send all balance (frontend-only)
     const handleSendAllBalance = () => {
         setPaymentAmount(Math.abs(platformBalance).toString());
         setPaymentDescription('Complete balance payout');
@@ -1053,7 +1107,11 @@ const ShopPreview = () => {
                                 <div className="grid grid-cols-1 gap-5 sm:grid-cols-2 mt-8">
                                     <div>
                                         <h6 className="text-sm font-semibold mb-2">Category</h6>
-                                        <span className="badge bg-primary text-white">{shop.categories?.title || 'Uncategorized'}</span>
+                                        <span className="badge bg-primary text-white">{shop.categories_shop?.title || 'Uncategorized'}</span>
+                                    </div>
+                                    <div>
+                                        <h6 className="text-sm font-semibold mb-2">Sub Category</h6>
+                                        <span className="badge bg-secondary text-white">{shop.categories_sub_shop?.title || 'No Sub Category'}</span>
                                     </div>
                                     <div>
                                         <h6 className="text-sm font-semibold mb-2">Visibility</h6>
@@ -1151,9 +1209,17 @@ const ShopPreview = () => {
                                     {/* Category */}
                                     <div>
                                         <h6 className="text-sm font-semibold mb-3">Category</h6>
-                                        <div className="flex">
-                                            <span className="badge bg-primary text-white">{shop.categories?.title || 'Uncategorized'}</span>
-                                            {shop.categories?.desc && <p className="ml-3 text-gray-500 dark:text-gray-400">{shop.categories.desc}</p>}
+                                        <div className="flex flex-col gap-2">
+                                            <div className="flex">
+                                                <span className="badge bg-primary text-white">{shop.categories_shop?.title || 'Uncategorized'}</span>
+                                                {shop.categories_shop?.description && <p className="ml-3 text-gray-500 dark:text-gray-400">{shop.categories_shop.description}</p>}
+                                            </div>
+                                            {shop.categories_sub_shop && (
+                                                <div className="flex">
+                                                    <span className="badge bg-secondary text-white">{shop.categories_sub_shop.title}</span>
+                                                    {shop.categories_sub_shop.description && <p className="ml-3 text-gray-500 dark:text-gray-400">{shop.categories_sub_shop.description}</p>}
+                                                </div>
+                                            )}
                                         </div>
                                     </div>
                                     {/* Working Hours */}
@@ -1333,11 +1399,8 @@ const ShopPreview = () => {
                                             </p>
                                         </div>
                                         <div className="text-right">
-                                            <button
-                                                className={`btn bg-white hover:bg-gray-100 ${platformBalance > 0 ? 'text-green-600' : platformBalance < 0 ? 'text-red-600' : 'text-blue-600'}`}
-                                                onClick={() => setShowPaymentModal(true)}
-                                            >
-                                                {t('send_payment')}
+                                            <button className="btn btn-primary" onClick={() => setShowPaymentModal(true)}>
+                                                Manage Balance
                                             </button>
                                         </div>
                                     </div>
@@ -1366,40 +1429,39 @@ const ShopPreview = () => {
                                         records={transactionRecords}
                                         columns={[
                                             {
-                                                accessor: 'transaction_id',
-                                                title: t('transaction_id'),
+                                                accessor: 'id',
+                                                title: 'ID',
                                                 sortable: true,
-                                                render: ({ transaction_id }) => <div className="font-mono text-sm text-primary">{transaction_id}</div>,
+                                                render: ({ id }) => <div className="font-mono text-sm text-primary">#{id}</div>,
+                                            },
+                                            {
+                                                accessor: 'type',
+                                                title: 'Type',
+                                                sortable: true,
+                                                render: ({ type }) => <span className={`badge ${type === 'recharge' ? 'bg-success' : 'bg-danger'}`}>{type.toUpperCase()}</span>,
                                             },
                                             {
                                                 accessor: 'amount',
-                                                title: t('amount'),
+                                                title: 'Amount',
                                                 sortable: true,
-                                                render: ({ amount }) => <div className="font-semibold text-success">+{formatCurrency(amount)}</div>,
+                                                render: ({ amount, type }) => (
+                                                    <div className={`font-semibold ${type === 'recharge' ? 'text-success' : 'text-danger'}`}>
+                                                        {type === 'recharge' ? '+' : '-'}
+                                                        {formatCurrency(amount)}
+                                                    </div>
+                                                ),
                                             },
                                             {
                                                 accessor: 'description',
-                                                title: t('description'),
+                                                title: 'Description',
                                                 sortable: true,
+                                                render: ({ description }) => <span>{description || 'No description'}</span>,
                                             },
                                             {
-                                                accessor: 'payment_method',
-                                                title: t('payment_method'),
+                                                accessor: 'created_at',
+                                                title: 'Date',
                                                 sortable: true,
-                                            },
-                                            {
-                                                accessor: 'date',
-                                                title: t('date'),
-                                                sortable: true,
-                                                render: ({ date }) => formatDate(date),
-                                            },
-                                            {
-                                                accessor: 'status',
-                                                title: t('status'),
-                                                sortable: true,
-                                                render: ({ status }) => (
-                                                    <span className={`badge ${status === 'completed' ? 'bg-success' : status === 'pending' ? 'bg-warning' : 'bg-danger'}`}>{t(status)}</span>
-                                                ),
+                                                render: ({ created_at }) => formatDate(created_at),
                                             },
                                         ]}
                                         totalRecords={shopTransactions.length}
@@ -1421,7 +1483,7 @@ const ShopPreview = () => {
                             <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                                 <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-full max-w-md mx-4">
                                     <div className="flex justify-between items-center mb-4">
-                                        <h3 className="text-lg font-semibold dark:text-white">{t('send_payment')}</h3>
+                                        <h3 className="text-lg font-semibold dark:text-white">Balance Management</h3>
                                         <button onClick={() => setShowPaymentModal(false)} className="text-gray-500 hover:text-gray-700">
                                             <IconX className="w-5 h-5" />
                                         </button>
@@ -1457,17 +1519,15 @@ const ShopPreview = () => {
                                                 </span>
                                             </p>
                                         </div>
-                                        <div className="flex gap-3">
-                                            <button type="button" className="btn btn-outline-primary flex-1" onClick={handleSendAllBalance}>
-                                                {t('send_all_balance')}
-                                            </button>
-                                        </div>
                                         <div className="flex gap-3 pt-4 border-t">
                                             <button type="button" className="btn btn-outline-danger flex-1" onClick={() => setShowPaymentModal(false)}>
-                                                {t('cancel')}
+                                                Cancel
                                             </button>
-                                            <button type="button" className="btn btn-primary flex-1" onClick={handleSendPayment} disabled={sendingPayment}>
-                                                {sendingPayment ? t('sending') : t('send_payment')}
+                                            <button type="button" className="btn btn-success flex-1" onClick={handleRecharge} disabled={sendingPayment}>
+                                                {sendingPayment ? 'Processing...' : 'Recharge'}
+                                            </button>
+                                            <button type="button" className="btn btn-danger flex-1" onClick={handleWithdraw} disabled={sendingPayment}>
+                                                {sendingPayment ? 'Processing...' : 'Withdraw'}
                                             </button>
                                         </div>
                                     </div>

@@ -29,7 +29,7 @@ import { generateOrderReceiptPDF } from '@/utils/pdf-generator';
 import supabase from '@/lib/supabase';
 import DateRangeSelector from '@/components/date-range-selector';
 import MultiSelect from '@/components/multi-select';
-import { calculateOrderTotal } from '@/utils/order-calculations';
+// Removed calculateOrderTotal import - using database total directly
 
 // Comment Modal Component
 const CommentModal = ({
@@ -207,7 +207,7 @@ const OrderTotalTooltip = ({ order }: { order: any }) => {
     };
 
     const calculateTotal = () => {
-        return calculateSubtotal() + calculateDeliveryFee() + calculateFeaturesTotal();
+        return parseFloat(order?.total) || 0;
     };
 
     const hasDeliveryOrFeatures = order?.delivery_methods || (order?.selected_features && order.selected_features.length > 0);
@@ -576,6 +576,7 @@ interface OrderData {
     payment_method: any;
     assigned_driver_id?: number;
     confirmed?: boolean;
+    total?: string;
     comment?: string;
     selected_feature_value_ids?: number[];
     // Joined data
@@ -665,7 +666,7 @@ const formatOrderForDisplay = (order: OrderData) => {
         shop_name: order.products?.shops?.[0]?.shop_name || 'Unknown Shop',
         city: shippingAddress.city || 'Unknown City',
         date: order.created_at,
-        total: `$${calculateOrderTotal(order).toFixed(2)}`,
+        total: `$${parseFloat(order.total || '0').toFixed(2)}`,
         status: statusMap[order.status] || 'processing',
         address: `${shippingAddress.address || ''}, ${shippingAddress.city || ''}, ${shippingAddress.zip || ''}`.trim(),
         items: [

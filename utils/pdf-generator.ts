@@ -1,6 +1,6 @@
 import jsPDF from 'jspdf';
 import html2canvas from 'html2canvas';
-import { calculateOrderSubtotal, calculateOrderDeliveryFee, calculateOrderFeaturesTotal, calculateOrderTotal } from './order-calculations';
+// Removed order calculations imports - using database total directly
 
 interface PDFOptions {
     filename?: string;
@@ -157,7 +157,7 @@ export const generateOrderReceiptPDF = async (orderData: any, options: PDFOption
                     <div style="border: 1px solid #ddd; padding: 20px; background-color: #f8f9fa;">
                         <div style="display: flex; justify-content: space-between; margin-bottom: 10px;">
                             <span style="color: #666;">Subtotal:</span>
-                            <span style="color: #666;">$${calculateOrderSubtotal(orderData).toFixed(2)}</span>
+                            <span style="color: #666;">$${(orderData.products?.price || 0).toFixed(2)}</span>
                         </div>
                         ${
                             orderData.delivery_methods
@@ -200,7 +200,7 @@ export const generateOrderReceiptPDF = async (orderData: any, options: PDFOption
                         }
                         <div style="display: flex; justify-content: space-between; padding-top: 10px; border-top: 2px solid #4f46e5; font-weight: bold; font-size: 18px;">
                             <span style="color: #333;">Total:</span>
-                            <span style="color: #4f46e5;">$${calculateOrderTotal(orderData).toFixed(2)}</span>
+                            <span style="color: #4f46e5;">$${(orderData.total || 0).toFixed(2)}</span>
                         </div>
                     </div>
                 </div>

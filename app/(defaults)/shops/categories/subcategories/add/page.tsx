@@ -1,10 +1,10 @@
 'use client';
-import SubCategoryForm from '@/components/subcategories/subcategory-form';
+import ShopSubCategoryForm from '@/components/shops/shop-subcategory-form';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import { getTranslation } from '@/i18n';
 
-const EditSubCategoryPage = ({ params }: { params: { id: string } }) => {
+const AddShopSubCategoryPage = () => {
     const router = useRouter();
     const { t } = getTranslation();
 
@@ -23,24 +23,34 @@ const EditSubCategoryPage = ({ params }: { params: { id: string } }) => {
                         </Link>
                     </li>
                     <li className="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
-                        <Link href="/categories/subcategories" className="text-primary hover:underline">
+                        <Link href="/shops" className="text-primary hover:underline">
+                            {t('shops')}
+                        </Link>
+                    </li>
+                    <li className="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
+                        <Link href="/shops/categories" className="text-primary hover:underline">
+                            {t('categories')}
+                        </Link>
+                    </li>
+                    <li className="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
+                        <Link href="/shops/categories/subcategories" className="text-primary hover:underline">
                             {t('sub_categories')}
                         </Link>
                     </li>
                     <li className="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
-                        <span>{t('edit_subcategory')}</span>
+                        <span>{t('add_new_subcategory')}</span>
                     </li>
                 </ul>
             </div>
 
             <div className="mb-6">
-                <h1 className="text-2xl font-bold">{t('edit_subcategory')}</h1>
-                <p className="text-gray-500">{t('update_subcategory_information')}</p>
+                <h1 className="text-2xl font-bold">{t('add_new_shop_subcategory')}</h1>
+                <p className="text-gray-500">{t('create_shop_subcategory_listing')}</p>
             </div>
 
-            <SubCategoryForm subCategoryId={params?.id} />
+            <ShopSubCategoryForm />
         </div>
     );
 };
 
-export default EditSubCategoryPage;
+export default AddShopSubCategoryPage;

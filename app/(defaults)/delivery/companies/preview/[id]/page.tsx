@@ -105,7 +105,7 @@ const DeliveryCompanyPreview = () => {
     const [orders, setOrders] = useState<any[]>([]);
     const [ordersLoading, setOrdersLoading] = useState(false);
 
-    // Balance UI state
+    // Balance UI state (frontend-only, always 0)
     const [balance, setBalance] = useState(0);
     const [showPaymentModal, setShowPaymentModal] = useState(false);
     const [paymentAmount, setPaymentAmount] = useState('');
@@ -866,6 +866,7 @@ const DeliveryCompanyPreview = () => {
                                         <p className={`mt-1 ${balance > 0 ? 'text-green-100' : balance < 0 ? 'text-red-100' : 'text-blue-100'}`}>
                                             {balance >= 0 ? 'Amount owed to company' : 'Amount company owes to platform'}
                                         </p>
+                                        <p className="text-xs text-gray-300 mt-2">(Frontend-only balance - resets on page refresh)</p>
                                     </div>
                                     <div className="text-right">
                                         <button
@@ -893,7 +894,7 @@ const DeliveryCompanyPreview = () => {
                                     className="btn btn-outline-success"
                                     onClick={() => {
                                         setBalance((prev) => prev + 100);
-                                        setAlert({ visible: true, message: 'Added $100.00 to balance', type: 'success' });
+                                        setAlert({ visible: true, message: 'Added $100.00 to balance (frontend-only)', type: 'success' });
                                     }}
                                 >
                                     Add $100.00
@@ -902,7 +903,7 @@ const DeliveryCompanyPreview = () => {
                                     className="btn btn-outline-danger"
                                     onClick={() => {
                                         setBalance((prev) => prev - 50);
-                                        setAlert({ visible: true, message: 'Subtracted $50.00 from balance', type: 'success' });
+                                        setAlert({ visible: true, message: 'Subtracted $50.00 from balance (frontend-only)', type: 'success' });
                                     }}
                                 >
                                     Subtract $50.00

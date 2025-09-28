@@ -31,10 +31,17 @@ interface Profile {
     avatar_url?: string;
 }
 
-interface Category {
+interface ShopCategory {
     id: number;
     title: string;
-    desc: string;
+    description: string;
+}
+
+interface ShopSubCategory {
+    id: number;
+    title: string;
+    description: string;
+    category_id: number;
 }
 
 interface DeliveryCompany {
@@ -64,7 +71,8 @@ const AddShopPage = () => {
         address: '',
         work_hours: null as WorkHours[] | null,
         phone_numbers: [''],
-        category_id: null as number | null,
+        category_shop_id: null as number | null,
+        subcategory_shop_id: null as number | null,
         delivery_companies_id: null as number | null,
         gallery: [] as string[],
         latitude: null as number | null, // Shop location coordinates
@@ -78,7 +86,8 @@ const AddShopPage = () => {
     });
     const [loading, setLoading] = useState(false);
     const [users, setUsers] = useState<Profile[]>([]);
-    const [categories, setCategories] = useState<Category[]>([]);
+    const [shopCategories, setShopCategories] = useState<ShopCategory[]>([]);
+    const [shopSubCategories, setShopSubCategories] = useState<ShopSubCategory[]>([]);
     const [searchTerm, setSearchTerm] = useState('');
     const [filteredUsers, setFilteredUsers] = useState<Profile[]>([]);
     const [showDropdown, setShowDropdown] = useState(false);
@@ -176,11 +185,14 @@ const AddShopPage = () => {
                 setUsers(profiles || []);
                 setFilteredUsers(profiles || []);
 
-                // Fetch all categories
-                const { data: categoriesData, error: categoriesError } = await supabase.from('categories').select('*').order('title', { ascending: true });
+                // Fetch all shop categories
+                const { data: shopCategoriesData, error: shopCategoriesError } = await supabase.from('categories_shop').select('*').order('title', { ascending: true });
+                const { data: shopSubCategoriesData, error: shopSubCategoriesError } = await supabase.from('categories_sub_shop').select('*').order('title', { ascending: true });
 
-                if (categoriesError) throw categoriesError;
-                setCategories(categoriesData || []);
+                if (shopCategoriesError) throw shopCategoriesError;
+                if (shopSubCategoriesError) throw shopSubCategoriesError;
+                setShopCategories(shopCategoriesData || []);
+                setShopSubCategories(shopSubCategoriesData || []);
 
                 // Fetch delivery companies
                 const { data: deliveryCompaniesData, error: deliveryCompaniesError } = await supabase.from('delivery_companies').select('id, company_name').order('company_name', { ascending: true });
@@ -381,7 +393,10 @@ const AddShopPage = () => {
         }
     };
 
-    const filteredCategories = categories.filter((category) => category.title.toLowerCase().includes(searchCategoryTerm.toLowerCase()));
+    const filteredShopCategories = shopCategories.filter((category) => category.title.toLowerCase().includes(searchCategoryTerm.toLowerCase()));
+    const filteredShopSubCategories = shopSubCategories.filter(
+        (subcategory) => subcategory.category_id === form.category_shop_id && subcategory.title.toLowerCase().includes(searchCategoryTerm.toLowerCase()),
+    );
 
     const handleSubmit = async (e: React.FormEvent) => {
         e.preventDefault();
@@ -412,7 +427,8 @@ const AddShopPage = () => {
                 address: form.address,
                 work_hours: form.work_hours,
                 phone_numbers: form.phone_numbers.filter((phone) => phone.trim() !== ''),
-                category_id: form.category_id,
+                category_shop_id: form.category_shop_id,
+                subcategory_shop_id: form.subcategory_shop_id,
                 delivery_companies_id: form.delivery_companies_id,
                 gallery: form.gallery,
                 latitude: form.latitude,
@@ -659,7 +675,7 @@ const AddShopPage = () => {
                                         className="cursor-pointer rounded border border-[#e0e6ed] bg-white p-2.5 text-dark dark:border-[#191e3a] dark:bg-black dark:text-white-dark flex items-center justify-between"
                                         onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
                                     >
-                                        <span>{form.category_id ? categories.find((c) => c.id === form.category_id)?.title || t('select_category') : t('select_category')}</span>
+                                        <span>{form.category_shop_id ? shopCategories.find((c) => c.id === form.category_shop_id)?.title || t('select_category') : t('select_category')}</span>
                                         <IconCaretDown className={`h-4 w-4 transition-transform duration-300 ${isCategoryDropdownOpen ? 'rotate-180' : ''}`} />
                                     </div>
 
@@ -675,25 +691,77 @@ const AddShopPage = () => {
                                                 />
                                             </div>
                                             <div className="max-h-64 overflow-y-auto">
-                                                {filteredCategories.map((category) => (
+                                                {filteredShopCategories.map((category) => (
                                                     <div
                                                         key={category.id}
                                                         className={`cursor-pointer px-4 py-2 hover:bg-gray-100 dark:text-white-dark dark:hover:bg-[#191e3a] ${
-                                                            form.category_id === category.id ? 'bg-primary/10 dark:bg-primary/10' : ''
+                                                            form.category_shop_id === category.id ? 'bg-primary/10 dark:bg-primary/10' : ''
                                                         }`}
                                                         onClick={() => {
-                                                            setForm((prev) => ({ ...prev, category_id: category.id }));
+                                                            setForm((prev) => ({
+                                                                ...prev,
+                                                                category_shop_id: category.id,
+                                                                subcategory_shop_id: null, // Reset subcategory when category changes
+                                                            }));
                                                             setIsCategoryDropdownOpen(false);
                                                         }}
                                                     >
                                                         {category.title}
                                                     </div>
                                                 ))}
-                                                {filteredCategories.length === 0 && <div className="px-4 py-2 text-gray-500 dark:text-gray-400">{t('no_categories_found')}</div>}
+                                                {filteredShopCategories.length === 0 && <div className="px-4 py-2 text-gray-500 dark:text-gray-400">{t('no_categories_found')}</div>}
                                             </div>
                                         </div>
                                     )}
-                                </div>{' '}
+                                </div>
+                                {/* Subcategory Dropdown */}
+                                {form.category_shop_id && (
+                                    <div className="relative">
+                                        <label htmlFor="subcategory_shop_id" className="block text-sm font-bold text-gray-700 dark:text-white">
+                                            Sub Category
+                                        </label>
+                                        <div
+                                            className="cursor-pointer rounded border border-[#e0e6ed] bg-white p-2.5 text-dark dark:border-[#191e3a] dark:bg-black dark:text-white-dark flex items-center justify-between"
+                                            onClick={() => setIsCategoryDropdownOpen(!isCategoryDropdownOpen)}
+                                        >
+                                            <span>
+                                                {form.subcategory_shop_id ? shopSubCategories.find((s) => s.id === form.subcategory_shop_id)?.title || 'Select Sub Category' : 'Select Sub Category'}
+                                            </span>
+                                            <IconCaretDown className={`h-4 w-4 transition-transform duration-300 ${isCategoryDropdownOpen ? 'rotate-180' : ''}`} />
+                                        </div>
+
+                                        {isCategoryDropdownOpen && (
+                                            <div className="absolute z-10 mt-1 w-full rounded-md border border-[#e0e6ed] bg-white shadow-lg dark:border-[#191e3a] dark:bg-black">
+                                                <div className="p-2">
+                                                    <input
+                                                        type="text"
+                                                        className="w-full rounded border border-[#e0e6ed] p-2 focus:border-primary focus:outline-none dark:border-[#191e3a] dark:bg-black dark:text-white-dark"
+                                                        placeholder="Search subcategories..."
+                                                        value={searchCategoryTerm}
+                                                        onChange={(e) => setSearchCategoryTerm(e.target.value)}
+                                                    />
+                                                </div>
+                                                <div className="max-h-64 overflow-y-auto">
+                                                    {filteredShopSubCategories.map((subcategory) => (
+                                                        <div
+                                                            key={subcategory.id}
+                                                            className={`cursor-pointer px-4 py-2 hover:bg-gray-100 dark:text-white-dark dark:hover:bg-[#191e3a] ${
+                                                                form.subcategory_shop_id === subcategory.id ? 'bg-primary/10 dark:bg-primary/10' : ''
+                                                            }`}
+                                                            onClick={() => {
+                                                                setForm((prev) => ({ ...prev, subcategory_shop_id: subcategory.id }));
+                                                                setIsCategoryDropdownOpen(false);
+                                                            }}
+                                                        >
+                                                            {subcategory.title}
+                                                        </div>
+                                                    ))}
+                                                    {filteredShopSubCategories.length === 0 && <div className="px-4 py-2 text-gray-500 dark:text-gray-400">No subcategories found</div>}
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
                                 <div>
                                     <label className="block text-sm font-bold text-gray-700 dark:text-white ">{t('visibility')}</label>
                                     <label className="inline-flex cursor-pointer items-center">

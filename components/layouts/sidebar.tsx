@@ -140,35 +140,27 @@ const Sidebar = () => {
                                         </Link>
                                     </li>
                                     <li className="nav-item">
-                                        <Link href="/shops" className="group">
+                                        <button type="button" className={`${currentMenu === 'shops' ? 'active' : ''} nav-link group w-full`} onClick={() => toggleMenu('shops')}>
                                             <div className="flex items-center">
-                                                <IconMenuWidgets className="shrink-0 group-hover:!text-primary" />
+                                                <IconBuilding className="shrink-0 group-hover:!text-primary" />
                                                 <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">{t('shops')}</span>
                                             </div>
-                                        </Link>
-                                    </li>
-                                    <li className="nav-item">
-                                        <Link href="/products" className="group">
-                                            <div className="flex items-center">
-                                                <IconMenuComponents className="shrink-0 group-hover:!text-primary" />
-                                                <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">{t('products')}</span>
-                                            </div>
-                                        </Link>
-                                    </li>
-                                    <li className="nav-item">
-                                        <button type="button" className={`${currentMenu === 'categories' ? 'active' : ''} nav-link group w-full`} onClick={() => toggleMenu('categories')}>
-                                            <div className="flex items-center">
-                                                <IconMenuTables className="shrink-0 group-hover:!text-primary" />
-                                                <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Categories</span>
-                                            </div>
-                                            <div className={`${currentMenu !== 'categories' ? 'rotate-90' : ''} ltr:ml-auto rtl:mr-auto`}>
+                                            <div className={`${currentMenu !== 'shops' ? 'rotate-90' : ''} ltr:ml-auto rtl:mr-auto`}>
                                                 <IconCaretDown className="w-4 h-4" />
                                             </div>
                                         </button>
-                                        <AnimateHeight duration={300} height={currentMenu === 'categories' ? 'auto' : 0}>
+                                        <AnimateHeight duration={300} height={currentMenu === 'shops' ? 'auto' : 0}>
                                             <ul className="sub-menu [&>li>a]:before:content-none [&>li>button]:before:content-none">
                                                 <li>
-                                                    <Link href="/categories" className="group nav-link">
+                                                    <Link href="/shops" className="group nav-link">
+                                                        <div className="flex items-center">
+                                                            <IconBuilding className="shrink-0 group-hover:!text-primary" />
+                                                            <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">{t('shops')}</span>
+                                                        </div>
+                                                    </Link>
+                                                </li>
+                                                <li>
+                                                    <Link href="/shops/categories" className="group nav-link">
                                                         <div className="flex items-center">
                                                             <IconMenuTables className="shrink-0 group-hover:!text-primary" />
                                                             <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Categories</span>
@@ -176,7 +168,54 @@ const Sidebar = () => {
                                                     </Link>
                                                 </li>
                                                 <li>
-                                                    <Link href="/categories/subcategories" className="group nav-link">
+                                                    <Link href="/shops/categories/subcategories" className="group nav-link">
+                                                        <div className="flex items-center">
+                                                            <IconMenuTables className="shrink-0 group-hover:!text-primary" />
+                                                            <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Sub Categories</span>
+                                                        </div>
+                                                    </Link>
+                                                </li>
+                                                <li>
+                                                    <Link href="/shops/cms" className="group nav-link">
+                                                        <div className="flex items-center">
+                                                            <IconMenuComponents className="shrink-0 group-hover:!text-primary" />
+                                                            <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">CMS</span>
+                                                        </div>
+                                                    </Link>
+                                                </li>
+                                            </ul>
+                                        </AnimateHeight>
+                                    </li>
+                                    <li className="nav-item">
+                                        <button type="button" className={`${currentMenu === 'products' ? 'active' : ''} nav-link group w-full`} onClick={() => toggleMenu('products')}>
+                                            <div className="flex items-center">
+                                                <IconMenuComponents className="shrink-0 group-hover:!text-primary" />
+                                                <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">{t('products')}</span>
+                                            </div>
+                                            <div className={`${currentMenu !== 'products' ? 'rotate-90' : ''} ltr:ml-auto rtl:mr-auto`}>
+                                                <IconCaretDown className="w-4 h-4" />
+                                            </div>
+                                        </button>
+                                        <AnimateHeight duration={300} height={currentMenu === 'products' ? 'auto' : 0}>
+                                            <ul className="sub-menu [&>li>a]:before:content-none [&>li>button]:before:content-none">
+                                                <li>
+                                                    <Link href="/products" className="group nav-link">
+                                                        <div className="flex items-center">
+                                                            <IconMenuComponents className="shrink-0 group-hover:!text-primary" />
+                                                            <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">{t('products')}</span>
+                                                        </div>
+                                                    </Link>
+                                                </li>
+                                                <li>
+                                                    <Link href="/products/categories" className="group nav-link">
+                                                        <div className="flex items-center">
+                                                            <IconMenuTables className="shrink-0 group-hover:!text-primary" />
+                                                            <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Categories</span>
+                                                        </div>
+                                                    </Link>
+                                                </li>
+                                                <li>
+                                                    <Link href="/products/categories/subcategories" className="group nav-link">
                                                         <div className="flex items-center">
                                                             <IconMenuTables className="shrink-0 group-hover:!text-primary" />
                                                             <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Sub Categories</span>
@@ -246,14 +285,6 @@ const Sidebar = () => {
                                         <AnimateHeight duration={300} height={currentMenu === 'delivery' ? 'auto' : 0}>
                                             <ul className="sub-menu [&>li>a]:before:content-none [&>li>button]:before:content-none">
                                                 <li>
-                                                    <Link href="/delivery" className="group nav-link">
-                                                        <div className="flex items-center">
-                                                            <IconMenuDashboard className="shrink-0 group-hover:!text-primary" />
-                                                            <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Dashboard</span>
-                                                        </div>
-                                                    </Link>
-                                                </li>
-                                                <li>
                                                     <Link href="/delivery/companies" className="group nav-link">
                                                         <div className="flex items-center">
                                                             <IconBuilding className="shrink-0 group-hover:!text-primary" />
@@ -290,6 +321,14 @@ const Sidebar = () => {
                                                         <div className="flex items-center">
                                                             <IconBuilding className="shrink-0 group-hover:!text-primary" />
                                                             <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Shops</span>
+                                                        </div>
+                                                    </Link>
+                                                </li>
+                                                <li>
+                                                    <Link href="/delivery/cms" className="group nav-link">
+                                                        <div className="flex items-center">
+                                                            <IconMenuComponents className="shrink-0 group-hover:!text-primary" />
+                                                            <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">CMS</span>
                                                         </div>
                                                     </Link>
                                                 </li>

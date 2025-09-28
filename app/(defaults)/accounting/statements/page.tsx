@@ -9,21 +9,23 @@ import React, { useEffect, useState } from 'react';
 import { Alert } from '@/components/elements/alerts/elements-alerts-default';
 import ConfirmModal from '@/components/modals/confirm-modal';
 import { getTranslation } from '@/i18n';
+import supabase from '@/lib/supabase';
 
-// Statement interface
-interface Statement {
+// Transaction interface for accounting statements
+interface Transaction {
     id: number;
-    title: string;
-    description: string;
+    entity_type: 'shop' | 'delivery';
+    entity_id: number;
+    entity_name: string;
+    type: 'recharge' | 'withdraw';
     amount: number;
-    type: 'income' | 'expense';
-    status: 'draft' | 'published' | 'archived';
+    description: string | null;
     created_at: string;
-    due_date?: string;
+    created_by: string | null;
 }
 
 const StatementsList = () => {
-    const [items, setItems] = useState<Statement[]>([]);
+    const [items, setItems] = useState<Transaction[]>([]);
     const [loading, setLoading] = useState(true);
     const { t } = getTranslation();
     const router = useRouter();
@@ -31,8 +33,8 @@ const StatementsList = () => {
     const [page, setPage] = useState(1);
     const PAGE_SIZES = [10, 20, 30, 50, 100];
     const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
-    const [initialRecords, setInitialRecords] = useState<Statement[]>([]);
-    const [records, setRecords] = useState<Statement[]>([]);
+    const [initialRecords, setInitialRecords] = useState<Transaction[]>([]);
+    const [records, setRecords] = useState<Transaction[]>([]);
     const [selectedRecords, setSelectedRecords] = useState<any>([]);
 
     const [search, setSearch] = useState('');
@@ -43,7 +45,7 @@ const StatementsList = () => {
 
     // State for confirm modal and alert
     const [showConfirmModal, setShowConfirmModal] = useState(false);
-    const [statementToDelete, setStatementToDelete] = useState<Statement | null>(null);
+    const [transactionToDelete, setTransactionToDelete] = useState<Transaction | null>(null);
     const [alert, setAlert] = useState<{ visible: boolean; message: string; type: 'success' | 'danger' }>({
         visible: false,
         message: '',
@@ -51,38 +53,83 @@ const StatementsList = () => {
     });
 
     useEffect(() => {
-        const fetchStatements = async () => {
+        const fetchTransactions = async () => {
             try {
-                // Mock data for now
-                const mockStatements: Statement[] = [
-                    {
-                        id: 1,
-                        title: 'Monthly Revenue Statement',
-                        description: 'Revenue statement for January 2024',
-                        amount: 15000.0,
-                        type: 'income',
-                        status: 'published',
-                        created_at: '2024-01-31T00:00:00Z',
-                        due_date: '2024-02-15T00:00:00Z',
-                    },
-                    {
-                        id: 2,
-                        title: 'Operating Expenses',
-                        description: 'Monthly operating expenses report',
-                        amount: 8500.0,
-                        type: 'expense',
-                        status: 'draft',
-                        created_at: '2024-01-30T00:00:00Z',
-                    },
-                ];
-                setItems(mockStatements);
+                setLoading(true);
+
+                // Fetch shop transactions (if table exists)
+                let shopTransactions = [];
+                try {
+                    const { data, error } = await supabase
+                        .from('shop_transactions')
+                        .select(
+                            `
+                            *,
+                            shops!shop_transactions_shop_id_fkey(shop_name)
+                        `,
+                        )
+                        .order('created_at', { ascending: false });
+
+                    if (error && error.code !== 'PGRST116') throw error; // PGRST116 = table doesn't exist
+                    shopTransactions = data || [];
+                } catch (error) {
+                    console.log('Shop transactions table not found, skipping...');
+                }
+
+                // Fetch delivery transactions (if table exists)
+                let deliveryTransactions = [];
+                try {
+                    const { data, error } = await supabase
+                        .from('delivery_transactions')
+                        .select(
+                            `
+                            *,
+                            delivery_companies!delivery_transactions_delivery_company_id_fkey(company_name)
+                        `,
+                        )
+                        .order('created_at', { ascending: false });
+
+                    if (error && error.code !== 'PGRST116') throw error; // PGRST116 = table doesn't exist
+                    deliveryTransactions = data || [];
+                } catch (error) {
+                    console.log('Delivery transactions table not found, skipping...');
+                }
+
+                // Combine and format transactions
+                const allTransactions: Transaction[] = [
+                    ...shopTransactions.map((t) => ({
+                        id: t.id,
+                        entity_type: 'shop' as const,
+                        entity_id: t.shop_id,
+                        entity_name: t.shops?.shop_name || 'Unknown Shop',
+                        type: t.type,
+                        amount: t.amount,
+                        description: t.description,
+                        created_at: t.created_at,
+                        created_by: t.created_by,
+                    })),
+                    ...deliveryTransactions.map((t) => ({
+                        id: t.id,
+                        entity_type: 'delivery' as const,
+                        entity_id: t.delivery_company_id,
+                        entity_name: t.delivery_companies?.company_name || 'Unknown Company',
+                        type: t.type,
+                        amount: t.amount,
+                        description: t.description,
+                        created_at: t.created_at,
+                        created_by: t.created_by,
+                    })),
+                ].sort((a, b) => new Date(b.created_at).getTime() - new Date(a.created_at).getTime());
+
+                setItems(allTransactions);
             } catch (error) {
-                console.error('Error fetching statements:', error);
+                console.error('Error fetching transactions:', error);
+                setAlert({ visible: true, message: 'Error fetching transactions', type: 'danger' });
             } finally {
                 setLoading(false);
             }
         };
-        fetchStatements();
+        fetchTransactions();
     }, []);
 
     useEffect(() => {
@@ -99,22 +146,27 @@ const StatementsList = () => {
         setInitialRecords(
             items.filter((item) => {
                 const searchTerm = search.toLowerCase();
-                return item.title.toLowerCase().includes(searchTerm) || item.description.toLowerCase().includes(searchTerm);
+                return (
+                    item.entity_name.toLowerCase().includes(searchTerm) ||
+                    (item.description && item.description.toLowerCase().includes(searchTerm)) ||
+                    item.type.toLowerCase().includes(searchTerm) ||
+                    item.entity_type.toLowerCase().includes(searchTerm)
+                );
             }),
         );
     }, [items, search]);
 
     useEffect(() => {
-        const sorted = sortBy(initialRecords, sortStatus.columnAccessor as keyof Statement);
+        const sorted = sortBy(initialRecords, sortStatus.columnAccessor as keyof Transaction);
         setRecords(sortStatus.direction === 'desc' ? sorted.reverse() : sorted);
         setPage(1);
     }, [sortStatus, initialRecords]);
 
     const deleteRow = (id: number | null = null) => {
         if (id) {
-            const statement = items.find((s) => s.id === id);
-            if (statement) {
-                setStatementToDelete(statement);
+            const transaction = items.find((s) => s.id === id);
+            if (transaction) {
+                setTransactionToDelete(transaction);
                 setShowConfirmModal(true);
             }
         }
@@ -122,16 +174,16 @@ const StatementsList = () => {
 
     // Confirm deletion callback
     const confirmDeletion = async () => {
-        if (!statementToDelete || !statementToDelete.id) return;
+        if (!transactionToDelete || !transactionToDelete.id) return;
         try {
-            const updatedItems = items.filter((s) => s.id !== statementToDelete.id);
+            const updatedItems = items.filter((s) => s.id !== transactionToDelete.id);
             setItems(updatedItems);
-            setAlert({ visible: true, message: 'Statement deleted successfully', type: 'success' });
+            setAlert({ visible: true, message: 'Transaction deleted successfully', type: 'success' });
         } catch (error) {
-            setAlert({ visible: true, message: 'Error deleting statement', type: 'danger' });
+            setAlert({ visible: true, message: 'Error deleting transaction', type: 'danger' });
         } finally {
             setShowConfirmModal(false);
-            setStatementToDelete(null);
+            setTransactionToDelete(null);
         }
     };
 
@@ -204,69 +256,43 @@ const StatementsList = () => {
                                 render: ({ id }) => <strong className="text-info">#{id}</strong>,
                             },
                             {
-                                accessor: 'title',
-                                title: 'Title',
+                                accessor: 'entity_type',
+                                title: 'Entity Type',
+                                sortable: true,
+                                render: ({ entity_type }) => <span className={`badge ${entity_type === 'shop' ? 'bg-primary' : 'bg-info'} text-white`}>{entity_type.toUpperCase()}</span>,
+                            },
+                            {
+                                accessor: 'entity_name',
+                                title: 'Entity Name',
                                 sortable: true,
                             },
                             {
-                                accessor: 'description',
-                                title: 'Description',
+                                accessor: 'type',
+                                title: 'Transaction Type',
                                 sortable: true,
-                                render: ({ description }) => <span>{description.slice(0, 50) || 'N/A'}</span>,
+                                render: ({ type }) => <span className={`badge ${type === 'recharge' ? 'bg-success' : 'bg-danger'} text-white`}>{type.toUpperCase()}</span>,
                             },
                             {
                                 accessor: 'amount',
                                 title: 'Amount',
                                 sortable: true,
-                                render: ({ amount, type }) => <span className={`font-semibold ${type === 'income' ? 'text-success' : 'text-danger'}`}>${amount.toFixed(2)}</span>,
+                                render: ({ amount, type }) => (
+                                    <span className={`font-semibold ${type === 'recharge' ? 'text-success' : 'text-danger'}`}>
+                                        {type === 'recharge' ? '+' : '-'}${amount.toFixed(2)}
+                                    </span>
+                                ),
                             },
                             {
-                                accessor: 'type',
-                                title: 'Type',
+                                accessor: 'description',
+                                title: 'Description',
                                 sortable: true,
-                                render: ({ type }) => getTypeBadge(type),
-                            },
-                            {
-                                accessor: 'status',
-                                title: 'Status',
-                                sortable: true,
-                                render: ({ status }) => getStatusBadge(status),
+                                render: ({ description }) => <span>{description || 'No description'}</span>,
                             },
                             {
                                 accessor: 'created_at',
-                                title: 'Created Date',
+                                title: 'Date',
                                 sortable: true,
                                 render: ({ created_at }) => (created_at ? <span>{new Date(created_at).toLocaleDateString()}</span> : ''),
-                            },
-                            {
-                                accessor: 'action',
-                                title: 'Actions',
-                                sortable: false,
-                                textAlignment: 'center',
-                                render: ({ id }) => (
-                                    <div className="mx-auto flex w-max items-center gap-4">
-                                        <Link href={`/accounting/statements/edit/${id}`} className="flex hover:text-info" onClick={(e) => e.stopPropagation()}>
-                                            <svg className="h-4.5 w-4.5" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                                                <path
-                                                    strokeLinecap="round"
-                                                    strokeLinejoin="round"
-                                                    strokeWidth={2}
-                                                    d="M11 5H6a2 2 0 00-2 2v11a2 2 0 002 2h11a2 2 0 002-2v-5m-1.414-9.414a2 2 0 112.828 2.828L11.828 15H9v-2.828l8.586-8.586z"
-                                                />
-                                            </svg>
-                                        </Link>
-                                        <button
-                                            type="button"
-                                            className="flex hover:text-danger"
-                                            onClick={(e) => {
-                                                e.stopPropagation();
-                                                deleteRow(id);
-                                            }}
-                                        >
-                                            <IconTrashLines />
-                                        </button>
-                                    </div>
-                                ),
                             },
                         ]}
                         highlightOnHover
@@ -295,7 +321,7 @@ const StatementsList = () => {
                 message="Are you sure you want to delete this statement?"
                 onCancel={() => {
                     setShowConfirmModal(false);
-                    setStatementToDelete(null);
+                    setTransactionToDelete(null);
                 }}
                 onConfirm={confirmDeletion}
                 confirmLabel="Delete"

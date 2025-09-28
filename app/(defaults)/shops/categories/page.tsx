@@ -1,6 +1,5 @@
 'use client';
 import IconEdit from '@/components/icon/icon-edit';
-import IconEye from '@/components/icon/icon-eye';
 import IconPlus from '@/components/icon/icon-plus';
 import IconTrashLines from '@/components/icon/icon-trash-lines';
 import { sortBy } from 'lodash';
@@ -9,41 +8,21 @@ import Link from 'next/link';
 import { useRouter } from 'next/navigation';
 import React, { useEffect, useState } from 'react';
 import supabase from '@/lib/supabase';
-import StorageManager from '@/utils/storage-manager';
 import { Alert } from '@/components/elements/alerts/elements-alerts-default';
 import ConfirmModal from '@/components/modals/confirm-modal';
 import { getTranslation } from '@/i18n';
 
-// Updated shop type reflecting the join with profiles and categories.
-interface Shop {
+// Shop Category interface
+interface ShopCategory {
     id: number;
-    shop_name: string;
-    shop_desc: string;
-    logo_url: string | null;
-    owner: string;
-    active: boolean;
-    created_at?: string;
-    public: boolean;
-    status: string;
-    category_shop_id?: number | null;
-    subcategory_shop_id?: number | null;
-    profiles?: {
-        full_name: string;
-    };
-    categories_shop?: {
-        id: number;
-        title: string;
-        description: string;
-    };
-    categories_sub_shop?: {
-        id: number;
-        title: string;
-        description: string;
-    };
+    title: string;
+    description: string;
+    image_url?: string;
+    created_at: string;
 }
 
-const ShopsList = () => {
-    const [items, setItems] = useState<Shop[]>([]);
+const ShopCategoriesList = () => {
+    const [items, setItems] = useState<ShopCategory[]>([]);
     const [loading, setLoading] = useState(true);
     const { t } = getTranslation();
     const router = useRouter();
@@ -51,8 +30,8 @@ const ShopsList = () => {
     const [page, setPage] = useState(1);
     const PAGE_SIZES = [10, 20, 30, 50, 100];
     const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
-    const [initialRecords, setInitialRecords] = useState<Shop[]>([]);
-    const [records, setRecords] = useState<Shop[]>([]);
+    const [initialRecords, setInitialRecords] = useState<ShopCategory[]>([]);
+    const [records, setRecords] = useState<ShopCategory[]>([]);
     const [selectedRecords, setSelectedRecords] = useState<any>([]);
 
     const [search, setSearch] = useState('');
@@ -61,9 +40,9 @@ const ShopsList = () => {
         direction: 'desc',
     });
 
-    // New state for confirm modal and alert.
+    // State for confirm modal and alert
     const [showConfirmModal, setShowConfirmModal] = useState(false);
-    const [shopToDelete, setShopToDelete] = useState<Shop | null>(null);
+    const [categoryToDelete, setCategoryToDelete] = useState<ShopCategory | null>(null);
     const [alert, setAlert] = useState<{ visible: boolean; message: string; type: 'success' | 'danger' }>({
         visible: false,
         message: '',
@@ -71,19 +50,18 @@ const ShopsList = () => {
     });
 
     useEffect(() => {
-        const fetchShops = async () => {
+        const fetchCategories = async () => {
             try {
-                // Join the profiles table and categories to fetch owner's full name and category info.
-                const { data, error } = await supabase.from('shops').select('*, profiles(full_name), categories_shop(*), categories_sub_shop(*)').order('created_at', { ascending: false });
+                const { data, error } = await supabase.from('categories_shop').select('*').order('created_at', { ascending: false });
                 if (error) throw error;
-                setItems(data as Shop[]);
+                setItems(data as ShopCategory[]);
             } catch (error) {
-                // Error fetching shops
+                // Error fetching categories
             } finally {
                 setLoading(false);
             }
         };
-        fetchShops();
+        fetchCategories();
     }, []);
 
     useEffect(() => {
@@ -100,48 +78,52 @@ const ShopsList = () => {
         setInitialRecords(
             items.filter((item) => {
                 const searchTerm = search.toLowerCase();
-                return (
-                    item.shop_name.toLowerCase().includes(searchTerm) ||
-                    // Also search owner name if available.
-                    (item.profiles?.full_name.toLowerCase().includes(searchTerm) ?? false)
-                );
+                return item.title.toLowerCase().includes(searchTerm) || item.description.toLowerCase().includes(searchTerm);
             }),
         );
     }, [items, search]);
 
     useEffect(() => {
-        const sorted = sortBy(initialRecords, sortStatus.columnAccessor as keyof Shop);
+        const sorted = sortBy(initialRecords, sortStatus.columnAccessor as keyof ShopCategory);
         setRecords(sortStatus.direction === 'desc' ? sorted.reverse() : sorted);
         setPage(1);
     }, [sortStatus, initialRecords]);
 
     const deleteRow = (id: number | null = null) => {
         if (id) {
-            const shop = items.find((s) => s.id === id);
-            if (shop) {
-                setShopToDelete(shop);
+            const category = items.find((c) => c.id === id);
+            if (category) {
+                setCategoryToDelete(category);
                 setShowConfirmModal(true);
             }
         }
     };
 
-    // Confirm deletion callback.
+    // Confirm deletion callback
     const confirmDeletion = async () => {
-        if (!shopToDelete || !shopToDelete.id) return;
+        if (!categoryToDelete || !categoryToDelete.id) return;
         try {
-            // Delete all shop data from storage (logo, cover, gallery, products)
-            await StorageManager.removeShopCompletely(shopToDelete.id);
+            // First, delete the category folder from storage
+            const folderPath = `${categoryToDelete.id}`;
+            const { data: files } = await supabase.storage.from('shop-categories').list(folderPath);
 
-            const { error } = await supabase.from('shops').delete().eq('id', shopToDelete.id);
+            if (files && files.length > 0) {
+                const filesToDelete = files.map((file) => `${folderPath}/${file.name}`);
+                await supabase.storage.from('shop-categories').remove(filesToDelete);
+            }
+
+            // Then delete the category from database
+            const { error } = await supabase.from('categories_shop').delete().eq('id', categoryToDelete.id);
             if (error) throw error;
-            const updatedItems = items.filter((s) => s.id !== shopToDelete.id);
+
+            const updatedItems = items.filter((c) => c.id !== categoryToDelete.id);
             setItems(updatedItems);
-            setAlert({ visible: true, message: t('shop_deleted_successfully'), type: 'success' });
+            setAlert({ visible: true, message: t('category_deleted_successfully'), type: 'success' });
         } catch (error) {
-            setAlert({ visible: true, message: t('error_deleting_shop'), type: 'danger' });
+            setAlert({ visible: true, message: t('error_deleting_category'), type: 'danger' });
         } finally {
             setShowConfirmModal(false);
-            setShopToDelete(null);
+            setCategoryToDelete(null);
         }
     };
 
@@ -165,7 +147,7 @@ const ShopsList = () => {
                             <IconTrashLines />
                             {t('delete')}
                         </button>
-                        <Link href="/shops/add" className="btn btn-primary gap-2">
+                        <Link href="/shops/categories/add" className="btn btn-primary gap-2">
                             <IconPlus />
                             {t('add_new')}
                         </Link>
@@ -180,7 +162,7 @@ const ShopsList = () => {
                         className={`${loading ? 'filter blur-sm pointer-events-none' : 'table-hover whitespace-nowrap cursor-pointer'}`}
                         records={records}
                         onRowClick={(record) => {
-                            router.push(`/shops/preview/${record.id}`);
+                            router.push(`/shops/categories/preview/${record.id}`);
                         }}
                         columns={[
                             {
@@ -190,59 +172,42 @@ const ShopsList = () => {
                                 render: ({ id }) => <strong className="text-info">#{id}</strong>,
                             },
                             {
-                                accessor: 'shop_name',
-                                title: t('shop_name'),
+                                accessor: 'title',
+                                title: t('category'),
                                 sortable: true,
-                                render: ({ shop_name, logo_url }) => (
+                                render: ({ title, image_url }) => (
                                     <div className="flex items-center font-semibold">
-                                        <div className="w-max rounded-full ltr:mr-2 rtl:ml-2 flex items-center justify-center">
-                                            <img className="h-8 w-8 rounded-full object-cover" src={logo_url || `/assets/images/user-placeholder.webp`} alt="" />
+                                        <div className="w-max rounded-full ltr:mr-2 rtl:ml-2">
+                                            {image_url ? (
+                                                <img className="h-8 w-8 rounded-md object-cover" src={image_url} alt={title} />
+                                            ) : (
+                                                <div className="h-8 w-8 rounded-md bg-gray-200 dark:bg-gray-700 flex items-center justify-center">
+                                                    <svg className="h-4 w-4 text-gray-400" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                        <path
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                            strokeWidth={2}
+                                                            d="M4 16l4.586-4.586a2 2 0 012.828 0L16 16m-2-2l1.586-1.586a2 2 0 012.828 0L20 14m-6-6h.01M6 20h12a2 2 0 002-2V6a2 2 0 00-2-2H6a2 2 0 00-2 2v12a2 2 0 002 2z"
+                                                        />
+                                                    </svg>
+                                                </div>
+                                            )}
                                         </div>
-                                        <div>{shop_name}</div>
+                                        <div>{title}</div>
                                     </div>
                                 ),
                             },
                             {
-                                accessor: 'owner',
-                                title: t('shop_owner'),
+                                accessor: 'description',
+                                title: t('description'),
                                 sortable: true,
-                                render: ({ owner, profiles }) => <span>{profiles ? profiles.full_name : owner}</span>,
+                                render: ({ description }) => <span>{description.slice(0, 100) || 'N/A'}</span>,
                             },
                             {
                                 accessor: 'created_at',
-                                title: t('registration_date'),
+                                title: t('created_date'),
                                 sortable: true,
-                                render: ({ created_at }) => (created_at ? <span>{new Date(created_at).toLocaleDateString('TR')}</span> : ''),
-                            },
-                            {
-                                accessor: 'status',
-                                title: t('status'),
-                                sortable: true,
-                                render: ({ status }) => {
-                                    let statusClass = 'warning';
-                                    if (status === 'Approved') statusClass = 'success';
-                                    else if (status === 'Rejected') statusClass = 'danger';
-
-                                    return <span className={`badge badge-outline-${statusClass}`}>{status ? t(status.toLowerCase()) : t('pending')}</span>;
-                                },
-                            },
-                            {
-                                accessor: 'visibility',
-                                title: t('visibility'),
-                                sortable: true,
-                                render: ({ public: isPublic }) => <span className={`badge badge-outline-${isPublic ? 'success' : 'danger'}`}>{isPublic ? t('public') : t('private')}</span>,
-                            },
-                            {
-                                accessor: 'categories_shop.title',
-                                title: 'Category',
-                                sortable: true,
-                                render: ({ categories_shop }) => <span className="badge bg-primary text-white">{categories_shop?.title || 'Uncategorized'}</span>,
-                            },
-                            {
-                                accessor: 'categories_sub_shop.title',
-                                title: 'Sub Category',
-                                sortable: true,
-                                render: ({ categories_sub_shop }) => <span className="badge bg-secondary text-white">{categories_sub_shop?.title || 'No Sub Category'}</span>,
+                                render: ({ created_at }) => (created_at ? <span>{new Date(created_at).toLocaleDateString()}</span> : ''),
                             },
                             {
                                 accessor: 'action',
@@ -251,11 +216,8 @@ const ShopsList = () => {
                                 textAlignment: 'center',
                                 render: ({ id }) => (
                                     <div className="mx-auto flex w-max items-center gap-4">
-                                        <Link href={`/shops/edit/${id}`} className="flex hover:text-info" onClick={(e) => e.stopPropagation()}>
+                                        <Link href={`/shops/categories/edit/${id}`} className="flex hover:text-info" onClick={(e) => e.stopPropagation()}>
                                             <IconEdit className="h-4.5 w-4.5" />
-                                        </Link>
-                                        <Link href={`/shops/preview/${id}`} className="flex hover:text-primary" onClick={(e) => e.stopPropagation()}>
-                                            <IconEye />
                                         </Link>
                                         <button
                                             type="button"
@@ -294,10 +256,10 @@ const ShopsList = () => {
             <ConfirmModal
                 isOpen={showConfirmModal}
                 title={t('confirm_deletion')}
-                message={t('confirm_delete_shop')}
+                message={t('confirm_delete_category')}
                 onCancel={() => {
                     setShowConfirmModal(false);
-                    setShopToDelete(null);
+                    setCategoryToDelete(null);
                 }}
                 onConfirm={confirmDeletion}
                 confirmLabel={t('delete')}
@@ -308,4 +270,4 @@ const ShopsList = () => {
     );
 };
 
-export default ShopsList;
+export default ShopCategoriesList;

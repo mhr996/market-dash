@@ -24,10 +24,10 @@ interface WorkHours {
     endTime: string;
 }
 
-interface Category {
+interface ShopCategory {
     id: number;
     title: string;
-    desc: string;
+    description: string;
 }
 
 interface DeliveryCompany {
@@ -73,7 +73,7 @@ interface Shop {
         email?: string | null;
         phone?: string | null;
     };
-    categories?: Category;
+    categories_shop?: ShopCategory;
     delivery_companies?: DeliveryCompany;
 }
 
@@ -85,7 +85,7 @@ const DeliveryShopPreview = () => {
     const [shop, setShop] = useState<Shop | null>(null);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'owner' | 'details' | 'transactions' | 'delivery'>('owner');
-    const [categories, setCategories] = useState<Category[]>([]);
+    const [categories, setCategories] = useState<ShopCategory[]>([]);
     const [deliveryCompany, setDeliveryCompany] = useState<DeliveryCompany | null>(null);
     const [alert, setAlert] = useState<{ visible: boolean; message: string; type: 'success' | 'danger' }>({
         visible: false,
@@ -108,7 +108,7 @@ const DeliveryShopPreview = () => {
     const [paymentAmount, setPaymentAmount] = useState('');
     const [paymentDescription, setPaymentDescription] = useState('');
     const [sendingPayment, setSendingPayment] = useState(false);
-    const [platformBalance, setPlatformBalance] = useState(0); // Set to 0 as requested
+    const [platformBalance, setPlatformBalance] = useState(0); // Frontend-only balance (always 0)
 
     // Format currency helper function
     const formatCurrency = (amount: number) => {
@@ -133,7 +133,7 @@ const DeliveryShopPreview = () => {
                         `
                         *,
                         profiles(id, full_name, avatar_url, email, phone),
-                        categories(id, title, desc),
+                        categories_shop(id, title, description),
                         delivery_companies(id, company_name, logo_url)
                     `,
                     )
@@ -149,7 +149,7 @@ const DeliveryShopPreview = () => {
                 }
 
                 // Fetch categories for dropdown
-                const { data: categoriesData, error: categoriesError } = await supabase.from('categories').select('id, title, desc').order('title', { ascending: true });
+                const { data: categoriesData, error: categoriesError } = await supabase.from('categories_shop').select('id, title, description').order('title', { ascending: true });
                 if (categoriesError) throw categoriesError;
                 setCategories(categoriesData || []);
             } catch (error) {
@@ -417,10 +417,10 @@ const DeliveryShopPreview = () => {
                                 )}
                             </div>
                             <div className="space-y-4">
-                                {shop.categories && (
+                                {shop.categories_shop && (
                                     <div>
                                         <p className="text-sm text-gray-500 dark:text-gray-400 mb-2">Category</p>
-                                        <p className="font-medium">{shop.categories.title}</p>
+                                        <p className="font-medium">{shop.categories_shop.title}</p>
                                     </div>
                                 )}
                                 <div>

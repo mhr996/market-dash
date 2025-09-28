@@ -31,7 +31,6 @@ import ConfirmModal from '@/components/modals/confirm-modal';
 import { getTranslation } from '@/i18n';
 import { generateOrderReceiptPDF } from '@/utils/pdf-generator';
 import supabase from '@/lib/supabase';
-import { updateShopBalance } from '@/lib/shop-balance';
 import DateRangeSelector from '@/components/date-range-selector';
 import MultiSelect from '@/components/multi-select';
 
@@ -59,7 +58,7 @@ const OrderTotalTooltip = ({ order }: { order: any }) => {
     };
 
     const calculateTotal = () => {
-        return calculateSubtotal() + calculateDeliveryFee() + calculateFeaturesTotal();
+        return parseFloat(order?.total) || 0;
     };
 
     const hasDeliveryOrFeatures = order?.delivery_methods || (order?.selected_features && order.selected_features.length > 0);
@@ -808,6 +807,7 @@ interface OrderData {
     payment_method: any;
     assigned_driver_id?: number;
     confirmed?: boolean;
+    total?: string;
     comment?: string;
     selected_feature_value_ids?: number[];
     // Joined data
@@ -902,12 +902,9 @@ const formatOrderForDisplay = (order: OrderData) => {
         Shipped: 'shipped',
     };
 
-    // Calculate total including delivery and features
+    // Use total from database
     const calculateOrderTotal = (order: any) => {
-        const subtotal = order.products?.price || 0;
-        const deliveryFee = order.delivery_methods ? (order.delivery_methods.price || 0) + (order.delivery_location_methods?.price_addition || 0) : 0;
-        const featuresTotal = order.selected_features ? order.selected_features.reduce((sum: number, feature: any) => sum + (feature.price_addition || 0), 0) : 0;
-        return subtotal + deliveryFee + featuresTotal;
+        return order.total || 0;
     };
 
     return {
@@ -919,7 +916,7 @@ const formatOrderForDisplay = (order: OrderData) => {
         delivery_status: deliveryStatusMap[order.status] || 'pending',
         city: shippingAddress.city || 'Unknown City',
         date: order.created_at,
-        total: `$${calculateOrderTotal(order).toFixed(2)}`,
+        total: `$${parseFloat(order.total || '0').toFixed(2)}`,
         status: statusMap[order.status] || 'processing',
         address: `${shippingAddress.address || ''}, ${shippingAddress.city || ''}, ${shippingAddress.zip || ''}`.trim(),
         items: [
@@ -1511,7 +1508,8 @@ const OrdersList = () => {
             if ((!wasCompleted && willBeCompleted) || (wasCompleted && !willBeCompleted)) {
                 try {
                     const shopId = currentOrder?.products?.shop || 0;
-                    await updateShopBalance(shopId);
+                    // Update shop balance if needed
+                    // await updateShopBalance(shopId);
                 } catch (balanceError) {
                     console.error('Error updating shop balance:', balanceError);
                     // Don't fail the entire operation if balance update fails

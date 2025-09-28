@@ -6,7 +6,9 @@ import { getTranslation } from '@/i18n';
 
 interface Option {
     id: number;
-    name: string;
+    name?: string;
+    label?: string;
+    value?: number;
     logo_url?: string;
 }
 
@@ -26,7 +28,10 @@ const MultiSelect: React.FC<MultiSelectProps> = ({ options, selectedValues, onCh
 
     const { t } = getTranslation();
 
-    const filteredOptions = options.filter((option) => option.name.toLowerCase().includes(searchTerm.toLowerCase()));
+    const filteredOptions = options.filter((option) => {
+        const displayName = option.name || option.label || '';
+        return displayName.toLowerCase().includes(searchTerm.toLowerCase());
+    });
 
     const selectedOptions = options.filter((option) => selectedValues.includes(option.id));
 
@@ -68,8 +73,8 @@ const MultiSelect: React.FC<MultiSelectProps> = ({ options, selectedValues, onCh
                                 key={option.id}
                                 className={`inline-flex items-center gap-1 rounded bg-primary/10 px-2 py-1 text-xs text-primary dark:bg-primary/20 ${isRtl ? 'flex-row-reverse' : ''}`}
                             >
-                                {option.logo_url && <img src={option.logo_url} alt={option.name} className="h-4 w-4 rounded-full object-cover" />}
-                                <span className="max-w-[100px] truncate">{option.name}</span>
+                                {option.logo_url && <img src={option.logo_url} alt={option.name || option.label || ''} className="h-4 w-4 rounded-full object-cover" />}
+                                <span className="max-w-[100px] truncate">{option.name || option.label || ''}</span>
                                 <button
                                     type="button"
                                     onClick={(e) => {
@@ -120,8 +125,8 @@ const MultiSelect: React.FC<MultiSelectProps> = ({ options, selectedValues, onCh
                                     onClick={() => toggleOption(option.id)}
                                 >
                                     <input type="checkbox" checked={selectedValues.includes(option.id)} onChange={() => {}} className="rounded border-gray-300" />
-                                    {option.logo_url && <img src={option.logo_url} alt={option.name} className="h-6 w-6 rounded-full object-cover" />}
-                                    <span className="truncate">{option.name}</span>
+                                    {option.logo_url && <img src={option.logo_url} alt={option.name || option.label || ''} className="h-6 w-6 rounded-full object-cover" />}
+                                    <span className="truncate">{option.name || option.label || ''}</span>
                                 </div>
                             ))
                         ) : (
