@@ -75,7 +75,6 @@ const DeliveryShopsList = () => {
                 if (error) throw error;
                 setItems(data as Shop[]);
             } catch (error) {
-                console.error('Error fetching shops:', error);
                 setAlert({ visible: true, message: 'Error fetching shops', type: 'danger' });
             } finally {
                 setLoading(false);

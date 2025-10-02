@@ -14,7 +14,12 @@ interface ShopCategory {
     title: string;
     description: string;
     image_url?: string;
+    shop_id?: number | null;
     created_at: string;
+    shops?: {
+        id: number;
+        shop_name: string;
+    };
 }
 
 const EditShopCategory = () => {
@@ -30,7 +35,9 @@ const EditShopCategory = () => {
         title: '',
         description: '',
         image_url: '',
+        shop_id: '',
     });
+    const [shops, setShops] = useState<Array<{ id: number; shop_name: string }>>([]);
     const [imageFile, setImageFile] = useState<File | null>(null);
     const [previewUrl, setPreviewUrl] = useState<string | null>(null);
     const [alert, setAlert] = useState<{ visible: boolean; message: string; type: 'success' | 'danger' }>({
@@ -49,6 +56,7 @@ const EditShopCategory = () => {
                     title: data.title,
                     description: data.description,
                     image_url: data.image_url || '',
+                    shop_id: data.shop_id ? data.shop_id.toString() : '',
                 });
                 if (data.image_url) {
                     setPreviewUrl(data.image_url);
@@ -60,8 +68,17 @@ const EditShopCategory = () => {
             }
         };
 
+        const fetchShops = async () => {
+            try {
+                const { data, error } = await supabase.from('shops').select('id, shop_name').order('shop_name');
+                if (error) throw error;
+                setShops(data || []);
+            } catch (error) {}
+        };
+
         if (categoryId) {
             fetchCategory();
+            fetchShops();
         }
     }, [categoryId]);
 
@@ -82,14 +99,18 @@ const EditShopCategory = () => {
             }
 
             // Update category
-            const { error } = await supabase
-                .from('categories_shop')
-                .update({
-                    title: form.title.trim(),
-                    description: form.description.trim(),
-                    image_url: imageUrl,
-                })
-                .eq('id', categoryId);
+            const updateData: any = {
+                title: form.title.trim(),
+                description: form.description.trim(),
+                image_url: imageUrl,
+            };
+
+            // Only add shop_id if the column exists
+            if (form.shop_id) {
+                updateData.shop_id = parseInt(form.shop_id);
+            }
+
+            const { error } = await supabase.from('categories_shop').update(updateData).eq('id', categoryId);
 
             if (error) throw error;
 
@@ -157,6 +178,22 @@ const EditShopCategory = () => {
                             Description *
                         </label>
                         <textarea id="description" className="form-textarea" rows={3} value={form.description} onChange={(e) => setForm({ ...form, description: e.target.value })} required />
+                    </div>
+                </div>
+
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    <div>
+                        <label htmlFor="shop_id" className="mb-2 block text-sm font-semibold text-gray-700 dark:text-white">
+                            Shop Owner
+                        </label>
+                        <select id="shop_id" className="form-select" value={form.shop_id} onChange={(e) => setForm({ ...form, shop_id: e.target.value })}>
+                            <option value="">Select a shop (optional)</option>
+                            {shops.map((shop) => (
+                                <option key={shop.id} value={shop.id}>
+                                    {shop.shop_name}
+                                </option>
+                            ))}
+                        </select>
                     </div>
                 </div>
 

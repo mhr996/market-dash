@@ -73,7 +73,6 @@ export const generatePDFFromElement = async (elementId: string, options: PDFOpti
         pdf.addImage(imgData, 'PNG', xOffset, yOffset, scaledWidth, scaledHeight);
         pdf.save(filename);
     } catch (error) {
-        console.error('Error generating PDF:', error);
         throw error;
     }
 };
@@ -226,7 +225,6 @@ export const generateOrderReceiptPDF = async (orderData: any, options: PDFOption
         // Clean up
         document.body.removeChild(tempContainer);
     } catch (error) {
-        console.error('Error generating order receipt PDF:', error);
         throw error;
     }
 };
@@ -238,13 +236,11 @@ export const generateOrderReceiptPDF = async (orderData: any, options: PDFOption
 export const printElement = (elementId: string): void => {
     const element = document.getElementById(elementId);
     if (!element) {
-        console.error(`Element with ID '${elementId}' not found`);
         return;
     }
 
     const printWindow = window.open('', '_blank');
     if (!printWindow) {
-        console.error('Could not open print window');
         return;
     }
 

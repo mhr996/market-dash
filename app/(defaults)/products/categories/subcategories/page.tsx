@@ -26,8 +26,13 @@ interface SubCategory {
     desc: string;
     category_id: number;
     image: string | null;
+    shop_id?: number | null;
     created_at: string;
     categories?: Category;
+    shops?: {
+        id: number;
+        shop_name: string;
+    };
 }
 
 const SubCategoriesList = () => {
@@ -61,12 +66,11 @@ const SubCategoriesList = () => {
     useEffect(() => {
         const fetchSubCategories = async () => {
             try {
-                const { data, error } = await supabase.from('categories_sub').select('*, categories(*)').order('created_at', { ascending: false });
+                const { data, error } = await supabase.from('categories_sub').select('*, categories(*), shops(id, shop_name)').order('created_at', { ascending: false });
                 if (error) throw error;
 
                 setItems(data as SubCategory[]);
             } catch (error) {
-                console.error('Error fetching subcategories:', error);
             } finally {
                 setLoading(false);
             }
@@ -209,6 +213,12 @@ const SubCategoriesList = () => {
                                 title: t('category'),
                                 sortable: true,
                                 render: ({ categories }) => <span>{categories?.title || 'N/A'}</span>,
+                            },
+                            {
+                                accessor: 'shops',
+                                title: 'Shop Owner',
+                                sortable: true,
+                                render: ({ shops }) => <span className="badge badge-outline-primary">{shops?.shop_name || 'No Shop Assigned'}</span>,
                             },
                             {
                                 accessor: 'created_at',

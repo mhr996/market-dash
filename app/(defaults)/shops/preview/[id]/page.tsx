@@ -121,7 +121,6 @@ const ShopPreview = () => {
     const [activeTab, setActiveTab] = useState<'owner' | 'details' | 'revenue' | 'transactions' | 'delivery'>('owner');
     const [shopCategories, setShopCategories] = useState<ShopCategory[]>([]);
     const [shopSubCategories, setShopSubCategories] = useState<ShopSubCategory[]>([]);
-    const [unauthorized, setUnauthorized] = useState(false);
 
     // Delivery company and drivers/cars data
     const [deliveryCompany, setDeliveryCompany] = useState<DeliveryCompany | null>(null);
@@ -200,13 +199,6 @@ const ShopPreview = () => {
                 const { data: userData, error: userError } = await supabase.auth.getUser();
                 if (userError) throw userError;
 
-                // Get user's role from profiles table
-                const { data: profileData, error: profileError } = await supabase.from('profiles').select('role').eq('id', userData?.user?.id).single();
-
-                if (profileError) throw profileError;
-
-                const isAdmin = profileData?.role === 1;
-
                 // Updated query to fetch shop category details
                 const { data, error } = await supabase
                     .from('shops')
@@ -222,13 +214,6 @@ const ShopPreview = () => {
                     .single();
 
                 if (error) throw error;
-
-                // Check if user has permission to view this shop
-                if (!isAdmin && data.owner !== userData?.user?.id) {
-                    setUnauthorized(true);
-                    setLoading(false);
-                    return;
-                }
 
                 // Fetch commission rate from shop owner's active subscription
                 let commissionRate = 10; // Default commission rate
@@ -524,7 +509,6 @@ const ShopPreview = () => {
             if (error) throw error;
             setPlatformBalance(data || 0);
         } catch (error) {
-            console.error('Error fetching shop balance:', error);
             setAlert({ visible: true, message: 'Error fetching balance', type: 'danger' });
         }
     };
@@ -537,7 +521,6 @@ const ShopPreview = () => {
             if (error) throw error;
             setShopTransactions(data || []);
         } catch (error) {
-            console.error('Error fetching transactions:', error);
             setAlert({ visible: true, message: 'Error fetching transactions', type: 'danger' });
         }
     };
@@ -708,39 +691,6 @@ const ShopPreview = () => {
 
     if (loading) {
         return <div className="flex items-center justify-center h-screen">Loading...</div>;
-    }
-
-    if (unauthorized) {
-        return (
-            <div className="container mx-auto p-6 w-full max-w-none">
-                <div className="panel w-full max-w-none">
-                    <div className="flex flex-col items-center justify-center p-6">
-                        <div className="text-danger mb-4">
-                            <svg
-                                xmlns="http://www.w3.org/2000/svg"
-                                width="40"
-                                height="40"
-                                viewBox="0 0 24 24"
-                                fill="none"
-                                stroke="currentColor"
-                                strokeWidth="2"
-                                strokeLinecap="round"
-                                strokeLinejoin="round"
-                            >
-                                <circle cx="12" cy="12" r="10"></circle>
-                                <line x1="12" y1="8" x2="12" y2="12"></line>
-                                <line x1="12" y1="16" x2="12.01" y2="16"></line>
-                            </svg>
-                        </div>
-                        <h2 className="text-xl font-bold mb-2">Unauthorized Access</h2>
-                        <p className="text-gray-500 mb-4">You do not have permission to view this shop.</p>
-                        <button onClick={() => router.push('/shops')} className="btn btn-primary">
-                            Return to Shops
-                        </button>
-                    </div>
-                </div>
-            </div>
-        );
     }
 
     if (!shop) {

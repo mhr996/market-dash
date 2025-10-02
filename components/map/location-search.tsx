@@ -63,11 +63,9 @@ const LocationSearch: React.FC<LocationSearchProps> = ({ onSelect, placeholder =
                     setResults(data);
                     setShowResults(true);
                 } else {
-                    console.error('Error fetching location data');
                     setResults([]);
                 }
             } catch (error) {
-                console.error('Error searching for location:', error);
                 setResults([]);
             } finally {
                 setLoading(false);

@@ -61,7 +61,6 @@ const SubscriptionsList = () => {
                 if (error) throw error;
                 setItems(data as Subscription[]);
             } catch (error) {
-                console.error('Error fetching subscriptions:', error);
                 setAlert({ visible: true, message: 'Error fetching subscriptions', type: 'danger' });
             } finally {
                 setLoading(false);

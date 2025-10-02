@@ -51,7 +51,6 @@ const EditLicensePage = () => {
                 if (error) throw error;
                 setForm(data);
             } catch (error) {
-                console.error('Error fetching license:', error);
                 setAlert({ visible: true, message: t('error_loading_license_data'), type: 'danger' });
             } finally {
                 setLoading(false);
@@ -124,7 +123,6 @@ const EditLicensePage = () => {
                 router.push('/licenses');
             }, 1500);
         } catch (error) {
-            console.error(error);
             setAlert({
                 visible: true,
                 message: error instanceof Error ? error.message : t('error_updating_license'),

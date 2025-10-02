@@ -75,7 +75,6 @@ const ShopSubCategoryForm: React.FC<ShopSubCategoryFormProps> = ({ subCategoryId
                     }
                 }
             } catch (error) {
-                console.error('Error fetching data:', error);
                 setAlert({ type: 'danger', message: t('error_loading_data') });
             }
         };
@@ -113,7 +112,6 @@ const ShopSubCategoryForm: React.FC<ShopSubCategoryFormProps> = ({ subCategoryId
                     const { error: uploadError } = await supabase.storage.from('shop-subcategory-images').upload(filePath, imageFile);
 
                     if (uploadError) {
-                        console.warn('Image upload failed, continuing without image:', uploadError);
                         imageUrl = null;
                     } else {
                         const {
@@ -122,7 +120,6 @@ const ShopSubCategoryForm: React.FC<ShopSubCategoryFormProps> = ({ subCategoryId
                         imageUrl = publicUrl;
                     }
                 } catch (error) {
-                    console.warn('Image upload failed, continuing without image:', error);
                     imageUrl = null;
                 }
             }
@@ -160,7 +157,6 @@ const ShopSubCategoryForm: React.FC<ShopSubCategoryFormProps> = ({ subCategoryId
                 }, 1500);
             }
         } catch (error) {
-            console.error('Error saving subcategory:', error);
             setAlert({ type: 'danger', message: error instanceof Error ? error.message : 'Error saving subcategory' });
         } finally {
             setLoading(false);

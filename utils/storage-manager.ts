@@ -46,9 +46,7 @@ class StorageManager {
                 const placeholderContent = new Blob([''], { type: 'text/plain' });
                 await supabase.storage.from(this.BUCKET_NAME).upload(placeholderPath, placeholderContent);
             }
-        } catch (error) {
-            console.error('Error ensuring shop folder:', error);
-        }
+        } catch (error) {}
     }
 
     /**
@@ -224,7 +222,6 @@ class StorageManager {
                     const filesToRemove = logoFiles.map((file) => `${shopId}/${file.name}`);
                     const { error } = await supabase.storage.from(this.BUCKET_NAME).remove(filesToRemove);
                     if (error) {
-                        console.error('Error removing logo files:', error);
                     }
                 }
             }
@@ -250,7 +247,6 @@ class StorageManager {
                     const filesToRemove = coverFiles.map((file) => `${shopId}/${file.name}`);
                     const { error } = await supabase.storage.from(this.BUCKET_NAME).remove(filesToRemove);
                     if (error) {
-                        console.error('Error removing cover files:', error);
                     }
                 }
             }
@@ -376,7 +372,6 @@ class StorageManager {
             const relevantParts = pathParts.slice(6); // Adjust based on your URL structure
             return relevantParts.join('/');
         } catch (error) {
-            console.error('Error parsing URL:', error);
             return '';
         }
     }

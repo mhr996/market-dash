@@ -63,11 +63,6 @@ const OrderTotalTooltip = ({ order }: { order: any }) => {
 
     const hasDeliveryOrFeatures = order?.delivery_methods || (order?.selected_features && order.selected_features.length > 0);
 
-    console.log('OrderTotalTooltip - hasDeliveryOrFeatures:', hasDeliveryOrFeatures, 'order:', order);
-    console.log('OrderTotalTooltip - delivery_methods:', order?.delivery_methods);
-    console.log('OrderTotalTooltip - selected_features:', order?.selected_features);
-    console.log('OrderTotalTooltip - selected_feature_value_ids:', order?.selected_feature_value_ids);
-
     if (!hasDeliveryOrFeatures) return null;
 
     return (
@@ -75,7 +70,6 @@ const OrderTotalTooltip = ({ order }: { order: any }) => {
             ref={iconRef}
             className="relative inline-block"
             onMouseEnter={() => {
-                console.log('Mouse enter - showing tooltip');
                 if (iconRef.current) {
                     const rect = iconRef.current.getBoundingClientRect();
                     setPosition({
@@ -86,7 +80,6 @@ const OrderTotalTooltip = ({ order }: { order: any }) => {
                 setIsVisible(true);
             }}
             onMouseLeave={() => {
-                console.log('Mouse leave - hiding tooltip');
                 setIsVisible(false);
             }}
         >
@@ -1204,7 +1197,6 @@ const OrdersList = () => {
 
             // Get unique order IDs
             const orderIds = new Set(data.map((item) => item.order_id));
-            console.log('Orders with comments:', orderIds);
             setOrdersWithComments(orderIds);
         } catch (error) {
             console.error('Error fetching orders with comments:', error);

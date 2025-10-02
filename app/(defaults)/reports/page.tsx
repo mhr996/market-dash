@@ -175,9 +175,7 @@ const Reports = () => {
 
             setAvailableShops(shopsResult.data || []);
             setAvailableCategories(categoriesResult.data || []);
-        } catch (error) {
-            console.error('Error fetching filter options:', error);
-        }
+        } catch (error) {}
     };
 
     const fetchReportData = async () => {
@@ -265,7 +263,6 @@ const Reports = () => {
             const processedData = processReportData(orders || [], shops || [], products || [], users || [], categories || []);
             setReportData(processedData);
         } catch (error) {
-            console.error('Error fetching report data:', error);
         } finally {
             setLoading(false);
         }
@@ -459,7 +456,6 @@ const Reports = () => {
     const exportReport = async () => {
         try {
             if (!reportData) {
-                console.error('No data to export');
                 return;
             }
 
@@ -532,9 +528,7 @@ const Reports = () => {
             };
 
             exportReportUtil(exportData, exportFormat as 'csv' | 'json', t, 'market_dashboard_report');
-        } catch (error) {
-            console.error('Error exporting report:', error);
-        }
+        } catch (error) {}
     };
 
     const convertToCSV = (data: any) => {

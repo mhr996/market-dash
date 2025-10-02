@@ -14,6 +14,7 @@ import supabase from '@/lib/supabase';
 import { Alert } from '@/components/elements/alerts/elements-alerts-default';
 import ImageUpload from '@/components/image-upload/image-upload';
 import ConfirmModal from '@/components/modals/confirm-modal';
+import { resetPassword } from '@/lib/auth';
 
 const ComponentsUsersAccountSettingsTabs = () => {
     const [loading, setLoading] = useState(false);
@@ -36,6 +37,7 @@ const ComponentsUsersAccountSettingsTabs = () => {
 
     const [alertMessage, setAlertMessage] = useState<{ type: 'success' | 'danger'; message: string } | null>(null);
     const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+    const [confirmResetPasswordOpen, setConfirmResetPasswordOpen] = useState(false);
 
     // Update the component to include email from auth
     useEffect(() => {
@@ -174,6 +176,34 @@ const ComponentsUsersAccountSettingsTabs = () => {
             setAlertMessage({
                 type: 'danger',
                 message: 'Error clearing cache',
+            });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const handleResetPassword = async () => {
+        // Close the confirm modal immediately so the UI updates
+        setConfirmResetPasswordOpen(false);
+        try {
+            setLoading(true);
+            const {
+                data: { user },
+            } = await supabase.auth.getUser();
+            if (!user || !user.email) throw new Error('No user or email found');
+
+            const { error } = await resetPassword(user.email);
+            if (error) throw new Error(error);
+
+            setAlertMessage({
+                type: 'success',
+                message: 'Password reset email sent! Please check your inbox and follow the instructions to reset your password.',
+            });
+        } catch (error) {
+            console.error('Error resetting password:', error);
+            setAlertMessage({
+                type: 'danger',
+                message: error instanceof Error ? error.message : 'Error sending password reset email',
             });
         } finally {
             setLoading(false);
@@ -398,6 +428,17 @@ const ComponentsUsersAccountSettingsTabs = () => {
                 <div className="switch">
                     <div className="grid grid-cols-1 gap-5 md:grid-cols-3">
                         <div className="panel space-y-5">
+                            <h5 className="mb-4 text-lg font-semibold">Reset Password</h5>
+                            <p>Send a password reset email to your registered email address. You will receive instructions to create a new password.</p>
+                            <p className="text-sm text-gray-500">
+                                This will send an email to: <strong>{profileData.email}</strong>
+                            </p>
+                            <button className="btn btn-warning" onClick={() => setConfirmResetPasswordOpen(true)} disabled={loading}>
+                                {loading ? 'Sending...' : 'Send Reset Email'}
+                            </button>
+                        </div>
+
+                        <div className="panel space-y-5">
                             <h5 className="mb-4 text-lg font-semibold">Purge Cache</h5>
                             <p>Remove the active resource from the cache without waiting for the predetermined cache expiry time.</p>
                             <p>Warning! This will log you out of your account</p>
@@ -422,6 +463,18 @@ const ComponentsUsersAccountSettingsTabs = () => {
                     )}
                 </div>
             ) : null}
+
+            {/* Confirm reset password modal */}
+            <ConfirmModal
+                isOpen={confirmResetPasswordOpen}
+                title="Reset Password"
+                message={`Are you sure you want to send a password reset email to ${profileData.email}? You will receive instructions to create a new password.`}
+                onCancel={() => setConfirmResetPasswordOpen(false)}
+                onConfirm={handleResetPassword}
+                size="sm"
+                confirmLabel="Send Email"
+                cancelLabel="Cancel"
+            />
 
             {/* Confirm deletion modal */}
             <ConfirmModal

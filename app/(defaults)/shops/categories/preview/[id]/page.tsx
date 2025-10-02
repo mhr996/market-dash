@@ -15,7 +15,12 @@ interface ShopCategory {
     title: string;
     description: string;
     image_url?: string;
+    shop_id?: number | null;
     created_at: string;
+    shops?: {
+        id: number;
+        shop_name: string;
+    };
 }
 
 const PreviewShopCategory = () => {
@@ -150,6 +155,16 @@ const PreviewShopCategory = () => {
                         <div>
                             <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Description</label>
                             <p className="text-gray-700 dark:text-gray-300">{category.description}</p>
+                        </div>
+                        <div>
+                            <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Shop Owner</label>
+                            <p className="text-gray-700 dark:text-gray-300">
+                                {category.shops?.shop_name ? (
+                                    <span className="badge badge-outline-primary">{category.shops.shop_name}</span>
+                                ) : (
+                                    <span className="text-gray-500 italic">No shop assigned</span>
+                                )}
+                            </p>
                         </div>
                         <div>
                             <label className="block text-sm font-medium text-gray-500 dark:text-gray-400">Created Date</label>

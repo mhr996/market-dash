@@ -60,8 +60,6 @@ const CurrentLocation: React.FC<CurrentLocationProps> = ({ onLocationFound, setE
 
             setIsFirstLoad(false);
         } catch (error) {
-            console.error('Error getting location:', error);
-
             // Set error message if callback is provided
             if (setErrorMessage && error instanceof Error) {
                 setErrorMessage(error.message);

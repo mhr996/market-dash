@@ -123,7 +123,6 @@ const ReceiptsList = () => {
 
                 setItems(receipts);
             } catch (error) {
-                console.error('Error fetching receipts:', error);
                 setAlert({ visible: true, message: `Error fetching receipts: ${error instanceof Error ? error.message : 'Unknown error'}`, type: 'danger' });
             } finally {
                 setLoading(false);

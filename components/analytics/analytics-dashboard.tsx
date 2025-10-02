@@ -345,7 +345,6 @@ const AnalyticsDashboard = () => {
                     topShops: calculateTopShops(currentOrders || [], allShops || []),
                 }));
             } catch (error) {
-                console.error('Error fetching analytics data:', error);
                 setAnalytics((prev) => ({ ...prev, loading: false }));
             }
         };

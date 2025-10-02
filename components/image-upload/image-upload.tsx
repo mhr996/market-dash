@@ -57,7 +57,6 @@ const ImageUpload: React.FC<ImageUploadProps> = ({ userId, url, bucket, placehol
 
             onUploadComplete(publicUrl);
         } catch (error) {
-            console.error('Error uploading avatar:', error);
             const errorMessage = error instanceof Error ? error.message : 'Error uploading avatar';
             onError?.(errorMessage);
         } finally {

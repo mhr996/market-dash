@@ -183,7 +183,6 @@ const HomePage = () => {
                     performanceData,
                 });
             } catch (error) {
-                console.error('Error fetching stats:', error);
                 setStats((prev) => ({ ...prev, loading: false }));
             }
         };

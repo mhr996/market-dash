@@ -105,7 +105,6 @@ const ProductsList = () => {
 
             setItems(data as Product[]);
         } catch (error) {
-            console.error('Error fetching products:', error);
             setAlert({ visible: true, message: `Error fetching products: ${error}`, type: 'danger' });
         } finally {
             setLoading(false);
@@ -117,9 +116,7 @@ const ProductsList = () => {
             const { data: shops, error } = await supabase.from('shops').select('id, shop_name, logo_url').order('shop_name', { ascending: true });
             if (error) throw error;
             setAvailableShops(shops || []);
-        } catch (error) {
-            console.error('Error fetching shops:', error);
-        }
+        } catch (error) {}
     };
 
     const fetchCategories = async () => {
@@ -127,9 +124,7 @@ const ProductsList = () => {
             const { data: categories, error } = await supabase.from('categories').select('id, title, desc, image_url').order('title', { ascending: true });
             if (error) throw error;
             setAvailableCategories(categories || []);
-        } catch (error) {
-            console.error('Error fetching categories:', error);
-        }
+        } catch (error) {}
     };
 
     const fetchSubcategories = async () => {
@@ -137,9 +132,7 @@ const ProductsList = () => {
             const { data: subcategories, error } = await supabase.from('categories_sub').select('id, title, desc, category_id').order('title', { ascending: true });
             if (error) throw error;
             setAvailableSubcategories(subcategories || []);
-        } catch (error) {
-            console.error('Error fetching subcategories:', error);
-        }
+        } catch (error) {}
     };
 
     useEffect(() => {

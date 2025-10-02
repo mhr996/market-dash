@@ -18,7 +18,12 @@ interface Category {
     title: string;
     desc: string;
     image_url?: string;
+    shop_id?: number | null;
     created_at: string;
+    shops?: {
+        id: number;
+        shop_name: string;
+    };
 }
 
 const CategoriesList = () => {
@@ -52,11 +57,11 @@ const CategoriesList = () => {
     useEffect(() => {
         const fetchCategories = async () => {
             try {
-                const { data, error } = await supabase.from('categories').select('*').order('created_at', { ascending: false });
+                const { data, error } = await supabase.from('categories').select('*, shops(id, shop_name)').order('created_at', { ascending: false });
                 if (error) throw error;
                 setItems(data as Category[]);
             } catch (error) {
-                // Error fetching categories
+                setAlert({ visible: true, message: 'Error fetching categories', type: 'danger' });
             } finally {
                 setLoading(false);
             }
@@ -202,6 +207,12 @@ const CategoriesList = () => {
                                 title: t('description'),
                                 sortable: true,
                                 render: ({ desc }) => <span>{desc.slice(0, 100) || 'N/A'}</span>,
+                            },
+                            {
+                                accessor: 'shops',
+                                title: 'Shop Owner',
+                                sortable: true,
+                                render: ({ shops }) => <span className="badge badge-outline-primary">{shops?.shop_name || 'No Shop Assigned'}</span>,
                             },
                             {
                                 accessor: 'created_at',

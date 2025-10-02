@@ -47,7 +47,6 @@ const ComponentsAuthUpdatePasswordForm = () => {
             }
         } catch (err) {
             setError('An unexpected error occurred. Please try again later.');
-            console.error(err);
         } finally {
             setLoading(false);
         }

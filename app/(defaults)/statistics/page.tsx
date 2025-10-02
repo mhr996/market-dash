@@ -182,9 +182,7 @@ const StatisticsPage = () => {
                     logo_url: user.avatar_url,
                 })),
             );
-        } catch (error) {
-            console.error('Error fetching filter options:', error);
-        }
+        } catch (error) {}
     };
 
     const getDateFilter = (timeRange: string) => {
@@ -790,7 +788,6 @@ const StatisticsPage = () => {
 
             setBestSellingCategories(sortedSalesCategories);
         } catch (error) {
-            console.error('Error fetching statistics:', error);
         } finally {
             setLoading(false);
         }

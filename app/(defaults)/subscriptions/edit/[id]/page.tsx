@@ -58,7 +58,6 @@ const EditSubscriptionPage = () => {
                 if (error) throw error;
                 setForm(data);
             } catch (error) {
-                console.error('Error fetching subscription:', error);
                 setAlert({ visible: true, message: 'Error loading subscription data', type: 'danger' });
             } finally {
                 setLoading(false);
@@ -146,7 +145,6 @@ const EditSubscriptionPage = () => {
                 router.push('/subscriptions');
             }, 1500);
         } catch (error) {
-            console.error(error);
             setAlert({
                 visible: true,
                 message: error instanceof Error ? error.message : t('error_updating_subscription'),

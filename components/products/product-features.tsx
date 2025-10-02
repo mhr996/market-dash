@@ -83,7 +83,6 @@ const ProductFeatures: React.FC<ProductFeaturesProps> = ({ features, onChange, d
             const { error: uploadError } = await supabase.storage.from(bucket).upload(filePath, file);
 
             if (uploadError) {
-                console.error('Image upload failed:', uploadError);
                 return null;
             }
 
@@ -92,7 +91,6 @@ const ProductFeatures: React.FC<ProductFeaturesProps> = ({ features, onChange, d
             } = supabase.storage.from(bucket).getPublicUrl(filePath);
             return publicUrl;
         } catch (error) {
-            console.error('Image upload failed:', error);
             return null;
         }
     };

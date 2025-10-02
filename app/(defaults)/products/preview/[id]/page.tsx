@@ -144,7 +144,6 @@ const ProductDetailsPage = ({ params }: ProductDetailsPageProps) => {
                 setFeatures([]);
             }
         } catch (error) {
-            console.error('Error loading product features:', error);
             setFeatures([]);
         }
     };

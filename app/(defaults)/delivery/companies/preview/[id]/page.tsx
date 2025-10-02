@@ -95,7 +95,6 @@ const DeliveryCompanyPreview = () => {
     const [company, setCompany] = useState<DeliveryCompany | null>(null);
     const [loading, setLoading] = useState(true);
     const [activeTab, setActiveTab] = useState<'company' | 'pricing' | 'drivers_cars' | 'orders' | 'balance'>('company');
-    const [unauthorized, setUnauthorized] = useState(false);
 
     // Drivers and Cars data
     const [drivers, setDrivers] = useState<any[]>([]);

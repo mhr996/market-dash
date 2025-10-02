@@ -68,12 +68,12 @@ const ElementsAlertsDefault = () => {
     return (
         <PanelCodeHighlight title="Default Alerts" codeHighlight={`<Alert type="primary" title="Primary" message="Lorem Ipsum is simply dummy text of the printing." />`}>
             <div className="mb-5 grid gap-5 lg:grid-cols-2">
-                <Alert type="primary" title="Primary" message="Lorem Ipsum is simply dummy text of the printing." onClose={() => console.log('closed')} />
-                <Alert type="secondary" title="Secondary" message="Lorem Ipsum is simply dummy text of the printing." onClose={() => console.log('closed')} />
-                <Alert type="success" title="Success" message="Lorem Ipsum is simply dummy text of the printing." onClose={() => console.log('closed')} />
-                <Alert type="warning" title="Warning" message="Lorem Ipsum is simply dummy text of the printing." onClose={() => console.log('closed')} />
-                <Alert type="danger" title="Danger" message="Lorem Ipsum is simply dummy text of the printing." onClose={() => console.log('closed')} />
-                <Alert type="info" title="Info" message="Lorem Ipsum is simply dummy text of the printing." onClose={() => console.log('closed')} />
+                <Alert type="primary" title="Primary" message="Lorem Ipsum is simply dummy text of the printing." onClose={() => {}} />
+                <Alert type="secondary" title="Secondary" message="Lorem Ipsum is simply dummy text of the printing." onClose={() => {}} />
+                <Alert type="success" title="Success" message="Lorem Ipsum is simply dummy text of the printing." onClose={() => {}} />
+                <Alert type="warning" title="Warning" message="Lorem Ipsum is simply dummy text of the printing." onClose={() => {}} />
+                <Alert type="danger" title="Danger" message="Lorem Ipsum is simply dummy text of the printing." onClose={() => {}} />
+                <Alert type="info" title="Info" message="Lorem Ipsum is simply dummy text of the printing." onClose={() => {}} />
             </div>
         </PanelCodeHighlight>
     );

@@ -814,15 +814,6 @@ const DeliveryOrdersList = () => {
                 const isDelivery = item.delivery_type === 'delivery';
                 const isCancelledOrRejected = item.status === 'cancelled' || item.status === 'rejected';
                 matchesFilter = isDelivery && isCancelledOrRejected;
-
-                console.log('Archived check:', {
-                    id: item.id,
-                    delivery_type: item.delivery_type,
-                    status: item.status,
-                    isDelivery,
-                    isCancelledOrRejected,
-                    matches: matchesFilter,
-                });
             } else {
                 // For other filters, only show confirmed delivery orders
                 if (item.confirmed !== true || item.delivery_type !== 'delivery') {
@@ -1190,13 +1181,11 @@ const DeliveryOrdersList = () => {
             }
 
             // Debug: show what orders were fetched
-            console.log('Fetched orders:', data?.length || 0);
             if (data && data.length > 0) {
                 const statusCounts = data.reduce((acc: any, order: any) => {
                     acc[order.status] = (acc[order.status] || 0) + 1;
                     return acc;
                 }, {});
-                console.log('Status counts:', statusCounts);
             }
 
             setItems(data as OrderData[]);

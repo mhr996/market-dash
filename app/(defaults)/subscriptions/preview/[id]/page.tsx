@@ -81,7 +81,6 @@ const SubscriptionDetailsPage = ({ params }: SubscriptionDetailsPageProps) => {
                 // Fetch payment history for this subscription
                 await fetchPaymentHistory(data.id);
             } catch (error) {
-                console.error('Error fetching subscription:', error);
             } finally {
                 setLoading(false);
             }
@@ -150,7 +149,6 @@ const SubscriptionDetailsPage = ({ params }: SubscriptionDetailsPageProps) => {
             setPaymentHistory(dummyPayments);
             setInitialRecords(dummyPayments);
         } catch (error) {
-            console.error('Error fetching payment history:', error);
         } finally {
             setLoadingPayments(false);
         }

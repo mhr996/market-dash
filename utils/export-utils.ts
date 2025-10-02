@@ -273,7 +273,6 @@ export const exportReport = (data: ExportData, format: 'csv' | 'json', t: Transl
             throw new Error(`Unsupported export format: ${format}`);
         }
     } catch (error) {
-        console.error('Export failed:', error);
         throw error;
     }
 };

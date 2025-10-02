@@ -277,7 +277,6 @@ const RevenuePage = () => {
                 setShopRevenue(shopRevenueArray);
                 setInitialRecords(shopRevenueArray);
             } catch (error) {
-                console.error('Error fetching revenue data:', error);
             } finally {
                 setIsLoading(false);
             }

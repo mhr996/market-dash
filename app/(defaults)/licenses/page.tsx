@@ -59,7 +59,6 @@ const LicensesList = () => {
                 if (error) throw error;
                 setItems(data as License[]);
             } catch (error) {
-                console.error('Error fetching licenses:', error);
             } finally {
                 setLoading(false);
             }
@@ -110,7 +109,6 @@ const LicensesList = () => {
             setItems((prevItems) => prevItems.filter((item) => item.id !== licenseToDelete.id));
             setAlert({ visible: true, message: t('license_deleted_successfully'), type: 'success' });
         } catch (error: any) {
-            console.error('Error deleting license:', error);
             setAlert({ visible: true, message: error.message || t('error_deleting_license'), type: 'danger' });
         } finally {
             setShowConfirmModal(false);

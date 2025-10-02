@@ -80,7 +80,6 @@ const MapSelector: React.FC<MapSelectorProps> = ({ initialPosition = null, zoom 
                         }, 200);
                     }
                 } catch (err) {
-                    console.log('Could not get initial location, using default', err);
                     // Continue with default position if location not available
                 }
             }

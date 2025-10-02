@@ -72,9 +72,7 @@ const StatementsList = () => {
 
                     if (error && error.code !== 'PGRST116') throw error; // PGRST116 = table doesn't exist
                     shopTransactions = data || [];
-                } catch (error) {
-                    console.log('Shop transactions table not found, skipping...');
-                }
+                } catch (error) {}
 
                 // Fetch delivery transactions (if table exists)
                 let deliveryTransactions = [];
@@ -91,9 +89,7 @@ const StatementsList = () => {
 
                     if (error && error.code !== 'PGRST116') throw error; // PGRST116 = table doesn't exist
                     deliveryTransactions = data || [];
-                } catch (error) {
-                    console.log('Delivery transactions table not found, skipping...');
-                }
+                } catch (error) {}
 
                 // Combine and format transactions
                 const allTransactions: Transaction[] = [

@@ -381,7 +381,6 @@ const PreviewDeliveryOrder = () => {
         const fetchTracking = async () => {
             if (!id) return;
             try {
-                console.log('Fetching tracking for order:', parseInt(id));
                 const { data, error } = await supabase
                     .from('order_tracking')
                     .select(
@@ -397,7 +396,6 @@ const PreviewDeliveryOrder = () => {
                     console.error('Error fetching tracking:', error);
                     throw error;
                 }
-                console.log('Tracking data:', data);
                 setTracking(data || []);
             } catch (error) {
                 console.error('Error fetching tracking:', error);
@@ -672,11 +670,9 @@ const PreviewDeliveryOrder = () => {
 
     const addTrackingEntry = async (action: string, metadata?: any) => {
         if (!order || !currentUser) {
-            console.log('addTrackingEntry: Missing order or currentUser', { order: !!order, currentUser: !!currentUser });
             return;
         }
         try {
-            console.log('Adding tracking entry:', { order_id: order.id, action, user_id: currentUser.id, metadata });
             const { error } = await supabase.from('order_tracking').insert({
                 order_id: order.id,
                 action,

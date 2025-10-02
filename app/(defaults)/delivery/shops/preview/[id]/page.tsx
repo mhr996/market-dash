@@ -153,7 +153,6 @@ const DeliveryShopPreview = () => {
                 if (categoriesError) throw categoriesError;
                 setCategories(categoriesData || []);
             } catch (error) {
-                console.error('Error fetching shop:', error);
                 setAlert({ visible: true, message: 'Error fetching shop details', type: 'danger' });
             } finally {
                 setLoading(false);

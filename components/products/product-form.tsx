@@ -663,8 +663,6 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
 
                     // Check if the data was actually updated
                     if (updatedProduct.title !== productData.title || updatedProduct.desc !== productData.desc || updatedProduct.price !== productData.price) {
-                        console.log('Data mismatch detected, trying upsert instead');
-
                         // If the data doesn't match, try an upsert operation instead
                         const { error: upsertError } = await supabase.from('products').upsert({
                             id: parseInt(productId),
@@ -677,8 +675,6 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                         const { data: upsertedProduct, error: upsertFetchError } = await supabase.from('products').select('*').eq('id', productId).single();
 
                         if (upsertFetchError) throw upsertFetchError;
-
-                        console.log('Upserted product data:', upsertedProduct);
 
                         // Update form with upserted data
                         setFormData({

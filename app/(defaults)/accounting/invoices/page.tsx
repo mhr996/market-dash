@@ -130,7 +130,6 @@ const InvoicesList = () => {
 
                 setItems(invoices);
             } catch (error) {
-                console.error('Error fetching invoices:', error);
                 setAlert({ visible: true, message: `Error fetching invoices: ${error instanceof Error ? error.message : 'Unknown error'}`, type: 'danger' });
             } finally {
                 setLoading(false);

@@ -128,7 +128,6 @@ const ImprovedImageUpload: React.FC<ImprovedImageUploadProps> = ({
                 onUploadComplete(newUrls);
             }
         } catch (error) {
-            console.error('Error uploading image:', error);
             const errorMessage = error instanceof Error ? error.message : 'Upload failed';
             onError?.(errorMessage);
         } finally {
@@ -157,7 +156,6 @@ const ImprovedImageUpload: React.FC<ImprovedImageUploadProps> = ({
             setPreviewUrls(newUrls);
             onUploadComplete(newUrls);
         } catch (error) {
-            console.error('Error removing image:', error);
             onError?.('Failed to remove image');
         }
     };

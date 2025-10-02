@@ -66,7 +66,6 @@ const ShopSubCategoriesList = () => {
 
                 setItems(data as ShopSubCategory[]);
             } catch (error) {
-                console.error('Error fetching subcategories:', error);
             } finally {
                 setLoading(false);
             }

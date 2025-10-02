@@ -62,7 +62,6 @@ const LicenseDetailsPage = ({ params }: LicenseDetailsPageProps) => {
                 if (error) throw error;
                 setLicense(data);
             } catch (error) {
-                console.error('Error fetching license:', error);
             } finally {
                 setLoading(false);
             }
@@ -81,7 +80,6 @@ const LicenseDetailsPage = ({ params }: LicenseDetailsPageProps) => {
                 if (error) throw error;
                 setSubscribers(data as Subscriber[]);
             } catch (error) {
-                console.error('Error fetching subscribers:', error);
             } finally {
                 setLoadingSubscribers(false);
             }

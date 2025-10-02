@@ -67,7 +67,6 @@ const AddLicensePage = () => {
             // Redirect back to the licenses list page after successful insertion
             router.push('/licenses');
         } catch (error: any) {
-            console.error(error);
             setAlert({ visible: true, message: error.message || t('error_adding_license'), type: 'danger' });
         } finally {
             setLoading(false);

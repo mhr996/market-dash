@@ -81,7 +81,6 @@ const DeliveryCompaniesList = () => {
                 if (error) throw error;
                 setItems(data as DeliveryCompany[]);
             } catch (error) {
-                console.error('Error fetching delivery companies:', error);
             } finally {
                 setLoading(false);
             }

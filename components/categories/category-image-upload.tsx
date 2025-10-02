@@ -66,7 +66,6 @@ const CategoryImageUpload: React.FC<CategoryImageUploadProps> = ({ categoryId, u
 
             onUploadComplete(publicUrl);
         } catch (error) {
-            console.error('Error uploading image:', error);
             const errorMessage = error instanceof Error ? error.message : 'Error uploading image';
             onError?.(errorMessage);
         } finally {
@@ -90,7 +89,6 @@ const CategoryImageUpload: React.FC<CategoryImageUploadProps> = ({ categoryId, u
 
             onDelete?.();
         } catch (error) {
-            console.error('Error deleting image:', error);
             const errorMessage = error instanceof Error ? error.message : 'Error deleting image';
             onError?.(errorMessage);
         } finally {
