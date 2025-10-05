@@ -2,7 +2,7 @@
 import React, { useEffect, useState } from 'react';
 import { useSelector } from 'react-redux';
 import { IRootState } from '@/store';
-import ReactApexChart from 'react-apexcharts';
+import SafeApexChart from '@/components/charts/safe-apex-chart';
 import supabase from '@/lib/supabase';
 import { useRouter } from 'next/navigation';
 import Dropdown from '@/components/dropdown';
@@ -949,7 +949,7 @@ const AnalyticsDashboard = () => {
                         </div>
                         <div className="flex items-center justify-between">
                             <div className="text-3xl font-bold dark:text-white-light">{analytics.shops.length}</div>
-                            {isMounted && <ReactApexChart series={shopTrendData.series} options={shopTrendData.options} type="line" height={50} width={100} />}
+                            {isMounted && <SafeApexChart series={shopTrendData.series} options={shopTrendData.options} type="line" height={50} />}
                         </div>
                     </div>
 
@@ -972,7 +972,7 @@ const AnalyticsDashboard = () => {
                         </div>
                         <div className="flex items-center justify-between">
                             <div className="text-3xl font-bold dark:text-white-light">{analytics.users.length}</div>
-                            {isMounted && <ReactApexChart series={userTrendData.series} options={userTrendData.options} type="line" height={50} width={100} />}
+                            {isMounted && <SafeApexChart series={userTrendData.series} options={userTrendData.options} type="line" height={50} />}
                         </div>
                     </div>
 
@@ -995,7 +995,7 @@ const AnalyticsDashboard = () => {
                         </div>
                         <div className="flex items-center justify-between">
                             <div className="text-3xl font-bold dark:text-white-light">{analytics.products.length}</div>
-                            {isMounted && <ReactApexChart series={productTrendData.series} options={productTrendData.options} type="line" height={50} width={100} />}
+                            {isMounted && <SafeApexChart series={productTrendData.series} options={productTrendData.options} type="line" height={50} />}
                         </div>
                     </div>
 
@@ -1018,7 +1018,7 @@ const AnalyticsDashboard = () => {
                         </div>
                         <div className="flex items-center justify-between">
                             <div className="text-3xl font-bold dark:text-white-light">{analytics.orders.length}</div>
-                            {isMounted && <ReactApexChart series={orderTrendData.series} options={orderTrendData.options} type="line" height={50} width={100} />}
+                            {isMounted && <SafeApexChart series={orderTrendData.series} options={orderTrendData.options} type="line" height={50} />}
                         </div>
                     </div>
                 </div>
@@ -1073,7 +1073,7 @@ const AnalyticsDashboard = () => {
                             </div>
                             <div className="sm:w-2/3">
                                 {isMounted && analytics.dailyRevenue.length > 0 ? (
-                                    <ReactApexChart options={revenueChartData.options} series={revenueChartData.series} type="area" height={300} />
+                                    <SafeApexChart options={revenueChartData.options} series={revenueChartData.series} type="area" height={300} />
                                 ) : (
                                     <div className="flex h-72 items-center justify-center">
                                         <div className="text-lg text-gray-500">{t('no_revenue_data')}</div>
@@ -1117,7 +1117,7 @@ const AnalyticsDashboard = () => {
 
                         <div>
                             {isMounted && analytics.ordersByStatus.length > 0 ? (
-                                <ReactApexChart options={orderStatusChartData.options} series={orderStatusChartData.series} type="donut" height={300} />
+                                <SafeApexChart options={orderStatusChartData.options} series={orderStatusChartData.series} type="donut" height={300} />
                             ) : (
                                 <div className="flex h-72 items-center justify-center">
                                     <div className="text-lg text-gray-500">{t('no_order_status_data')}</div>
@@ -1203,14 +1203,14 @@ const AnalyticsDashboard = () => {
                         <AnimateHeight duration={300} height={expandedSection !== 'shopProductTrend' ? 'auto' : 0}>
                             <div className="mb-5">
                                 <h6 className="mb-3 text-base font-medium dark:text-white-light">{t('user_vs_order_trends')}</h6>
-                                {isMounted && <ReactApexChart options={timeTrendsData.options} series={timeTrendsData.series} type="line" height={300} />}
+                                {isMounted && <SafeApexChart options={timeTrendsData.options} series={timeTrendsData.series} type="line" height={300} />}
                             </div>
                         </AnimateHeight>
 
                         <AnimateHeight duration={300} height={expandedSection !== 'userOrderTrend' ? 'auto' : 0}>
                             <div className="mb-5">
                                 <h6 className="mb-3 text-base font-medium dark:text-white-light">{t('shop_vs_product_distribution')}</h6>
-                                {isMounted && <ReactApexChart options={shopProductComparisonData.options} series={shopProductComparisonData.series} type="bar" height={300} />}
+                                {isMounted && <SafeApexChart options={shopProductComparisonData.options} series={shopProductComparisonData.series} type="bar" height={300} />}
                             </div>
                         </AnimateHeight>
                     </div>
