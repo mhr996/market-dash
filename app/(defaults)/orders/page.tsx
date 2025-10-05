@@ -33,6 +33,7 @@ import { generateOrderReceiptPDF } from '@/utils/pdf-generator';
 import supabase from '@/lib/supabase';
 import DateRangeSelector from '@/components/date-range-selector';
 import MultiSelect from '@/components/multi-select';
+import { useAuth } from '@/hooks/useAuth';
 
 // Tooltip Component for Order Total Breakdown
 const OrderTotalTooltip = ({ order }: { order: any }) => {
@@ -727,12 +728,15 @@ const AssignmentModal = ({ order, isOpen, onClose, onAssign }: { order: any; isO
             const { data: productData } = await supabase.from('products').select('shop').eq('id', order.product_id).single();
 
             if (productData?.shop) {
-                // Get the shop's delivery company
-                const { data: shopData } = await supabase.from('shops').select('delivery_companies_id').eq('id', productData.shop).single();
+                // Get the shop's delivery companies through the junction table
+                const { data: shopDeliveryData } = await supabase.from('shop_delivery_companies').select('delivery_company_id').eq('shop_id', productData.shop).eq('is_active', true);
 
-                if (shopData?.delivery_companies_id) {
-                    // Fetch drivers for this delivery company
-                    const { data: driversData } = await supabase.from('delivery_drivers').select('id, name, phone, avatar_url').eq('delivery_companies_id', shopData.delivery_companies_id);
+                if (shopDeliveryData && shopDeliveryData.length > 0) {
+                    // Get all delivery company IDs for this shop
+                    const deliveryCompanyIds = shopDeliveryData.map((sdc) => sdc.delivery_company_id);
+
+                    // Fetch drivers for these delivery companies
+                    const { data: driversData } = await supabase.from('delivery_drivers').select('id, name, phone, avatar_url').in('delivery_company_id', deliveryCompanyIds);
 
                     setDrivers(driversData || []);
                 }
@@ -799,6 +803,7 @@ interface OrderData {
     shipping_address: any;
     payment_method: any;
     assigned_driver_id?: number;
+    assigned_delivery_company_id?: number;
     confirmed?: boolean;
     total?: string;
     comment?: string;
@@ -812,7 +817,6 @@ interface OrderData {
         shop: number;
         shops?: {
             shop_name: string;
-            delivery_companies_id?: number;
         }[];
     };
     profiles?: {
@@ -825,6 +829,10 @@ interface OrderData {
         name: string;
         phone: string;
         avatar_url?: string;
+    };
+    assigned_delivery_company?: {
+        id: number;
+        company_name: string;
     };
     delivery_methods?: {
         id: number;
@@ -927,7 +935,8 @@ const formatOrderForDisplay = (order: OrderData) => {
         delivery_type: deliveryType,
         assigned_driver_id: order.assigned_driver_id,
         assigned_driver: order.assigned_driver,
-        delivery_company_id: order.products?.shops?.[0]?.delivery_companies_id,
+        assigned_delivery_company_id: order.assigned_delivery_company_id,
+        assigned_delivery_company: order.assigned_delivery_company,
         confirmed: order.confirmed || false,
         comment: order.comment || '',
         // Delivery and features data
@@ -952,9 +961,29 @@ interface Order {
 const OrdersList = () => {
     const { t } = getTranslation();
     const router = useRouter();
+    const { user, loading: authLoading } = useAuth();
     const [items, setItems] = useState<OrderData[]>([]);
     const [displayItems, setDisplayItems] = useState<any[]>([]);
     const [loading, setLoading] = useState(true);
+
+    // Helper function to get accessible shop IDs based on user role
+    const getAccessibleShopIds = async (): Promise<number[]> => {
+        if (!user) return [];
+
+        if (user.role_name === 'super_admin') {
+            // Super admin can see all shops
+            const { data: allShops } = await supabase.from('shops').select('id');
+            return allShops?.map((shop) => shop.id) || [];
+        }
+
+        if (user.shops && user.shops.length > 0) {
+            // Shop owner/editor can only see their assigned shops
+            return user.shops.map((shop) => shop.shop_id);
+        }
+
+        return [];
+    };
+
     const [page, setPage] = useState(1);
     const PAGE_SIZES = [10, 20, 30, 50, 100];
     const [pageSize, setPageSize] = useState(PAGE_SIZES[0]);
@@ -1032,11 +1061,13 @@ const OrdersList = () => {
     };
 
     useEffect(() => {
+        if (authLoading) return;
+
         fetchCurrentUser();
         fetchOrders();
         fetchShops();
         fetchOrdersWithComments();
-    }, []);
+    }, [user?.role_name, authLoading]);
 
     // Close dropdowns when clicking outside
     useEffect(() => {
@@ -1323,8 +1354,36 @@ const OrdersList = () => {
             },
         ];
 
-        // Only add driver column for processing, on_the_way, and completed filters
+        // Only add driver and company columns for processing, on_the_way, and completed filters
         if (deliveryFilter === 'processing' || deliveryFilter === 'on_the_way' || deliveryFilter === 'completed') {
+            // Add delivery company column
+            baseColumns.push({
+                accessor: 'assigned_delivery_company',
+                title: 'Delivery Company',
+                sortable: false,
+                render: ({ assigned_delivery_company, delivery_type, status, confirmed }: { assigned_delivery_company: any; delivery_type: any; status: any; confirmed: any }) => {
+                    // Only show company column for confirmed delivery orders in processing, on_the_way, or completed status
+                    if (!confirmed || delivery_type !== 'delivery' || (status !== 'processing' && status !== 'on_the_way' && status !== 'completed')) {
+                        return null;
+                    }
+
+                    if (assigned_delivery_company) {
+                        return (
+                            <div className="flex items-center gap-2">
+                                <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                                    <IconTruck className="h-4 w-4 text-blue-600" />
+                                </div>
+                                <div className="flex-1">
+                                    <div className="text-sm font-medium">{assigned_delivery_company.company_name}</div>
+                                </div>
+                            </div>
+                        );
+                    }
+                    return <span className="text-gray-500 text-sm">-</span>;
+                },
+            });
+
+            // Add driver column
             baseColumns.push({
                 accessor: 'assigned_driver',
                 title: 'Driver',
@@ -1684,7 +1743,15 @@ const OrdersList = () => {
 
     const fetchShops = async () => {
         try {
-            const { data: shops, error } = await supabase.from('shops').select('id, shop_name, logo_url').order('shop_name', { ascending: true });
+            // Get accessible shop IDs based on user role
+            const accessibleShopIds = await getAccessibleShopIds();
+
+            if (accessibleShopIds.length === 0) {
+                setAvailableShops([]);
+                return;
+            }
+
+            const { data: shops, error } = await supabase.from('shops').select('id, shop_name, logo_url').in('id', accessibleShopIds).order('shop_name', { ascending: true });
 
             if (error) throw error;
             setAvailableShops(shops || []);
@@ -1695,17 +1762,31 @@ const OrdersList = () => {
 
     const fetchOrders = async () => {
         try {
-            // Build query with filters
+            // Get accessible shop IDs first
+            const accessibleShopIds = await getAccessibleShopIds();
+
+            if (accessibleShopIds.length === 0) {
+                setItems([]);
+                setDisplayItems([]);
+                setLoading(false);
+                return;
+            }
+
+            // Build query with filters - only fetch orders from accessible shops
             let query = supabase.from('orders').select(
                 `
                     *,
-                    products(id, title, price, images, shop),
+                    products!inner(id, title, price, images, shop),
                     profiles(id, full_name, email),
                     assigned_driver:delivery_drivers(id, name, phone, avatar_url),
+                    assigned_delivery_company:delivery_companies(id, company_name),
                     delivery_methods(id, label, delivery_time, price),
                     delivery_location_methods(id, location_name, price_addition)
                 `,
             );
+
+            // Filter by accessible shops at the database level
+            query = query.in('products.shop', accessibleShopIds);
 
             // Apply date range filter
             if (dateRange.length === 2) {
@@ -1763,7 +1844,7 @@ const OrdersList = () => {
                 return;
             }
 
-            // Get products with their shop IDs
+            // Get products with their shop IDs (already filtered by accessible shops)
             const { data: productsData, error: productsError } = await supabase.from('products').select('id, title, price, images, shop').in('id', productIds);
 
             if (productsError) throw productsError;
@@ -1776,8 +1857,8 @@ const OrdersList = () => {
                 return;
             }
 
-            // Get shops with their delivery company info
-            const { data: shopsData, error: shopsError } = await supabase.from('shops').select('id, shop_name, delivery_companies_id').in('id', shopIds);
+            // Get shops info
+            const { data: shopsData, error: shopsError } = await supabase.from('shops').select('id, shop_name').in('id', shopIds);
 
             if (shopsError) throw shopsError;
 
@@ -1803,7 +1884,7 @@ const OrdersList = () => {
                 });
             });
 
-            // Apply shop filter
+            // Apply additional shop filter if selected
             if (selectedShops.length > 0) {
                 transformed = transformed.filter((order) => {
                     const product = productsData?.find((p) => p.id === order.product_id);

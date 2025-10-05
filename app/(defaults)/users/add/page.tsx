@@ -23,12 +23,10 @@ const AddUserPage = () => {
         website: '',
         avatar_url: '',
         status: 'Active',
-        role: 'user', // NEW: Role selection
-        shop_ids: [] as number[], // NEW: Multiple shop selection
-        delivery_company_ids: [] as number[], // NEW: Multiple delivery company selection
+        role: 'shop_editor', // Default to shop_editor
+        shop_ids: [] as number[], // Multiple shop selection
     });
     const [availableShops, setAvailableShops] = useState<any[]>([]);
-    const [availableDeliveryCompanies, setAvailableDeliveryCompanies] = useState<any[]>([]);
     const [alert, setAlert] = useState<{ visible: boolean; message: string; type: 'success' | 'danger' }>({
         visible: false,
         message: '',
@@ -36,30 +34,22 @@ const AddUserPage = () => {
     });
     const [loading, setLoading] = useState(false);
 
-    // Fetch available shops and delivery companies based on user's permissions
+    // Fetch available shops based on user's permissions
     useEffect(() => {
         const fetchOptions = async () => {
             if (authLoading || !user) return;
 
             try {
                 if (user.role_name === 'super_admin') {
-                    // Super admin can assign to any shop/delivery company
+                    // Super admin can assign to any shop
                     const { data: shops } = await supabase.from('shops').select('id, shop_name');
-                    const { data: deliveryCompanies } = await supabase.from('delivery_companies').select('id, company_name');
                     setAvailableShops(shops || []);
-                    setAvailableDeliveryCompanies(deliveryCompanies || []);
-                } else {
-                    // User can only assign to their own shops/delivery companies
+                } else if (user.role_name === 'shop_owner') {
+                    // Shop owner can only assign to their own shops
                     if (user.shops && user.shops.length > 0) {
                         const shopIds = user.shops.map((shop) => shop.shop_id);
                         const { data: shops } = await supabase.from('shops').select('id, shop_name').in('id', shopIds);
                         setAvailableShops(shops || []);
-                    }
-
-                    if (user.delivery_companies && user.delivery_companies.length > 0) {
-                        const deliveryCompanyIds = user.delivery_companies.map((dc) => dc.delivery_company_id);
-                        const { data: deliveryCompanies } = await supabase.from('delivery_companies').select('id, company_name').in('id', deliveryCompanyIds);
-                        setAvailableDeliveryCompanies(deliveryCompanies || []);
                     }
                 }
             } catch (error) {
@@ -138,9 +128,8 @@ const AddUserPage = () => {
                         status: form.status,
                         role: form.role, // NEW: Include role
                     },
-                    role: form.role, // NEW: Role for assignment
-                    shop_ids: form.shop_ids, // NEW: Multiple shop assignments
-                    delivery_company_ids: form.delivery_company_ids, // NEW: Multiple delivery company assignments
+                    role: form.role, // Role for assignment
+                    shop_ids: form.shop_ids, // Multiple shop assignments
                 }),
             });
             const result = await response.json();
@@ -305,25 +294,6 @@ const AddUserPage = () => {
                                             className="form-checkbox"
                                         />
                                         <span className="text-sm">{shop.shop_name}</span>
-                                    </label>
-                                ))}
-                            </div>
-                        </div>
-                    )}
-                    {/* NEW: Multiple Delivery Company Selection (only for delivery roles) */}
-                    {['delivery_owner', 'driver'].includes(form.role) && (
-                        <div>
-                            <label className="block text-sm font-bold text-gray-700 dark:text-white mb-2">Delivery Companies * (Select all that apply)</label>
-                            <div className="space-y-2 max-h-40 overflow-y-auto border border-gray-300 rounded p-3">
-                                {availableDeliveryCompanies.map((dc) => (
-                                    <label key={dc.id} className="flex items-center space-x-2">
-                                        <input
-                                            type="checkbox"
-                                            checked={form.delivery_company_ids.includes(dc.id)}
-                                            onChange={(e) => handleMultiSelectChange('delivery_company_ids', dc.id, e.target.checked)}
-                                            className="form-checkbox"
-                                        />
-                                        <span className="text-sm">{dc.company_name}</span>
                                     </label>
                                 ))}
                             </div>

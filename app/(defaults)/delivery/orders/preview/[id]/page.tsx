@@ -328,6 +328,10 @@ const PreviewDeliveryOrder = () => {
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [showCompleteModal, setShowCompleteModal] = useState(false);
     const [showAssignModal, setShowAssignModal] = useState(false);
+    const [assignmentStep, setAssignmentStep] = useState<'company' | 'driver'>('company');
+    const [selectedCompany, setSelectedCompany] = useState<number | null>(null);
+    const [selectedDriver, setSelectedDriver] = useState<number | null>(null);
+    const [companies, setCompanies] = useState<any[]>([]);
     const [drivers, setDrivers] = useState<any[]>([]);
     const [comments, setComments] = useState<any[]>([]);
     const [tracking, setTracking] = useState<any[]>([]);
@@ -415,7 +419,7 @@ const PreviewDeliveryOrder = () => {
                             id, title, price, images, shop,
                             shops(
                                 id, shop_name, logo_url, address, 
-                                phone_numbers, delivery_companies_id
+                                phone_numbers
                             )
                         ),
                         profiles(
@@ -424,6 +428,9 @@ const PreviewDeliveryOrder = () => {
                         ),
                         assigned_driver:delivery_drivers(
                             id, name, phone, avatar_url
+                        ),
+                        assigned_delivery_company:delivery_companies(
+                            id, company_name
                         )
                     `,
                     )
@@ -529,27 +536,40 @@ const PreviewDeliveryOrder = () => {
         fetchTracking();
     }, [id]);
 
-    // Fetch drivers function
-    const fetchDrivers = async () => {
+    // Fetch companies function
+    const fetchCompanies = async () => {
         try {
-            // Get the shop's delivery company
-            const { data: shopData } = await supabase.from('shops').select('delivery_companies_id').eq('id', order?.shop?.id).single();
+            // Get the shop's delivery companies through the junction table
+            const { data: shopDeliveryData } = await supabase
+                .from('shop_delivery_companies')
+                .select('delivery_company_id, delivery_companies(company_name)')
+                .eq('shop_id', order?.shop?.id)
+                .eq('is_active', true);
 
-            if (shopData?.delivery_companies_id) {
-                // Fetch drivers for this delivery company
-                const { data: driversData } = await supabase.from('delivery_drivers').select('id, name, phone, avatar_url').eq('delivery_companies_id', shopData.delivery_companies_id);
+            setCompanies(shopDeliveryData || []);
+        } catch (error) {
+            console.error('Error fetching companies:', error);
+        }
+    };
 
-                setDrivers(driversData || []);
-            }
+    // Fetch drivers function for selected company
+    const fetchDrivers = async (companyId: number) => {
+        try {
+            // Fetch drivers for the selected company
+            const { data: driversData, error } = await supabase.from('delivery_drivers').select('id, name, phone, avatar_url, delivery_companies_id').eq('delivery_companies_id', companyId);
+
+            if (error) throw error;
+
+            setDrivers(driversData || []);
         } catch (error) {
             console.error('Error fetching drivers:', error);
         }
     };
 
-    // Fetch drivers when order is loaded
+    // Fetch companies when order is loaded
     useEffect(() => {
         if (order?.shop?.id) {
-            fetchDrivers();
+            fetchCompanies();
         }
     }, [order?.shop?.id]);
 
@@ -766,12 +786,32 @@ const PreviewDeliveryOrder = () => {
         }
     };
 
-    const handleAssignDriver = async (driverId: number) => {
+    const handleCompanySelect = (companyId: number) => {
+        setSelectedCompany(companyId);
+        fetchDrivers(companyId);
+        setAssignmentStep('driver');
+    };
+
+    const handleDriverSelect = (driverId: number) => {
+        setSelectedDriver(driverId);
+        if (selectedCompany) {
+            handleAssignDriver(selectedCompany, driverId);
+        }
+    };
+
+    const handleBackToCompany = () => {
+        setAssignmentStep('company');
+        setSelectedDriver(null);
+        setDrivers([]);
+    };
+
+    const handleAssignDriver = async (companyId: number, driverId: number) => {
         if (!order) return;
         try {
             const { error } = await supabase
                 .from('orders')
                 .update({
+                    assigned_delivery_company_id: companyId,
                     assigned_driver_id: driverId,
                     status: 'on_the_way', // Automatically change status to on_the_way
                 })
@@ -782,12 +822,15 @@ const PreviewDeliveryOrder = () => {
             // Add tracking entry
             await addTrackingEntry('Driver Assigned');
 
-            // Update order with new driver info
+            // Update order with new driver and company info
             const selectedDriver = drivers.find((d) => d.id === driverId);
+            const selectedCompany = companies.find((c) => c.delivery_company_id === companyId);
             setOrder((prev: any) =>
                 prev
                     ? {
                           ...prev,
+                          assigned_delivery_company_id: companyId,
+                          assigned_delivery_company: selectedCompany?.delivery_companies,
                           assigned_driver_id: driverId,
                           assigned_driver: selectedDriver,
                           status: 'on_the_way',
@@ -796,6 +839,9 @@ const PreviewDeliveryOrder = () => {
             );
 
             setShowAssignModal(false);
+            setAssignmentStep('company');
+            setSelectedCompany(null);
+            setSelectedDriver(null);
             setAlert({ visible: true, message: 'Driver assigned successfully', type: 'success' });
         } catch (error) {
             setAlert({ visible: true, message: 'Error assigning driver', type: 'danger' });
@@ -1382,33 +1428,80 @@ const PreviewDeliveryOrder = () => {
             {showAssignModal && (
                 <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
                     <div className="bg-white dark:bg-gray-800 p-6 rounded-lg w-96 max-w-full mx-4">
-                        <h3 className="text-lg font-semibold mb-4">Assign Driver</h3>
-                        <p className="mb-4">Select a driver to assign to this order:</p>
-                        <div className="space-y-2 max-h-60 overflow-y-auto">
-                            {drivers.length === 0 ? (
-                                <p className="text-gray-500 text-sm">No drivers available</p>
-                            ) : (
-                                drivers.map((driver) => (
-                                    <button
-                                        key={driver.id}
-                                        onClick={() => handleAssignDriver(driver.id)}
-                                        className="w-full text-left p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3"
-                                    >
-                                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                            <IconUser className="h-4 w-4 text-primary" />
-                                        </div>
-                                        <div>
-                                            <div className="font-medium">{driver.name}</div>
-                                            <div className="text-sm text-gray-500">{driver.phone}</div>
-                                        </div>
+                        <h3 className="text-lg font-semibold mb-4">{assignmentStep === 'company' ? 'Step 1: Select Delivery Company' : 'Step 2: Select Driver'}</h3>
+
+                        {assignmentStep === 'company' ? (
+                            <div>
+                                <p className="mb-4">Select a delivery company to handle this order:</p>
+                                <div className="space-y-2 max-h-60 overflow-y-auto">
+                                    {companies.length === 0 ? (
+                                        <p className="text-gray-500 text-sm">No companies available</p>
+                                    ) : (
+                                        companies.map((company) => (
+                                            <button
+                                                key={company.delivery_company_id}
+                                                onClick={() => handleCompanySelect(company.delivery_company_id)}
+                                                className="w-full text-left p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
+                                            >
+                                                <div className="font-medium">{company.delivery_companies?.company_name}</div>
+                                            </button>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        ) : (
+                            <div>
+                                <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                                    <div className="text-sm text-blue-600 dark:text-blue-400">
+                                        Selected Company: {companies.find((c) => c.delivery_company_id === selectedCompany)?.delivery_companies?.company_name}
+                                    </div>
+                                </div>
+                                <p className="mb-4">Select a driver from this company:</p>
+                                <div className="space-y-2 max-h-60 overflow-y-auto">
+                                    {drivers.length === 0 ? (
+                                        <p className="text-gray-500 text-sm">No drivers available for this company</p>
+                                    ) : (
+                                        drivers.map((driver) => (
+                                            <button
+                                                key={driver.id}
+                                                onClick={() => handleDriverSelect(driver.id)}
+                                                className="w-full text-left p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700 flex items-center gap-3"
+                                            >
+                                                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                                    <IconUser className="h-4 w-4 text-primary" />
+                                                </div>
+                                                <div>
+                                                    <div className="font-medium">{driver.name}</div>
+                                                    <div className="text-sm text-gray-500">{driver.phone}</div>
+                                                </div>
+                                            </button>
+                                        ))
+                                    )}
+                                </div>
+                            </div>
+                        )}
+
+                        <div className="flex gap-2 justify-between mt-4">
+                            <div>
+                                {assignmentStep === 'driver' && (
+                                    <button onClick={handleBackToCompany} className="btn btn-outline">
+                                        Back
                                     </button>
-                                ))
-                            )}
-                        </div>
-                        <div className="flex gap-2 justify-end mt-4">
-                            <button onClick={() => setShowAssignModal(false)} className="btn btn-outline">
-                                Cancel
-                            </button>
+                                )}
+                            </div>
+                            <div>
+                                <button
+                                    onClick={() => {
+                                        setShowAssignModal(false);
+                                        setAssignmentStep('company');
+                                        setSelectedCompany(null);
+                                        setSelectedDriver(null);
+                                    }}
+                                    className="btn btn-outline"
+                                >
+                                    Cancel
+                                </button>
+                            </div>
                         </div>
                     </div>
                 </div>

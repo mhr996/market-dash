@@ -36,6 +36,13 @@ interface SubCategory {
     category_id: number;
 }
 
+interface Brand {
+    id: number;
+    brand: string;
+    description: string;
+    image_url?: string;
+}
+
 interface FeatureLabel {
     id?: number;
     label: string;
@@ -69,6 +76,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
     const [shops, setShops] = useState<Shop[]>([]);
     const [categories, setCategories] = useState<Category[]>([]);
     const [subcategories, setSubcategories] = useState<SubCategory[]>([]);
+    const [brands, setBrands] = useState<Brand[]>([]);
     const [previewUrls, setPreviewUrls] = useState<string[]>([]);
     const [alert, setAlert] = useState<{ type: 'success' | 'danger'; message: string } | null>(null);
 
@@ -93,10 +101,12 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
     const [isShopDropdownOpen, setIsShopDropdownOpen] = useState(false);
     const [isCategoryDropdownOpen, setIsCategoryDropdownOpen] = useState(false);
     const [isSubcategoryDropdownOpen, setIsSubcategoryDropdownOpen] = useState(false);
-    const [searchTerm, setSearchTerm] = useState({ shop: '', category: '', subcategory: '' });
+    const [isBrandDropdownOpen, setIsBrandDropdownOpen] = useState(false);
+    const [searchTerm, setSearchTerm] = useState({ shop: '', category: '', subcategory: '', brand: '' });
     const shopRef = useRef<HTMLDivElement>(null);
     const categoryRef = useRef<HTMLDivElement>(null);
     const subcategoryRef = useRef<HTMLDivElement>(null);
+    const brandRef = useRef<HTMLDivElement>(null);
 
     // Form state
     const [formData, setFormData] = useState({
@@ -106,6 +116,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
         shop: '',
         category: '',
         subcategory: '',
+        brand: '',
         active: true, // Default to active
         onsale: false, // Default to not on sale
     });
@@ -286,6 +297,9 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
             if (subcategoryRef.current && !subcategoryRef.current.contains(event.target as Node)) {
                 setIsSubcategoryDropdownOpen(false);
             }
+            if (brandRef.current && !brandRef.current.contains(event.target as Node)) {
+                setIsBrandDropdownOpen(false);
+            }
         };
 
         document.addEventListener('mousedown', handleClickOutside);
@@ -319,6 +333,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                             shop: product.shop,
                             category: product.category?.toString() || '',
                             subcategory: product.subcategory_id?.toString() || '',
+                            brand: product.brand_id?.toString() || '',
                             active: product.active !== undefined ? product.active : true,
                             onsale: product.onsale || false,
                         });
@@ -360,6 +375,23 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
 
         fetchData();
     }, [productId]);
+
+    // Fetch brands when shop changes
+    useEffect(() => {
+        const fetchBrandsForShop = async () => {
+            if (formData.shop) {
+                try {
+                    const { data: brandsData } = await supabase.from('categories_brands').select('*').eq('shop_id', parseInt(formData.shop)).order('brand', { ascending: true });
+                    if (brandsData) setBrands(brandsData);
+                } catch (error) {
+                    console.error('Error fetching brands:', error);
+                }
+            } else {
+                setBrands([]);
+            }
+        };
+        fetchBrandsForShop();
+    }, [formData.shop]);
 
     // Sync onsale field with hasSalePrice state
     useEffect(() => {
@@ -514,6 +546,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                         shop: formData.shop,
                         category: formData.category ? parseInt(formData.category) : null,
                         subcategory_id: formData.subcategory ? parseInt(formData.subcategory) : null,
+                        brand_id: formData.brand ? parseInt(formData.brand) : null,
                         images: [], // Empty initially
                         sale_price: hasSalePrice && finalPrice ? finalPrice : null,
                         discount_type: hasSalePrice ? discountType : null,
@@ -557,6 +590,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                         shop: '',
                         category: '',
                         subcategory: '',
+                        brand: '',
                         active: true,
                         onsale: false,
                     });
@@ -581,6 +615,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                         shop: formData.shop,
                         category: formData.category ? parseInt(formData.category) : null,
                         subcategory_id: formData.subcategory ? parseInt(formData.subcategory) : null,
+                        brand_id: formData.brand ? parseInt(formData.brand) : null,
                         images: [],
                         sale_price: hasSalePrice && finalPrice ? finalPrice : null,
                         discount_type: hasSalePrice ? discountType : null,
@@ -607,6 +642,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                         shop: '',
                         category: '',
                         subcategory: '',
+                        brand: '',
                         active: true,
                         onsale: false,
                     });
@@ -634,6 +670,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                     shop: formData.shop,
                     category: formData.category ? parseInt(formData.category) : null,
                     subcategory_id: formData.subcategory ? parseInt(formData.subcategory) : null,
+                    brand_id: formData.brand ? parseInt(formData.brand) : null,
                     images: finalImageUrls,
                     sale_price: hasSalePrice && finalPrice ? finalPrice : null,
                     discount_type: hasSalePrice ? discountType : null,
@@ -684,6 +721,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                             shop: upsertedProduct.shop,
                             category: upsertedProduct.category?.toString() || '',
                             subcategory: upsertedProduct.subcategory_id?.toString() || '',
+                            brand: upsertedProduct.brand_id?.toString() || '',
                             active: upsertedProduct.active,
                             onsale: upsertedProduct.onsale || false,
                         });
@@ -709,6 +747,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                             shop: updatedProduct.shop,
                             category: updatedProduct.category?.toString() || '',
                             subcategory: updatedProduct.subcategory_id?.toString() || '',
+                            brand: updatedProduct.brand_id?.toString() || '',
                             active: updatedProduct.active,
                             onsale: updatedProduct.onsale || false,
                         });
@@ -1145,6 +1184,60 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                                     </div>
                                 </div>
                             )}
+
+                            {/* Brand Selection */}
+                            <div ref={brandRef} className="relative">
+                                <label htmlFor="brand">Brand</label>
+                                <div className="relative">
+                                    <div
+                                        className="cursor-pointer rounded border border-[#e0e6ed] bg-white p-2.5 text-dark dark:border-[#191e3a] dark:bg-black dark:text-white-dark flex items-center justify-between"
+                                        onClick={() => setIsBrandDropdownOpen(!isBrandDropdownOpen)}
+                                    >
+                                        <span>{formData.brand ? brands.find((b) => b.id.toString() === formData.brand)?.brand : 'Select Brand'}</span>
+                                        <IconCaretDown className={`h-4 w-4 transition-transform duration-300 ${isBrandDropdownOpen ? 'rotate-180' : ''}`} />
+                                    </div>
+
+                                    {isBrandDropdownOpen && (
+                                        <div className="absolute z-50 mt-1 w-full rounded-md border border-[#e0e6ed] bg-white shadow-lg dark:border-[#191e3a] dark:bg-black">
+                                            <div className="p-2">
+                                                <input
+                                                    type="text"
+                                                    className="w-full rounded border border-[#e0e6ed] p-2 focus:border-primary focus:outline-none dark:border-[#191e3a] dark:bg-black dark:text-white-dark"
+                                                    placeholder="Search brands..."
+                                                    value={searchTerm.brand}
+                                                    onChange={(e) => setSearchTerm((prev) => ({ ...prev, brand: e.target.value }))}
+                                                />
+                                            </div>
+                                            <div className="max-h-64 overflow-y-auto">
+                                                {/* Unselect option */}
+                                                <div
+                                                    className="cursor-pointer px-4 py-2 hover:bg-gray-100 dark:text-white-dark dark:hover:bg-[#191e3a] text-gray-500 italic"
+                                                    onClick={() => {
+                                                        setFormData((prev) => ({ ...prev, brand: '' }));
+                                                        setIsBrandDropdownOpen(false);
+                                                    }}
+                                                >
+                                                    -- No Brand --
+                                                </div>
+                                                {brands
+                                                    .filter((brand) => brand.brand.toLowerCase().includes(searchTerm.brand.toLowerCase()))
+                                                    .map((brand) => (
+                                                        <div
+                                                            key={brand.id}
+                                                            className="cursor-pointer px-4 py-2 hover:bg-gray-100 dark:text-white-dark dark:hover:bg-[#191e3a]"
+                                                            onClick={() => {
+                                                                setFormData((prev) => ({ ...prev, brand: brand.id.toString() }));
+                                                                setIsBrandDropdownOpen(false);
+                                                            }}
+                                                        >
+                                                            {brand.brand}
+                                                        </div>
+                                                    ))}
+                                            </div>
+                                        </div>
+                                    )}
+                                </div>
+                            </div>
 
                             {/* Image Upload */}
                             <div>

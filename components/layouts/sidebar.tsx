@@ -50,6 +50,7 @@ const Sidebar = () => {
     const { user, loading: authLoading } = useAuth();
     const [currentMenu, setCurrentMenu] = useState<string>('');
     const [errorSubMenu, setErrorSubMenu] = useState(false);
+    const [isReady, setIsReady] = useState(false);
     const themeConfig = useSelector((state: IRootState) => state.themeConfig);
     const semidark = useSelector((state: IRootState) => state.themeConfig.semidark);
     const toggleMenu = (value: string) => {
@@ -69,7 +70,16 @@ const Sidebar = () => {
         }
     };
 
+    // Optimize rendering by waiting for auth to complete
     useEffect(() => {
+        if (!authLoading) {
+            setIsReady(true);
+        }
+    }, [authLoading]);
+
+    useEffect(() => {
+        if (!isReady) return;
+
         const selector = document.querySelector('.sidebar ul a[href="' + window.location.pathname + '"]');
         if (selector) {
             selector.classList.add('active');
@@ -88,7 +98,7 @@ const Sidebar = () => {
                 }
             }
         }
-    }, []);
+    }, [isReady]);
 
     useEffect(() => {
         setActiveRoute();
@@ -128,6 +138,23 @@ const Sidebar = () => {
         selector?.classList.add('active');
     };
 
+    // Don't render until auth is ready to prevent laggy rendering
+    if (!isReady) {
+        return (
+            <div className={semidark ? 'dark' : ''}>
+                <nav
+                    className={`sidebar fixed bottom-0 top-0 z-50 h-full min-h-screen w-[260px] shadow-[5px_0_25px_0_rgba(94,92,154,0.1)] transition-all duration-300 ${semidark ? 'text-white-dark' : ''}`}
+                >
+                    <div className="h-full bg-white dark:bg-black">
+                        <div className="flex items-center justify-center h-full">
+                            <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                        </div>
+                    </div>
+                </nav>
+            </div>
+        );
+    }
+
     return (
         <div className={semidark ? 'dark' : ''}>
             <nav
@@ -157,139 +184,156 @@ const Sidebar = () => {
 
                             <li className="nav-item">
                                 <ul>
-                                    <li className="nav-item">
-                                        <Link href="/" className={`group ${pathname === '/' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}>
-                                            <div className="flex items-center">
-                                                <IconMenuDashboard className="shrink-0 group-hover:!text-primary" />
-                                                <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">{t('home')}</span>
-                                            </div>
-                                        </Link>
-                                    </li>
-                                    <li className="nav-item">
-                                        <Link href="/analytics" className={`group ${pathname === '/analytics' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}>
-                                            <div className="flex items-center">
-                                                <IconMenuCharts className="shrink-0 group-hover:!text-primary" />
-                                                <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">{t('analytics')}</span>
-                                            </div>
-                                        </Link>
-                                    </li>
-                                    {/* Shop section - only visible to shop roles and super admin */}
-                                    {(user?.role_name === 'super_admin' || (user?.shops && user.shops.length > 0)) && (
+                                    {/* Home - Only for super_admin and shop_owner */}
+                                    {user?.role_name === 'super_admin' || user?.role_name === 'shop_owner' ? (
                                         <li className="nav-item">
-                                            <button
-                                                type="button"
-                                                className={`${currentMenu === 'shops' ? 'active' : ''} nav-link group w-full ${pathname?.startsWith('/shops') ? 'bg-primary/10 text-primary' : ''}`}
-                                                onClick={() => handleMenuClick('shops')}
-                                            >
+                                            <Link href="/" className={`group ${pathname === '/' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}>
                                                 <div className="flex items-center">
-                                                    <IconBuilding className="shrink-0 group-hover:!text-primary" />
-                                                    <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">{t('shops')}</span>
+                                                    <IconMenuDashboard className="shrink-0 group-hover:!text-primary" />
+                                                    <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">{t('home')}</span>
                                                 </div>
-                                                <div className={`${currentMenu !== 'shops' ? 'rotate-90' : ''} ltr:ml-auto rtl:mr-auto`}>
-                                                    <IconCaretDown className="w-4 h-4" />
+                                            </Link>
+                                        </li>
+                                    ) : null}
+                                    {/* Analytics - Only for super_admin and shop_owner */}
+                                    {user?.role_name === 'super_admin' || user?.role_name === 'shop_owner' ? (
+                                        <li className="nav-item">
+                                            <Link href="/analytics" className={`group ${pathname === '/analytics' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}>
+                                                <div className="flex items-center">
+                                                    <IconMenuCharts className="shrink-0 group-hover:!text-primary" />
+                                                    <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">{t('analytics')}</span>
                                                 </div>
-                                            </button>
-                                            <AnimateHeight duration={300} height={currentMenu === 'shops' ? 'auto' : 0}>
-                                                <ul className="sub-menu [&>li>a]:before:content-none [&>li>button]:before:content-none">
-                                                    <li>
-                                                        <Link href="/shops" className={`group nav-link ${pathname === '/shops' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}>
-                                                            <div className="flex items-center">
-                                                                <IconBuilding className="shrink-0 group-hover:!text-primary" />
-                                                                <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">{t('shops')}</span>
-                                                            </div>
-                                                        </Link>
-                                                    </li>
-                                                    <li>
-                                                        <Link
-                                                            href="/shops/categories"
-                                                            className={`group nav-link ${pathname === '/shops/categories' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}
-                                                        >
-                                                            <div className="flex items-center">
-                                                                <IconMenuTables className="shrink-0 group-hover:!text-primary" />
-                                                                <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Categories</span>
-                                                            </div>
-                                                        </Link>
-                                                    </li>
-                                                    <li>
-                                                        <Link
-                                                            href="/shops/categories/subcategories"
-                                                            className={`group nav-link ${pathname === '/shops/categories/subcategories' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}
-                                                        >
-                                                            <div className="flex items-center">
-                                                                <IconMenuTables className="shrink-0 group-hover:!text-primary" />
-                                                                <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Sub Categories</span>
-                                                            </div>
-                                                        </Link>
-                                                    </li>
-                                                </ul>
-                                            </AnimateHeight>
+                                            </Link>
+                                        </li>
+                                    ) : null}
+                                    {/* Shop section - Different views for different roles */}
+                                    {(user?.role_name === 'super_admin' || (user?.role_name === 'shop_owner' && user?.shops && user.shops.length > 0)) && (
+                                        <li className="nav-item">
+                                            {user?.role_name === 'super_admin' ? (
+                                                // Super admin gets full dropdown with categories
+                                                <>
+                                                    <button
+                                                        type="button"
+                                                        className={`${currentMenu === 'shops' ? 'active' : ''} nav-link group w-full ${pathname?.startsWith('/shops') ? 'bg-primary/10 text-primary' : ''}`}
+                                                        onClick={() => handleMenuClick('shops')}
+                                                    >
+                                                        <div className="flex items-center">
+                                                            <IconBuilding className="shrink-0 group-hover:!text-primary" />
+                                                            <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">{t('shops')}</span>
+                                                        </div>
+                                                        <div className={`${currentMenu !== 'shops' ? 'rotate-90' : ''} ltr:ml-auto rtl:mr-auto`}>
+                                                            <IconCaretDown className="w-4 h-4" />
+                                                        </div>
+                                                    </button>
+                                                    <AnimateHeight duration={300} height={currentMenu === 'shops' ? 'auto' : 0}>
+                                                        <ul className="sub-menu [&>li>a]:before:content-none [&>li>button]:before:content-none">
+                                                            <li>
+                                                                <Link href="/shops" className={`group nav-link ${pathname === '/shops' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}>
+                                                                    <div className="flex items-center">
+                                                                        <IconBuilding className="shrink-0 group-hover:!text-primary" />
+                                                                        <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">{t('shops')}</span>
+                                                                    </div>
+                                                                </Link>
+                                                            </li>
+                                                            <li>
+                                                                <Link
+                                                                    href="/shops/categories"
+                                                                    className={`group nav-link ${pathname === '/shops/categories' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}
+                                                                >
+                                                                    <div className="flex items-center">
+                                                                        <IconMenuTables className="shrink-0 group-hover:!text-primary" />
+                                                                        <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Categories</span>
+                                                                    </div>
+                                                                </Link>
+                                                            </li>
+                                                            <li>
+                                                                <Link
+                                                                    href="/shops/categories/subcategories"
+                                                                    className={`group nav-link ${pathname === '/shops/categories/subcategories' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}
+                                                                >
+                                                                    <div className="flex items-center">
+                                                                        <IconMenuTables className="shrink-0 group-hover:!text-primary" />
+                                                                        <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Sub Categories</span>
+                                                                    </div>
+                                                                </Link>
+                                                            </li>
+                                                        </ul>
+                                                    </AnimateHeight>
+                                                </>
+                                            ) : (
+                                                // Shop owner gets direct link (no dropdown, no categories)
+                                                <Link href="/shops" className={`group ${pathname === '/shops' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}>
+                                                    <div className="flex items-center">
+                                                        <IconBuilding className="shrink-0 group-hover:!text-primary" />
+                                                        <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">{t('shops')}</span>
+                                                    </div>
+                                                </Link>
+                                            )}
                                         </li>
                                     )}
-                                    {/* Products section - only visible to shop roles and super admin */}
-                                    {(user?.role_name === 'super_admin' || (user?.shops && user.shops.length > 0)) && (
-                                        <li className="nav-item">
-                                            <button
-                                                type="button"
-                                                className={`${currentMenu === 'products' ? 'active' : ''} nav-link group w-full ${pathname?.startsWith('/products') ? 'bg-primary/10 text-primary' : ''}`}
-                                                onClick={() => handleMenuClick('products')}
-                                            >
-                                                <div className="flex items-center">
-                                                    <IconMenuComponents className="shrink-0 group-hover:!text-primary" />
-                                                    <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">{t('products')}</span>
-                                                </div>
-                                                <div className={`${currentMenu !== 'products' ? 'rotate-90' : ''} ltr:ml-auto rtl:mr-auto`}>
-                                                    <IconCaretDown className="w-4 h-4" />
-                                                </div>
-                                            </button>
-                                            <AnimateHeight duration={300} height={currentMenu === 'products' ? 'auto' : 0}>
-                                                <ul className="sub-menu [&>li>a]:before:content-none [&>li>button]:before:content-none">
-                                                    <li>
-                                                        <Link href="/products" className={`group nav-link ${pathname === '/products' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}>
-                                                            <div className="flex items-center">
-                                                                <IconMenuComponents className="shrink-0 group-hover:!text-primary" />
-                                                                <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">{t('products')}</span>
-                                                            </div>
-                                                        </Link>
-                                                    </li>
-                                                    <li>
-                                                        <Link
-                                                            href="/products/categories"
-                                                            className={`group nav-link ${pathname === '/products/categories' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}
-                                                        >
-                                                            <div className="flex items-center">
-                                                                <IconMenuTables className="shrink-0 group-hover:!text-primary" />
-                                                                <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Categories</span>
-                                                            </div>
-                                                        </Link>
-                                                    </li>
-                                                    <li>
-                                                        <Link
-                                                            href="/products/categories/subcategories"
-                                                            className={`group nav-link ${pathname === '/products/categories/subcategories' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}
-                                                        >
-                                                            <div className="flex items-center">
-                                                                <IconMenuTables className="shrink-0 group-hover:!text-primary" />
-                                                                <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Sub Categories</span>
-                                                            </div>
-                                                        </Link>
-                                                    </li>
-                                                    <li>
-                                                        <Link
-                                                            href="/products/brands"
-                                                            className={`group nav-link ${pathname === '/products/brands' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}
-                                                        >
-                                                            <div className="flex items-center">
-                                                                <IconMenuComponents className="shrink-0 group-hover:!text-primary" />
-                                                                <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Brands</span>
-                                                            </div>
-                                                        </Link>
-                                                    </li>
-                                                </ul>
-                                            </AnimateHeight>
-                                        </li>
-                                    )}
-                                    {/* Accounting section - only visible to shop roles and super admin */}
-                                    {(user?.role_name === 'super_admin' || (user?.shops && user.shops.length > 0)) && (
+                                    {/* Products section - Available to all roles */}
+                                    <li className="nav-item">
+                                        <button
+                                            type="button"
+                                            className={`${currentMenu === 'products' ? 'active' : ''} nav-link group w-full ${pathname?.startsWith('/products') ? 'bg-primary/10 text-primary' : ''}`}
+                                            onClick={() => handleMenuClick('products')}
+                                        >
+                                            <div className="flex items-center">
+                                                <IconMenuComponents className="shrink-0 group-hover:!text-primary" />
+                                                <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">{t('products')}</span>
+                                            </div>
+                                            <div className={`${currentMenu !== 'products' ? 'rotate-90' : ''} ltr:ml-auto rtl:mr-auto`}>
+                                                <IconCaretDown className="w-4 h-4" />
+                                            </div>
+                                        </button>
+                                        <AnimateHeight duration={300} height={currentMenu === 'products' ? 'auto' : 0}>
+                                            <ul className="sub-menu [&>li>a]:before:content-none [&>li>button]:before:content-none">
+                                                <li>
+                                                    <Link href="/products" className={`group nav-link ${pathname === '/products' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}>
+                                                        <div className="flex items-center">
+                                                            <IconMenuComponents className="shrink-0 group-hover:!text-primary" />
+                                                            <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">{t('products')}</span>
+                                                        </div>
+                                                    </Link>
+                                                </li>
+                                                <li>
+                                                    <Link
+                                                        href="/products/categories"
+                                                        className={`group nav-link ${pathname === '/products/categories' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}
+                                                    >
+                                                        <div className="flex items-center">
+                                                            <IconMenuTables className="shrink-0 group-hover:!text-primary" />
+                                                            <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Categories</span>
+                                                        </div>
+                                                    </Link>
+                                                </li>
+                                                <li>
+                                                    <Link
+                                                        href="/products/categories/subcategories"
+                                                        className={`group nav-link ${pathname === '/products/categories/subcategories' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}
+                                                    >
+                                                        <div className="flex items-center">
+                                                            <IconMenuTables className="shrink-0 group-hover:!text-primary" />
+                                                            <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Sub Categories</span>
+                                                        </div>
+                                                    </Link>
+                                                </li>
+                                                <li>
+                                                    <Link
+                                                        href="/products/brands"
+                                                        className={`group nav-link ${pathname === '/products/brands' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}
+                                                    >
+                                                        <div className="flex items-center">
+                                                            <IconMenuComponents className="shrink-0 group-hover:!text-primary" />
+                                                            <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Brands</span>
+                                                        </div>
+                                                    </Link>
+                                                </li>
+                                            </ul>
+                                        </AnimateHeight>
+                                    </li>
+                                    {/* Accounting section - Only for super_admin */}
+                                    {user?.role_name === 'super_admin' && (
                                         <li className="nav-item">
                                             <button
                                                 type="button"
@@ -343,96 +387,81 @@ const Sidebar = () => {
                                             </AnimateHeight>
                                         </li>
                                     )}
-                                    {/* Orders section - only visible to shop roles and super admin */}
-                                    {(user?.role_name === 'super_admin' || (user?.shops && user.shops.length > 0)) && (
-                                        <li className="nav-item">
-                                            <Link href="/orders" className={`group ${pathname === '/orders' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}>
-                                                <div className="flex items-center">
-                                                    <IconMenuNotes className="shrink-0 group-hover:!text-primary" />
-                                                    <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">{t('orders')}</span>
-                                                </div>
-                                            </Link>
-                                        </li>
-                                    )}
-                                    {/* Delivery section - only visible to delivery roles and super admin */}
-                                    {(user?.role_name === 'super_admin' || (user?.delivery_companies && user.delivery_companies.length > 0)) && (
-                                        <li className="nav-item">
-                                            <button
-                                                type="button"
-                                                className={`${currentMenu === 'delivery' ? 'active' : ''} nav-link group w-full ${pathname?.startsWith('/delivery') ? 'bg-primary/10 text-primary' : ''}`}
-                                                onClick={() => handleMenuClick('delivery')}
-                                            >
-                                                <div className="flex items-center">
-                                                    <IconTruck className="shrink-0 group-hover:!text-primary" />
-                                                    <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Delivery</span>
-                                                </div>
-                                                <div className={`${currentMenu !== 'delivery' ? 'rotate-90' : ''} ltr:ml-auto rtl:mr-auto`}>
-                                                    <IconCaretDown className="w-4 h-4" />
-                                                </div>
-                                            </button>
-                                            <AnimateHeight duration={300} height={currentMenu === 'delivery' ? 'auto' : 0}>
-                                                <ul className="sub-menu [&>li>a]:before:content-none [&>li>button]:before:content-none">
-                                                    <li>
-                                                        <Link
-                                                            href="/delivery/companies"
-                                                            className={`group nav-link ${pathname === '/delivery/companies' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}
-                                                        >
-                                                            <div className="flex items-center">
-                                                                <IconBuilding className="shrink-0 group-hover:!text-primary" />
-                                                                <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Companies</span>
-                                                            </div>
-                                                        </Link>
-                                                    </li>
-                                                    <li>
-                                                        <Link
-                                                            href="/delivery/cars"
-                                                            className={`group nav-link ${pathname === '/delivery/cars' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}
-                                                        >
-                                                            <div className="flex items-center">
-                                                                <IconTruck className="shrink-0 group-hover:!text-primary" />
-                                                                <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Cars</span>
-                                                            </div>
-                                                        </Link>
-                                                    </li>
-                                                    <li>
-                                                        <Link
-                                                            href="/delivery/drivers"
-                                                            className={`group nav-link ${pathname === '/delivery/drivers' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}
-                                                        >
-                                                            <div className="flex items-center">
-                                                                <IconUsers className="shrink-0 group-hover:!text-primary" />
-                                                                <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Drivers</span>
-                                                            </div>
-                                                        </Link>
-                                                    </li>
-                                                    <li>
-                                                        <Link
-                                                            href="/delivery/orders"
-                                                            className={`group nav-link ${pathname === '/delivery/orders' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}
-                                                        >
-                                                            <div className="flex items-center">
-                                                                <IconMenuNotes className="shrink-0 group-hover:!text-primary" />
-                                                                <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Orders</span>
-                                                            </div>
-                                                        </Link>
-                                                    </li>
-                                                    <li>
-                                                        <Link
-                                                            href="/delivery/shops"
-                                                            className={`group nav-link ${pathname === '/delivery/shops' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}
-                                                        >
-                                                            <div className="flex items-center">
-                                                                <IconBuilding className="shrink-0 group-hover:!text-primary" />
-                                                                <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Shops</span>
-                                                            </div>
-                                                        </Link>
-                                                    </li>
-                                                </ul>
-                                            </AnimateHeight>
-                                        </li>
-                                    )}
-                                    {/* Revenue section - only visible to shop roles and super admin */}
-                                    {(user?.role_name === 'super_admin' || (user?.shops && user.shops.length > 0)) && (
+                                    {/* Orders section - Available to all roles */}
+                                    <li className="nav-item">
+                                        <Link href="/orders" className={`group ${pathname === '/orders' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}>
+                                            <div className="flex items-center">
+                                                <IconMenuNotes className="shrink-0 group-hover:!text-primary" />
+                                                <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">{t('orders')}</span>
+                                            </div>
+                                        </Link>
+                                    </li>
+                                    {/* Delivery section - Available to all roles */}
+                                    <li className="nav-item">
+                                        <button
+                                            type="button"
+                                            className={`${currentMenu === 'delivery' ? 'active' : ''} nav-link group w-full ${pathname?.startsWith('/delivery') ? 'bg-primary/10 text-primary' : ''}`}
+                                            onClick={() => handleMenuClick('delivery')}
+                                        >
+                                            <div className="flex items-center">
+                                                <IconTruck className="shrink-0 group-hover:!text-primary" />
+                                                <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Delivery</span>
+                                            </div>
+                                            <div className={`${currentMenu !== 'delivery' ? 'rotate-90' : ''} ltr:ml-auto rtl:mr-auto`}>
+                                                <IconCaretDown className="w-4 h-4" />
+                                            </div>
+                                        </button>
+                                        <AnimateHeight duration={300} height={currentMenu === 'delivery' ? 'auto' : 0}>
+                                            <ul className="sub-menu [&>li>a]:before:content-none [&>li>button]:before:content-none">
+                                                <li>
+                                                    <Link
+                                                        href="/delivery/companies"
+                                                        className={`group nav-link ${pathname === '/delivery/companies' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}
+                                                    >
+                                                        <div className="flex items-center">
+                                                            <IconBuilding className="shrink-0 group-hover:!text-primary" />
+                                                            <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Companies</span>
+                                                        </div>
+                                                    </Link>
+                                                </li>
+                                                <li>
+                                                    <Link
+                                                        href="/delivery/cars"
+                                                        className={`group nav-link ${pathname === '/delivery/cars' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}
+                                                    >
+                                                        <div className="flex items-center">
+                                                            <IconTruck className="shrink-0 group-hover:!text-primary" />
+                                                            <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Cars</span>
+                                                        </div>
+                                                    </Link>
+                                                </li>
+                                                <li>
+                                                    <Link
+                                                        href="/delivery/drivers"
+                                                        className={`group nav-link ${pathname === '/delivery/drivers' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}
+                                                    >
+                                                        <div className="flex items-center">
+                                                            <IconUsers className="shrink-0 group-hover:!text-primary" />
+                                                            <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Drivers</span>
+                                                        </div>
+                                                    </Link>
+                                                </li>
+                                                <li>
+                                                    <Link
+                                                        href="/delivery/orders"
+                                                        className={`group nav-link ${pathname === '/delivery/orders' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}
+                                                    >
+                                                        <div className="flex items-center">
+                                                            <IconMenuNotes className="shrink-0 group-hover:!text-primary" />
+                                                            <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Orders</span>
+                                                        </div>
+                                                    </Link>
+                                                </li>
+                                            </ul>
+                                        </AnimateHeight>
+                                    </li>
+                                    {/* Revenue section - Only for super_admin and shop_owner */}
+                                    {user?.role_name === 'super_admin' || user?.role_name === 'shop_owner' ? (
                                         <li className="nav-item">
                                             <Link href="/revenue" className={`group ${pathname === '/revenue' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}>
                                                 <div className="flex items-center">
@@ -441,9 +470,9 @@ const Sidebar = () => {
                                                 </div>
                                             </Link>
                                         </li>
-                                    )}
-                                    {/* Statistics section - only visible to super admin */}
-                                    {user?.role_name === 'super_admin' && (
+                                    ) : null}
+                                    {/* Statistics section - Only for super_admin and shop_owner */}
+                                    {user?.role_name === 'super_admin' || user?.role_name === 'shop_owner' ? (
                                         <li className="nav-item">
                                             <Link href="/statistics" className={`group ${pathname === '/statistics' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}>
                                                 <div className="flex items-center">
@@ -452,9 +481,9 @@ const Sidebar = () => {
                                                 </div>
                                             </Link>
                                         </li>
-                                    )}
-                                    {/* Reports section - only visible to super admin */}
-                                    {user?.role_name === 'super_admin' && (
+                                    ) : null}
+                                    {/* Reports section - Only for super_admin and shop_owner */}
+                                    {user?.role_name === 'super_admin' || user?.role_name === 'shop_owner' ? (
                                         <li className="nav-item">
                                             <Link href="/reports" className={`group ${pathname === '/reports' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}>
                                                 <div className="flex items-center">
@@ -463,25 +492,41 @@ const Sidebar = () => {
                                                 </div>
                                             </Link>
                                         </li>
-                                    )}
+                                    ) : null}
                                 </ul>
                             </li>
 
-                            <h2 className="-mx-4 mb-1 flex items-center bg-white-light/30 px-7 py-3 font-extrabold uppercase dark:bg-dark dark:bg-opacity-[0.08]">
-                                <IconMinus className="hidden h-5 w-4 flex-none" />
-                                <span>{t('user_and_pages')}</span>
-                            </h2>
+                            {/* Users section - Only show if user can see users or customers */}
+                            {(user?.role_name === 'super_admin' || user?.role_name === 'shop_owner') && (
+                                <>
+                                    <h2 className="-mx-4 mb-1 flex items-center bg-white-light/30 px-7 py-3 font-extrabold uppercase dark:bg-dark dark:bg-opacity-[0.08]">
+                                        <IconMinus className="hidden h-5 w-4 flex-none" />
+                                        <span>{t('user_and_pages')}</span>
+                                    </h2>
 
-                            {/* Users section - only visible to admin and owners */}
-                            {(user?.role_name === 'super_admin' || (user?.shops && user.shops.length > 0) || (user?.delivery_companies && user.delivery_companies.length > 0)) && (
-                                <li className="nav-item">
-                                    <Link href="/users" className={`group ${pathname === '/users' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}>
-                                        <div className="flex items-center">
-                                            <IconMenuUsers className="shrink-0 group-hover:!text-primary" />
-                                            <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">{t('users_list')}</span>
-                                        </div>
-                                    </Link>
-                                </li>
+                                    {/* Users section - Only for super_admin and shop_owner */}
+                                    {user?.role_name === 'super_admin' || user?.role_name === 'shop_owner' ? (
+                                        <li className="nav-item">
+                                            <Link href="/users" className={`group ${pathname === '/users' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}>
+                                                <div className="flex items-center">
+                                                    <IconMenuUsers className="shrink-0 group-hover:!text-primary" />
+                                                    <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">{t('users_list')}</span>
+                                                </div>
+                                            </Link>
+                                        </li>
+                                    ) : null}
+                                    {/* Customers List - Only for super_admin */}
+                                    {user?.role_name === 'super_admin' && (
+                                        <li className="nav-item">
+                                            <Link href="/customers" className={`group ${pathname === '/customers' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}>
+                                                <div className="flex items-center">
+                                                    <IconUsers className="shrink-0 group-hover:!text-primary" />
+                                                    <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Customers</span>
+                                                </div>
+                                            </Link>
+                                        </li>
+                                    )}
+                                </>
                             )}
 
                             <h2 className="-mx-4 mb-1 flex items-center bg-white-light/30 px-7 py-3 font-extrabold uppercase dark:bg-dark dark:bg-opacity-[0.08]">
@@ -505,22 +550,28 @@ const Sidebar = () => {
                                     </div>
                                 </Link>
                             </li>
-                            <li className="nav-item">
-                                <Link href="/licenses" className={`group ${pathname === '/licenses' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}>
-                                    <div className="flex items-center">
-                                        <IconMenuDragAndDrop className="shrink-0 group-hover:!text-primary" />
-                                        <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">{t('licenses')}</span>
-                                    </div>
-                                </Link>
-                            </li>
-                            <li className="nav-item">
-                                <Link href="/subscriptions" className={`group ${pathname === '/subscriptions' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}>
-                                    <div className="flex items-center">
-                                        <IconMenuDatatables className="shrink-0 group-hover:!text-primary" />
-                                        <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">{t('subscriptions')}</span>
-                                    </div>
-                                </Link>
-                            </li>
+                            {/* Licenses - Only for super_admin and shop_owner */}
+                            {user?.role_name === 'super_admin' || user?.role_name === 'shop_owner' ? (
+                                <li className="nav-item">
+                                    <Link href="/licenses" className={`group ${pathname === '/licenses' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}>
+                                        <div className="flex items-center">
+                                            <IconMenuDragAndDrop className="shrink-0 group-hover:!text-primary" />
+                                            <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">{t('licenses')}</span>
+                                        </div>
+                                    </Link>
+                                </li>
+                            ) : null}
+                            {/* Subscriptions - Only for super_admin and shop_owner */}
+                            {user?.role_name === 'super_admin' || user?.role_name === 'shop_owner' ? (
+                                <li className="nav-item">
+                                    <Link href="/subscriptions" className={`group ${pathname === '/subscriptions' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}>
+                                        <div className="flex items-center">
+                                            <IconMenuDatatables className="shrink-0 group-hover:!text-primary" />
+                                            <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">{t('subscriptions')}</span>
+                                        </div>
+                                    </Link>
+                                </li>
+                            ) : null}
                         </ul>
                     </PerfectScrollbar>
                 </div>

@@ -10,15 +10,6 @@ interface UserShop {
     };
 }
 
-interface UserDeliveryCompany {
-    id: number;
-    delivery_company_id: number;
-    role: 'delivery_owner' | 'driver';
-    delivery_companies?: {
-        company_name: string;
-    };
-}
-
 interface User {
     id: string;
     email: string;
@@ -27,7 +18,6 @@ interface User {
     role: number; // Changed to reference user_roles.id
     role_name?: string; // We'll get this from the join
     shops: UserShop[];
-    delivery_companies: UserDeliveryCompany[];
 }
 
 export const useAuth = () => {
@@ -76,27 +66,11 @@ export const useAuth = () => {
                             )
                             .eq('user_id', authUser.user.id);
 
-                        // Get user's delivery companies
-                        const { data: userDeliveryCompanies } = await supabase
-                            .from('user_roles_delivery')
-                            .select(
-                                `
-                                id,
-                                delivery_company_id,
-                                role,
-                                delivery_companies!inner (
-                                    company_name
-                                )
-                            `,
-                            )
-                            .eq('user_id', authUser.user.id);
-
                         if (isMounted) {
                             setUser({
                                 ...profile,
                                 role_name: profile.user_roles?.name || 'user',
                                 shops: userShops || [],
-                                delivery_companies: userDeliveryCompanies || [],
                             });
                         }
                     }
@@ -131,17 +105,10 @@ export const useAuth = () => {
         return user.shops.some((shop) => shop.shop_id === shopId);
     };
 
-    const hasDeliveryAccess = (deliveryCompanyId: number): boolean => {
-        if (!user) return false;
-        if (user.role_name === 'super_admin') return true;
-        return user.delivery_companies.some((dc) => dc.delivery_company_id === deliveryCompanyId);
-    };
-
     const canAccessUsers = (): boolean => {
         if (!user) return false;
         if (user.role_name === 'super_admin') return true;
         if (user.shops && user.shops.length > 0) return true;
-        if (user.delivery_companies && user.delivery_companies.length > 0) return true;
         return false;
     };
 
@@ -157,18 +124,14 @@ export const useAuth = () => {
         if (!user) return [];
 
         if (user.role_name === 'super_admin') {
-            return ['super_admin', 'shop_owner', 'shop_editor', 'delivery_owner', 'driver', 'user'];
+            return ['super_admin', 'shop_owner', 'shop_editor'];
         }
 
-        const roles = [];
-        if (user.shops && user.shops.length > 0) {
-            roles.push('shop_owner', 'shop_editor');
-        }
-        if (user.delivery_companies && user.delivery_companies.length > 0) {
-            roles.push('delivery_owner', 'driver');
+        if (user.role_name === 'shop_owner') {
+            return ['shop_editor'];
         }
 
-        return roles;
+        return [];
     };
 
     const getAccessibleUserIds = async (): Promise<string[]> => {
@@ -185,15 +148,6 @@ export const useAuth = () => {
             shopUsers?.forEach((su) => userIds.add(su.user_id));
         }
 
-        // If user has delivery access
-        if (user.delivery_companies && user.delivery_companies.length > 0) {
-            const deliveryCompanyIds = user.delivery_companies.map((dc) => dc.delivery_company_id);
-
-            const { data: deliveryUsers } = await supabase.from('user_roles_delivery').select('user_id').in('delivery_company_id', deliveryCompanyIds);
-
-            deliveryUsers?.forEach((du) => userIds.add(du.user_id));
-        }
-
         return Array.from(userIds);
     };
 
@@ -202,7 +156,6 @@ export const useAuth = () => {
         loading,
         hasRole,
         hasShopAccess,
-        hasDeliveryAccess,
         canAccessUsers,
         canAddUsers,
         canDeleteUsers,

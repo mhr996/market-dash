@@ -34,6 +34,14 @@ const UsersList = () => {
                 name: string;
                 display_name: string;
             };
+            shops?: Array<{
+                id: number;
+                shop_id: number;
+                role: string;
+                shops?: {
+                    shop_name: string;
+                } | null;
+            }>;
         }>
     >([]);
     const [loading, setLoading] = useState(true);
@@ -74,14 +82,27 @@ const UsersList = () => {
             }
 
             try {
-                let query = supabase.from('profiles').select(`
+                let query = supabase
+                    .from('profiles')
+                    .select(
+                        `
                     *,
                     user_roles!inner (
                         id,
                         name,
                         display_name
+                    ),
+                    shops:user_roles_shop!user_roles_shop_user_id_fkey (
+                        id,
+                        shop_id,
+                        role,
+                        shops!inner (
+                            shop_name
+                        )
                     )
-                `);
+                `,
+                    )
+                    .neq('role', 6); // Exclude customers (role=6)
 
                 if (user?.role_name === 'super_admin') {
                     // Super admin sees everyone
@@ -285,109 +306,120 @@ const UsersList = () => {
 
                 <div className="relative">
                     {viewMode === 'grid' ? (
-                        // Card Grid View
-                        <div className="p-5">
+                        // Card Grid View - Redesigned
+                        <div className="p-6">
                             <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
                                 {records.map((user) => (
                                     <div
                                         key={user.id}
-                                        className="group cursor-pointer rounded-lg border border-gray-200 bg-white p-6 shadow-sm transition-all duration-200 hover:shadow-md hover:border-primary dark:border-gray-700 dark:bg-gray-800"
-                                        onClick={() => router.push(`/users/preview/${user.id}`)}
+                                        className="group relative bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-lg transition-shadow duration-200 flex flex-col h-full"
                                     >
-                                        {/* User Avatar and Basic Info */}
-                                        <div className="mb-4 flex items-center space-x-3">
-                                            <div className="relative">
-                                                <img
-                                                    className="h-12 w-12 rounded-full object-cover ring-2 ring-gray-200 dark:ring-gray-600"
-                                                    src={user.avatar_url || `/assets/images/user-placeholder.webp`}
-                                                    alt={user.full_name}
-                                                />
-                                                <div className={`absolute -bottom-1 -right-1 h-4 w-4 rounded-full border-2 border-white ${user.status === 'Active' ? 'bg-green-400' : 'bg-red-400'}`} />
-                                            </div>
-                                            <div className="flex-1 min-w-0">
-                                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">{user.full_name}</h3>
-                                                <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{user.email}</p>
+                                        {/* Header with Avatar and Status */}
+                                        <div className="p-6 pb-4">
+                                            <div className="flex items-center space-x-3">
+                                                <div className="relative">
+                                                    <img
+                                                        className="h-14 w-14 rounded-xl object-cover ring-2 ring-gray-100 dark:ring-gray-700"
+                                                        src={user.avatar_url || `/assets/images/user-placeholder.webp`}
+                                                        alt={user.full_name}
+                                                    />
+                                                    <div
+                                                        className={`absolute -bottom-1 -right-1 h-5 w-5 rounded-full border-2 border-white ${user.status === 'Active' ? 'bg-green-500' : 'bg-red-500'}`}
+                                                    />
+                                                </div>
+                                                <div className="flex-1 min-w-0">
+                                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">{user.full_name}</h3>
+                                                    <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{user.email}</p>
+                                                    <span
+                                                        className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium mt-1 ${
+                                                            user.user_roles?.name === 'super_admin'
+                                                                ? 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                                                                : user.user_roles?.name === 'shop_owner'
+                                                                  ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                                                                  : user.user_roles?.name === 'shop_editor'
+                                                                    ? 'bg-cyan-100 text-cyan-800 dark:bg-cyan-900 dark:text-cyan-200'
+                                                                    : 'bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200'
+                                                        }`}
+                                                    >
+                                                        {user.user_roles?.display_name || 'User'}
+                                                    </span>
+                                                </div>
                                             </div>
                                         </div>
 
                                         {/* User Details */}
-                                        <div className="space-y-2 mb-4">
-                                            <div className="flex items-center justify-between text-sm">
-                                                <span className="text-gray-500 dark:text-gray-400">ID:</span>
-                                                <span className="font-mono text-gray-900 dark:text-white">#{user.id.toString().slice(0, 6)}</span>
-                                            </div>
-                                            <div className="flex items-center justify-between text-sm">
-                                                <span className="text-gray-500 dark:text-gray-400">Status:</span>
-                                                <span
-                                                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                                        user.status === 'Active'
-                                                            ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
-                                                            : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
-                                                    }`}
-                                                >
-                                                    {user.status}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center justify-between text-sm">
-                                                <span className="text-gray-500 dark:text-gray-400">Role:</span>
-                                                <span
-                                                    className={`badge ${
-                                                        user.user_roles?.name === 'super_admin'
-                                                            ? 'badge-danger'
-                                                            : user.user_roles?.name === 'shop_owner'
-                                                              ? 'badge-primary'
-                                                              : user.user_roles?.name === 'delivery_owner'
-                                                                ? 'badge-success'
-                                                                : user.user_roles?.name === 'shop_editor'
-                                                                  ? 'badge-info'
-                                                                  : user.user_roles?.name === 'driver'
-                                                                    ? 'badge-warning'
-                                                                    : 'badge-secondary'
-                                                    }`}
-                                                >
-                                                    {user.user_roles?.display_name || 'User'}
-                                                </span>
-                                            </div>
-                                            <div className="flex items-center justify-between text-sm">
-                                                <span className="text-gray-500 dark:text-gray-400">Joined:</span>
-                                                <span className="text-gray-900 dark:text-white">{user.registration_date ? new Date(user.registration_date).toLocaleDateString('TR') : 'N/A'}</span>
-                                            </div>
-                                            {user.uid && (
+                                        <div className="px-6 pb-4 flex-1">
+                                            <div className="space-y-3">
                                                 <div className="flex items-center justify-between text-sm">
-                                                    <span className="text-gray-500 dark:text-gray-400">UID:</span>
-                                                    <span className="font-mono text-xs text-gray-600 dark:text-gray-400 truncate max-w-20">{user.uid.substring(0, 8)}...</span>
+                                                    <span className="text-gray-500 dark:text-gray-400">Status</span>
+                                                    <span
+                                                        className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+                                                            user.status === 'Active'
+                                                                ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
+                                                                : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
+                                                        }`}
+                                                    >
+                                                        {user.status}
+                                                    </span>
                                                 </div>
-                                            )}
+                                                <div className="flex items-center justify-between text-sm">
+                                                    <span className="text-gray-500 dark:text-gray-400">Joined</span>
+                                                    <span className="text-gray-900 dark:text-white">{user.registration_date ? new Date(user.registration_date).toLocaleDateString('TR') : 'N/A'}</span>
+                                                </div>
+                                                {/* Shop Information for shop roles - Always show this section to maintain consistent height */}
+                                                <div className="pt-2 border-t border-gray-100 dark:border-gray-700">
+                                                    <div className="text-sm text-gray-500 dark:text-gray-400 mb-2">Assigned Shops</div>
+                                                    {(user.user_roles?.name === 'shop_owner' || user.user_roles?.name === 'shop_editor') && user.shops && user.shops.length > 0 ? (
+                                                        <div className="flex flex-wrap gap-1">
+                                                            {user.shops.slice(0, 3).map((shop, index) => (
+                                                                <span
+                                                                    key={index}
+                                                                    className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                                                                >
+                                                                    {shop.shops?.shop_name || `Shop ${shop.shop_id}`}
+                                                                </span>
+                                                            ))}
+                                                            {user.shops.length > 3 && (
+                                                                <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+                                                                    +{user.shops.length - 3}
+                                                                </span>
+                                                            )}
+                                                        </div>
+                                                    ) : (
+                                                        <span className="text-sm text-gray-400">No shops assigned</span>
+                                                    )}
+                                                </div>
+                                            </div>
                                         </div>
 
                                         {/* Action Buttons */}
-                                        <div className="flex items-center justify-between pt-4 border-t border-gray-200 dark:border-gray-600">
-                                            <div className="flex space-x-2">
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setAlert({ visible: true, message: t('cannot_edit_admin_user'), type: 'danger' });
-                                                    }}
-                                                    className="p-2 text-gray-400 hover:text-info transition-colors"
-                                                    title="Edit"
-                                                >
-                                                    <IconEdit className="h-4 w-4" />
-                                                </button>
-                                                <Link
-                                                    href={`/users/preview/${user.id}`}
-                                                    onClick={(e) => e.stopPropagation()}
-                                                    className="p-2 text-gray-400 hover:text-primary transition-colors"
-                                                    title="View"
-                                                >
-                                                    <IconEye className="h-4 w-4" />
-                                                </Link>
+                                        <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700/50 rounded-b-xl">
+                                            <div className="flex items-center justify-between">
+                                                <div className="flex space-x-3">
+                                                    <Link
+                                                        href={`/users/edit/${user.id}`}
+                                                        className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
+                                                        title="Edit User"
+                                                    >
+                                                        <IconEdit className="h-4 w-4 mr-1" />
+                                                        Edit
+                                                    </Link>
+                                                    <Link
+                                                        href={`/users/preview/${user.id}`}
+                                                        className="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-primary border border-transparent rounded-lg hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                                                        title="View User"
+                                                    >
+                                                        <IconEye className="h-4 w-4 mr-1" />
+                                                        View
+                                                    </Link>
+                                                </div>
                                                 <button
                                                     onClick={(e) => {
                                                         e.stopPropagation();
                                                         deleteRow(user.id);
                                                     }}
-                                                    className="p-2 text-gray-400 hover:text-danger transition-colors"
-                                                    title="Delete"
+                                                    className="inline-flex items-center p-2 text-sm font-medium text-red-600 hover:text-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                                                    title="Delete User"
                                                 >
                                                     <IconTrashLines className="h-4 w-4" />
                                                 </button>
@@ -461,11 +493,6 @@ const UsersList = () => {
                                         ),
                                     },
                                     {
-                                        accessor: 'email',
-                                        title: t('email'),
-                                        sortable: true,
-                                    },
-                                    {
                                         accessor: 'user_roles.display_name',
                                         title: 'Role',
                                         sortable: true,
@@ -476,13 +503,9 @@ const UsersList = () => {
                                                         ? 'badge-danger'
                                                         : user_roles?.name === 'shop_owner'
                                                           ? 'badge-primary'
-                                                          : user_roles?.name === 'delivery_owner'
-                                                            ? 'badge-success'
-                                                            : user_roles?.name === 'shop_editor'
-                                                              ? 'badge-info'
-                                                              : user_roles?.name === 'driver'
-                                                                ? 'badge-warning'
-                                                                : 'badge-secondary'
+                                                          : user_roles?.name === 'shop_editor'
+                                                            ? 'badge-info'
+                                                            : 'badge-secondary'
                                                 }`}
                                             >
                                                 {user_roles?.display_name || 'User'}
@@ -490,18 +513,39 @@ const UsersList = () => {
                                         ),
                                     },
                                     {
-                                        accessor: 'uid',
-                                        title: t('uid'),
+                                        accessor: 'email',
+                                        title: t('email'),
                                         sortable: true,
-                                        render: ({ uid }) =>
-                                            uid ? (
-                                                <div className="relative group">
-                                                    <span>{uid.substring(0, 8)}...</span>
-                                                    <div className="absolute z-10 hidden group-hover:block bg-dark text-white text-xs rounded p-2 whitespace-nowrap">{uid}</div>
+                                    },
+                                    {
+                                        accessor: 'shops',
+                                        title: 'Shops',
+                                        sortable: false,
+                                        render: ({ shops, user_roles }) => {
+                                            if (!['shop_owner', 'shop_editor'].includes(user_roles?.name || '')) {
+                                                return <span className="text-gray-400">-</span>;
+                                            }
+                                            if (!shops || shops.length === 0) {
+                                                return <span className="text-gray-400">No shops</span>;
+                                            }
+                                            return (
+                                                <div className="flex flex-wrap gap-1">
+                                                    {shops.slice(0, 2).map((shop: any, index: number) => (
+                                                        <span
+                                                            key={index}
+                                                            className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200"
+                                                        >
+                                                            {shop.shops?.shop_name || `Shop ${shop.shop_id}`}
+                                                        </span>
+                                                    ))}
+                                                    {shops.length > 2 && (
+                                                        <span className="inline-flex items-center px-2 py-1 rounded text-xs font-medium bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
+                                                            +{shops.length - 2}
+                                                        </span>
+                                                    )}
                                                 </div>
-                                            ) : (
-                                                'N/A'
-                                            ),
+                                            );
+                                        },
                                     },
                                     {
                                         accessor: 'registration_date',
@@ -522,15 +566,9 @@ const UsersList = () => {
                                         textAlignment: 'center',
                                         render: ({ id, user_roles }) => (
                                             <div className="mx-auto flex w-max items-center gap-4">
-                                                <div
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setAlert({ visible: true, message: t('cannot_edit_admin_user'), type: 'danger' });
-                                                    }}
-                                                    className="flex hover:text-info"
-                                                >
+                                                <Link href={`/users/edit/${id}`} className="flex hover:text-info" onClick={(e) => e.stopPropagation()}>
                                                     <IconEdit className="h-4.5 w-4.5" />
-                                                </div>
+                                                </Link>
                                                 <Link href={`/users/preview/${id}`} className="flex hover:text-primary" onClick={(e) => e.stopPropagation()}>
                                                     <IconEye />
                                                 </Link>

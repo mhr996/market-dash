@@ -55,6 +55,14 @@ interface DeliveryCompany {
     logo_url: string | null;
 }
 
+interface ShopDeliveryCompany {
+    id: number;
+    shop_id: number;
+    delivery_company_id: number;
+    is_active: boolean;
+    delivery_companies?: DeliveryCompany;
+}
+
 interface ShopSale {
     id: number;
     order_id: string;
@@ -78,13 +86,23 @@ interface ShopTransaction {
     created_by: string | null;
 }
 
+interface ShopOwner {
+    id: number;
+    user_id: string;
+    shop_id: number;
+    role: string;
+    profiles?: {
+        full_name: string;
+        email?: string;
+    };
+}
+
 interface Shop {
     id: number;
     shop_name: string;
     shop_desc: string;
     logo_url: string | null;
     cover_image_url: string | null;
-    owner: string;
     status: string; // Shop status (Pending, Approved, etc.)
     public: boolean; // Controls if shop is public or private
     created_at?: string;
@@ -93,19 +111,15 @@ interface Shop {
     phone_numbers?: string[];
     category_shop_id?: number | null;
     subcategory_shop_id?: number | null;
-    delivery_companies_id?: number | null;
+    delivery_company_ids: number[];
+    // Remove old delivery_companies_id, add new relationship
+    shop_delivery_companies?: ShopDeliveryCompany[];
     gallery?: string[] | null;
     latitude?: number | null; // Geographical location data
     longitude?: number | null; // Geographical location data
     balance?: number; // Shop balance/revenue
     commission_rate?: number; // Commission rate percentage
-    profiles?: {
-        id: string;
-        full_name: string;
-        avatar_url?: string | null;
-        email?: string | null;
-        phone?: string | null;
-    };
+    shop_owners?: ShopOwner[];
     categories_shop?: ShopCategory;
     categories_sub_shop?: ShopSubCategory;
 }
@@ -121,11 +135,6 @@ const ShopPreview = () => {
     const [activeTab, setActiveTab] = useState<'owner' | 'details' | 'revenue' | 'transactions' | 'delivery'>('owner');
     const [shopCategories, setShopCategories] = useState<ShopCategory[]>([]);
     const [shopSubCategories, setShopSubCategories] = useState<ShopSubCategory[]>([]);
-
-    // Delivery company and drivers/cars data
-    const [deliveryCompany, setDeliveryCompany] = useState<DeliveryCompany | null>(null);
-    const [drivers, setDrivers] = useState<any[]>([]);
-    const [cars, setCars] = useState<any[]>([]);
 
     // Pricing data
     const [deliveryPrices, setDeliveryPrices] = useState<{
@@ -195,25 +204,55 @@ const ShopPreview = () => {
     useEffect(() => {
         const fetchShop = async () => {
             try {
-                // Get current user
-                const { data: userData, error: userError } = await supabase.auth.getUser();
-                if (userError) throw userError;
-
-                // Updated query to fetch shop category details
+                console.log('Fetching shop with ID:', id, 'Parsed:', parseInt(id));
+                // Fetch shop with all related data including delivery companies and shop owners
                 const { data, error } = await supabase
                     .from('shops')
                     .select(
                         `
                         *, 
-                        profiles(id, full_name, avatar_url, email, phone), 
-                        categories_shop(*),
-                        categories_sub_shop(*)
+                        categories_shop!category_shop_id(*),
+                        categories_sub_shop!subcategory_shop_id(*),
+                        shop_delivery_companies(
+                            id,
+                            is_active,
+                            delivery_companies(
+                                id,
+                                company_name,
+                                logo_url
+                            )
+                        ),
+                        shop_owners:user_roles_shop(
+                            id,
+                            user_id,
+                            shop_id,
+                            role,
+                            profiles(
+                                full_name,
+                                email
+                            )
+                        )
                     `,
                     )
-                    .eq('id', id)
+                    .eq('id', parseInt(id))
                     .single();
 
-                if (error) throw error;
+                if (error) {
+                    console.error('Shop fetch error:', error);
+                    throw error;
+                }
+
+                console.log('Shop data fetched:', data);
+                console.log('Shop owners:', data.shop_owners);
+                console.log('Shop owners length:', data.shop_owners?.length);
+                console.log('First shop owner:', data.shop_owners?.[0]);
+                console.log('Delivery companies:', data.shop_delivery_companies);
+                console.log('Delivery companies length:', data.shop_delivery_companies?.length);
+                console.log('First delivery company:', data.shop_delivery_companies?.[0]);
+                console.log(
+                    'Active delivery companies:',
+                    data.shop_delivery_companies?.filter((sdc: any) => sdc.is_active),
+                );
 
                 // Fetch commission rate from shop owner's active subscription
                 let commissionRate = 10; // Default commission rate
@@ -240,10 +279,14 @@ const ShopPreview = () => {
                     // No active subscription found, using default commission rate
                 }
 
+                // Process delivery companies data
+                const deliveryCompanyIds = data.shop_delivery_companies?.filter((sdc: any) => sdc.is_active).map((sdc: any) => sdc.delivery_company_id) || [];
+
                 // Add commission rate to shop data
                 const shopWithCommission = {
                     ...data,
                     commission_rate: commissionRate,
+                    delivery_company_ids: deliveryCompanyIds,
                 };
 
                 setShop(shopWithCommission);
@@ -256,85 +299,6 @@ const ShopPreview = () => {
                 if (shopSubCategoriesError) throw shopSubCategoriesError;
                 setShopCategories(shopCategoriesData || []);
                 setShopSubCategories(shopSubCategoriesData || []);
-
-                // Fetch delivery company data if shop has one
-                if (data.delivery_companies_id) {
-                    const { data: deliveryCompanyData, error: deliveryCompanyError } = await supabase
-                        .from('delivery_companies')
-                        .select('id, company_name, logo_url')
-                        .eq('id', data.delivery_companies_id)
-                        .single();
-
-                    if (deliveryCompanyError) throw deliveryCompanyError;
-                    setDeliveryCompany(deliveryCompanyData);
-
-                    // Fetch drivers for this delivery company
-                    const { data: driversData, error: driversError } = await supabase
-                        .from('delivery_drivers')
-                        .select(
-                            `
-                            id,
-                            name,
-                            avatar_url,
-                            phone,
-                            delivery_cars(
-                                id,
-                                plate_number,
-                                brand,
-                                model
-                            )
-                        `,
-                        )
-                        .eq('delivery_companies_id', data.delivery_companies_id);
-
-                    if (driversError) throw driversError;
-                    setDrivers(driversData || []);
-
-                    // Fetch cars for this delivery company
-                    const { data: carsData, error: carsError } = await supabase
-                        .from('delivery_cars')
-                        .select(
-                            `
-                            id,
-                            plate_number,
-                            brand,
-                            model,
-                            color,
-                            capacity,
-                            delivery_drivers(
-                                id,
-                                name,
-                                phone
-                            )
-                        `,
-                        )
-                        .eq('delivery_companies_id', data.delivery_companies_id);
-
-                    if (carsError) throw carsError;
-                    setCars(carsData || []);
-
-                    // Fetch delivery pricing data
-                    const { data: pricingData, error: pricingError } = await supabase
-                        .from('delivery_prices')
-                        .select('express_price, fast_price, standard_price')
-                        .eq('delivery_companies_id', data.delivery_companies_id)
-                        .single();
-
-                    if (!pricingError && pricingData) {
-                        setDeliveryPrices(pricingData);
-                    }
-
-                    // Fetch location-based pricing
-                    const { data: locationPricesData, error: locationPricesError } = await supabase
-                        .from('delivery_location_prices')
-                        .select('id, delivery_location, express_price, fast_price, standard_price')
-                        .eq('delivery_companies_id', data.delivery_companies_id)
-                        .order('delivery_location', { ascending: true });
-
-                    if (!locationPricesError) {
-                        setLocationPrices(locationPricesData || []);
-                    }
-                }
 
                 // Fetch products count
                 const { count: productsCount, error: productsError } = await supabase.from('products').select('id', { count: 'exact' }).eq('shop', data.id);
@@ -371,14 +335,17 @@ const ShopPreview = () => {
                 if (newOrdersError) throw newOrdersError;
                 setNewOrdersCount(newOrders || 0);
             } catch (error) {
+                console.error('Error in fetchShop:', error);
                 setAlert({ visible: true, message: 'Error fetching shop details', type: 'danger' });
             } finally {
                 setLoading(false);
             }
         };
 
-        if (id) {
+        if (id && !isNaN(parseInt(id))) {
             fetchShop();
+        } else {
+            setLoading(false);
         }
     }, [id]);
 
@@ -694,7 +661,25 @@ const ShopPreview = () => {
     }
 
     if (!shop) {
-        return <div className="text-center p-6">Shop not found.</div>;
+        return (
+            <div className="text-center p-6">
+                <div className="mb-4">
+                    <svg className="mx-auto h-12 w-12 text-gray-400" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                        <path
+                            strokeLinecap="round"
+                            strokeLinejoin="round"
+                            strokeWidth={2}
+                            d="M9.172 16.172a4 4 0 015.656 0M9 12h6m-6-4h6m2 5.291A7.962 7.962 0 0112 15c-2.34 0-4.29-1.009-5.824-2.709M15 6.291A7.962 7.962 0 0112 4c-2.34 0-4.29 1.009-5.824 2.709"
+                        />
+                    </svg>
+                </div>
+                <h3 className="text-lg font-medium text-gray-900 dark:text-white mb-2">Shop not found</h3>
+                <p className="text-gray-500 dark:text-gray-400 mb-4">The shop you're looking for doesn't exist or you don't have permission to view it.</p>
+                <button onClick={() => router.back()} className="btn btn-primary">
+                    Go Back
+                </button>
+            </div>
+        );
     }
 
     return (
@@ -795,16 +780,6 @@ const ShopPreview = () => {
                         <div className="flex items-center gap-2">
                             <IconCreditCard className="h-5 w-5" />
                             {t('shop_transactions')}
-                        </div>
-                    </button>
-                    <button
-                        type="button"
-                        className={`p-4 border-b-2 ${activeTab === 'delivery' ? 'border-primary text-primary' : 'border-transparent hover:border-gray-300'}`}
-                        onClick={() => setActiveTab('delivery')}
-                    >
-                        <div className="flex items-center gap-2">
-                            <IconTruck className="h-5 w-5" />
-                            {t('delivery')}
                         </div>
                     </button>
                 </div>
@@ -1005,45 +980,45 @@ const ShopPreview = () => {
 
                 {activeTab === 'owner' && (
                     <>
-                        {/* Owner Information */}
-                        <div className="lg:col-span-1">
+                        {/* Shop Owners Information */}
+                        <div className="lg:col-span-3">
                             <div className="panel h-full">
-                                <div className="mb-5 flex flex-col items-center text-center">
-                                    <div className="mb-5 h-32 w-32 overflow-hidden rounded-full">
-                                        <img src={shop.profiles?.avatar_url || '/assets/images/user-placeholder.webp'} alt={shop.profiles?.full_name} className="h-full w-full object-cover" />
-                                    </div>
-                                    <h5 className="text-xl font-bold text-primary">{shop.profiles?.full_name || 'N/A'}</h5>
-                                    <p className="text-gray-500 dark:text-gray-400">Shop Owner</p>
+                                <div className="mb-5">
+                                    <h5 className="text-lg font-semibold dark:text-white-light">Shop Owners</h5>
+                                    <p className="text-gray-500 dark:text-gray-400">People who have ownership access to this shop</p>
                                 </div>
-                                <div className="space-y-4 border-t border-[#ebedf2] pt-5 dark:border-[#191e3a]">
-                                    <div className="flex items-center">
-                                        <span className="flex h-8 w-8 items-center justify-center rounded-md bg-primary-light text-primary dark:bg-primary dark:text-white-light">
-                                            <IconMail className="h-5 w-5" />
-                                        </span>
-                                        <div className="ltr:ml-3 rtl:mr-3">
-                                            <h5 className="text-sm font-semibold dark:text-white-light">Email</h5>
-                                            <p className="text-gray-500 dark:text-gray-400">{shop.profiles?.email || 'N/A'}</p>
-                                        </div>
+
+                                {shop.shop_owners && shop.shop_owners.length > 0 ? (
+                                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4">
+                                        {shop.shop_owners.map((owner, index) => (
+                                            <div key={index} className="border border-[#ebedf2] dark:border-[#191e3a] rounded-lg p-4">
+                                                <div className="flex items-center space-x-3 mb-3">
+                                                    <div className="h-12 w-12 rounded-full bg-primary/10 flex items-center justify-center">
+                                                        <span className="text-primary font-semibold text-lg">{owner.profiles?.full_name?.charAt(0) || 'U'}</span>
+                                                    </div>
+                                                    <div>
+                                                        <h6 className="font-semibold text-gray-900 dark:text-white">{owner.profiles?.full_name || 'Unknown'}</h6>
+                                                        <p className="text-sm text-gray-500 dark:text-gray-400 capitalize">{owner.role.replace('_', ' ')}</p>
+                                                    </div>
+                                                </div>
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center text-sm">
+                                                        <IconMail className="h-4 w-4 text-gray-400 mr-2" />
+                                                        <span className="text-gray-600 dark:text-gray-300">{owner.profiles?.email || 'N/A'}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+                                        ))}
                                     </div>
-                                    <div className="flex items-center">
-                                        <span className="flex h-8 w-8 items-center justify-center rounded-md bg-success-light text-success dark:bg-success dark:text-white-light">
-                                            <IconPhone className="h-5 w-5" />
-                                        </span>
-                                        <div className="ltr:ml-3 rtl:mr-3">
-                                            <h5 className="text-sm font-semibold dark:text-white-light">Phone</h5>
-                                            <p className="text-gray-500 dark:text-gray-400">{shop.profiles?.phone || 'N/A'}</p>
+                                ) : (
+                                    <div className="text-center py-8">
+                                        <div className="text-gray-400 dark:text-gray-500 mb-2">
+                                            <IconUser className="h-12 w-12 mx-auto" />
                                         </div>
+                                        <h6 className="text-lg font-semibold text-gray-500 dark:text-gray-400">No Owners Assigned</h6>
+                                        <p className="text-gray-400 dark:text-gray-500">This shop doesn't have any owners assigned yet.</p>
                                     </div>
-                                    <div className="flex items-center">
-                                        <span className="flex h-8 w-8 items-center justify-center rounded-md bg-warning-light text-warning dark:bg-warning dark:text-white-light">
-                                            <IconCalendar className="h-5 w-5" />
-                                        </span>
-                                        <div className="ltr:ml-3 rtl:mr-3">
-                                            <h5 className="text-sm font-semibold dark:text-white-light">Registration Date</h5>
-                                            <p className="text-gray-500 dark:text-gray-400">{shop.created_at ? new Date(shop.created_at).toLocaleDateString() : 'N/A'}</p>
-                                        </div>
-                                    </div>
-                                </div>
+                                )}
                             </div>
                         </div>
 
@@ -1489,111 +1464,103 @@ const ShopPreview = () => {
 
                 {activeTab === 'delivery' && (
                     <div className="lg:col-span-3">
-                        {shop?.delivery_companies_id ? (
+                        {shop?.shop_delivery_companies && shop.shop_delivery_companies.length > 0 ? (
                             <div className="panel">
                                 <div className="mb-5">
                                     <h5 className="text-lg font-semibold dark:text-white-light">{t('delivery_company')}</h5>
                                     <p className="text-gray-500 dark:text-gray-400 mt-1">{t('shop_delivery_company_info')}</p>
                                 </div>
 
-                                {/* Delivery Company Info */}
+                                {/* Delivery Companies Info */}
                                 <div className="mb-8">
-                                    <div className="flex items-center mb-4">
-                                        <div className="h-16 w-16 rounded-lg border-2 border-gray-200 overflow-hidden bg-white mr-4">
-                                            <img
-                                                src={deliveryCompany?.logo_url || '/assets/images/company-placeholder.jpg'}
-                                                alt={deliveryCompany?.company_name}
-                                                className="h-full w-full object-cover"
-                                            />
+                                    {shop.shop_delivery_companies && shop.shop_delivery_companies.length > 0 ? (
+                                        <div className="space-y-4">
+                                            {shop.shop_delivery_companies
+                                                .filter((sdc: any) => sdc.is_active)
+                                                .map((sdc) => (
+                                                    <div key={sdc.id} className="flex items-center mb-4 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                                        <div className="h-16 w-16 rounded-lg border-2 border-gray-200 overflow-hidden bg-white mr-4">
+                                                            <img
+                                                                src={sdc.delivery_companies?.logo_url || '/assets/images/company-placeholder.jpg'}
+                                                                alt={sdc.delivery_companies?.company_name}
+                                                                className="h-full w-full object-cover"
+                                                            />
+                                                        </div>
+                                                        <div className="flex-1">
+                                                            <div className="flex items-center space-x-2">
+                                                                <h3 className="text-xl font-bold text-primary">{sdc.delivery_companies?.company_name}</h3>
+                                                            </div>
+                                                            <p className="text-gray-500 dark:text-gray-400">{t('delivery_company')}</p>
+                                                        </div>
+                                                    </div>
+                                                ))}
                                         </div>
-                                        <div>
-                                            <h3 className="text-xl font-bold text-primary">{deliveryCompany?.company_name}</h3>
-                                            <p className="text-gray-500 dark:text-gray-400">{t('delivery_company')}</p>
+                                    ) : (
+                                        <div className="text-center py-8">
+                                            <div className="text-gray-400 mb-2">
+                                                <IconTruck className="h-12 w-12 mx-auto" />
+                                            </div>
+                                            <p className="text-gray-500 dark:text-gray-400">No delivery companies assigned</p>
+                                        </div>
+                                    )}
+                                </div>
+
+                                {/* Delivery Pricing Section - same as edit page but read-only */}
+                                {shop.delivery_company_ids && shop.delivery_company_ids.length > 0 && (
+                                    <div className="mb-8">
+                                        <h6 className="text-lg font-semibold dark:text-white-light mb-4 flex items-center">
+                                            <IconCash className="h-5 w-5 mr-2" />
+                                            Delivery Pricing
+                                        </h6>
+                                        <div className="space-y-6">
+                                            {shop?.shop_delivery_companies
+                                                ?.filter((sdc: any) => sdc.is_active)
+                                                .map((sdc: any) => {
+                                                    const company = sdc.delivery_companies;
+
+                                                    return (
+                                                        <div key={sdc.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4">
+                                                            <div className="flex items-center justify-between mb-4">
+                                                                <div className="flex items-center space-x-3">
+                                                                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                                                        <span className="text-xs font-bold text-primary">{company?.company_name?.charAt(0) || 'D'}</span>
+                                                                    </div>
+                                                                    <h6 className="font-semibold text-gray-900 dark:text-white">{company?.company_name || 'Unknown Company'}</h6>
+                                                                </div>
+                                                            </div>
+
+                                                            <div className="text-center py-8">
+                                                                <p className="text-gray-500 dark:text-gray-400">Delivery pricing information will be displayed here.</p>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                })}
                                         </div>
                                     </div>
-                                </div>
+                                )}
 
                                 {/* Drivers Section */}
                                 <div className="mb-8">
                                     <h6 className="text-lg font-semibold dark:text-white-light mb-4 flex items-center">
                                         <IconUser className="h-5 w-5 mr-2" />
-                                        {t('drivers')} ({drivers.length})
+                                        {t('drivers')} (0)
                                     </h6>
-                                    {drivers.length > 0 ? (
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                            {drivers.map((driver) => (
-                                                <div key={driver.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow">
-                                                    <div className="flex items-center mb-3">
-                                                        <div className="h-12 w-12 rounded-full overflow-hidden mr-3">
-                                                            <img src={driver.avatar_url || '/assets/images/user-placeholder.webp'} alt={driver.name} className="h-full w-full object-cover" />
-                                                        </div>
-                                                        <div className="flex-1">
-                                                            <h6 className="font-semibold text-primary text-lg">{driver.name}</h6>
-                                                            <p className="text-sm text-gray-500 dark:text-gray-400">{driver.phone || 'No phone'}</p>
-                                                        </div>
-                                                    </div>
-                                                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                                                        <p className="mb-2">
-                                                            <span className="font-medium">{t('assigned_car')}:</span>{' '}
-                                                            {driver.delivery_cars && driver.delivery_cars.length > 0 ? driver.delivery_cars[0].plate_number : t('not_assigned')}
-                                                        </p>
-                                                        {driver.delivery_cars && driver.delivery_cars.length > 0 && (
-                                                            <div className="flex flex-wrap gap-1">
-                                                                <span className="inline-block bg-primary/10 text-primary text-xs px-2 py-1 rounded">{driver.delivery_cars[0].brand}</span>
-                                                                <span className="inline-block bg-primary/10 text-primary text-xs px-2 py-1 rounded">{driver.delivery_cars[0].model}</span>
-                                                            </div>
-                                                        )}
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                                            <IconUser className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                                            <p>{t('no_drivers_found')}</p>
-                                        </div>
-                                    )}
+                                    <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                                        <IconUser className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                                        <p>{t('no_drivers_found')}</p>
+                                    </div>
                                 </div>
 
                                 {/* Cars Section */}
                                 <div>
                                     <h6 className="text-lg font-semibold dark:text-white-light mb-4 flex items-center">
                                         <IconCar className="h-5 w-5 mr-2" />
-                                        {t('cars')} ({cars.length})
+                                        {t('cars')} (0)
                                     </h6>
-                                    {cars.length > 0 ? (
-                                        <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-3 gap-4">
-                                            {cars.map((car) => (
-                                                <div key={car.id} className="border border-gray-200 dark:border-gray-700 rounded-lg p-4 hover:shadow-md transition-shadow">
-                                                    <div className="flex items-center mb-3">
-                                                        <div className="h-12 w-12 rounded-md bg-primary-light dark:bg-primary text-primary dark:text-primary-light flex items-center justify-center mr-3">
-                                                            <IconCar className="h-6 w-6" />
-                                                        </div>
-                                                        <div className="flex-1">
-                                                            <h6 className="font-semibold text-primary text-lg">{car.plate_number}</h6>
-                                                            <p className="text-sm text-gray-500 dark:text-gray-400">{car.brand}</p>
-                                                        </div>
-                                                    </div>
-                                                    <div className="text-sm text-gray-600 dark:text-gray-400">
-                                                        <p className="mb-2">
-                                                            <span className="font-medium">{t('assigned_driver')}:</span>{' '}
-                                                            {car.delivery_drivers ? `${car.delivery_drivers.name} - ${car.delivery_drivers.phone || 'No phone'}` : t('not_assigned')}
-                                                        </p>
-                                                        <div className="flex flex-wrap gap-1">
-                                                            <span className="inline-block bg-primary/10 text-primary text-xs px-2 py-1 rounded">{car.model}</span>
-                                                            {car.color && <span className="inline-block bg-primary/10 text-primary text-xs px-2 py-1 rounded">{car.color}</span>}
-                                                            {car.capacity && <span className="inline-block bg-primary/10 text-primary text-xs px-2 py-1 rounded">{car.capacity} seats</span>}
-                                                        </div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        </div>
-                                    ) : (
-                                        <div className="text-center py-8 text-gray-500 dark:text-gray-400">
-                                            <IconCar className="h-12 w-12 mx-auto mb-3 opacity-50" />
-                                            <p>{t('no_cars_found')}</p>
-                                        </div>
-                                    )}
+                                    <div className="text-center py-8 text-gray-500 dark:text-gray-400">
+                                        <IconCar className="h-12 w-12 mx-auto mb-3 opacity-50" />
+                                        <p>{t('no_cars_found')}</p>
+                                    </div>
                                 </div>
 
                                 {/* Pricing Section */}

@@ -21,6 +21,7 @@ import Tabs from '@/components/tabs';
 import 'leaflet/dist/leaflet.css';
 import dynamic from 'next/dynamic';
 import { getTranslation } from '@/i18n';
+import DeliveryPricing from '@/components/delivery/delivery-pricing';
 
 // Import the map component dynamically with no SSR
 const MapSelector = dynamic(() => import('@/components/map/map-selector'), {
@@ -52,10 +53,20 @@ interface DeliveryCompany {
     company_name: string;
 }
 
+interface ShopOwner {
+    id: number;
+    user_id: string;
+    shop_id: number;
+    role: string;
+    profiles?: {
+        full_name: string;
+        email?: string;
+    };
+}
+
 interface Shop {
     id: number;
     created_at: string;
-    owner: string; // This is a UUID string
     shop_name: string;
     shop_desc: string;
     logo_url: string | null;
@@ -68,14 +79,11 @@ interface Shop {
     phone_numbers?: string[];
     category_shop_id?: number | null;
     subcategory_shop_id?: number | null;
-    delivery_companies_id?: number | null;
+    delivery_company_ids: number[];
     gallery?: string[];
     latitude?: number | null;
     longitude?: number | null;
-    profiles?: {
-        full_name: string;
-        email?: string;
-    };
+    shop_owners?: ShopOwner[];
 }
 
 const EditShop = () => {
@@ -97,21 +105,21 @@ const EditShop = () => {
     const [deliveryCompanies, setDeliveryCompanies] = useState<DeliveryCompany[]>([]);
     const [isDeliveryCompanyDropdownOpen, setIsDeliveryCompanyDropdownOpen] = useState(false);
     const [searchDeliveryCompanyTerm, setSearchDeliveryCompanyTerm] = useState('');
-    const deliveryCompanyRef = useRef<HTMLDivElement>(null);
 
-    // Pricing states
-    const [deliveryPrices, setDeliveryPrices] = useState<{
-        express_price: number;
-        fast_price: number;
-        standard_price: number;
-    } | null>(null);
-    const [locationPrices, setLocationPrices] = useState<any[]>([]);
-    const [newLocationPrice, setNewLocationPrice] = useState({
-        location: '',
-        express_price: '',
-        fast_price: '',
-        standard_price: '',
-    });
+    // Shop owners states
+    const [availableOwners, setAvailableOwners] = useState<{ id: string; full_name: string; email?: string }[]>([]);
+    const [isOwnerDropdownOpen, setIsOwnerDropdownOpen] = useState(false);
+    const [searchOwnerTerm, setSearchOwnerTerm] = useState('');
+    const deliveryCompanyRef = useRef<HTMLDivElement>(null);
+    const ownerRef = useRef<HTMLDivElement>(null);
+
+    // State for delivery methods per company
+    const [deliveryMethods, setDeliveryMethods] = useState<{ [companyId: number]: any[] }>({});
+
+    // Delivery pricing states - using the same structure as delivery companies
+    const [deliveryPricing, setDeliveryPricing] = useState<{ [companyId: number]: any[] }>({});
+    const [loadingPricing, setLoadingPricing] = useState<{ [companyId: number]: boolean }>({});
+    const [savingPricing, setSavingPricing] = useState<{ [companyId: number]: boolean }>({});
     const categoryRef = useRef<HTMLDivElement>(null);
     const statusRef = useRef<HTMLDivElement>(null);
 
@@ -121,7 +129,6 @@ const EditShop = () => {
         shop_desc: '',
         logo_url: null,
         cover_image_url: null,
-        owner: '',
         public: true,
         status: 'Approved',
         created_at: '',
@@ -129,6 +136,7 @@ const EditShop = () => {
         phone_numbers: [''],
         category_shop_id: null,
         subcategory_shop_id: null,
+        delivery_company_ids: [],
         gallery: [],
     });
 
@@ -159,6 +167,9 @@ const EditShop = () => {
             if (deliveryCompanyRef.current && !deliveryCompanyRef.current.contains(event.target as Node)) {
                 setIsDeliveryCompanyDropdownOpen(false);
             }
+            if (ownerRef.current && !ownerRef.current.contains(event.target as Node)) {
+                setIsOwnerDropdownOpen(false);
+            }
         };
 
         document.addEventListener('mousedown', handleClickOutside);
@@ -168,8 +179,36 @@ const EditShop = () => {
     // Fetch shop data and categories
     const fetchShopData = async () => {
         try {
-            // Fetch shop data
-            const { data, error } = await supabase.from('shops').select('*, profiles(full_name, email)').eq('id', id).single();
+            // Fetch shop data with delivery companies and shop owners
+            const { data, error } = await supabase
+                .from('shops')
+                .select(
+                    `
+                    *, 
+                    shop_delivery_companies(
+                        id,
+                        delivery_company_id,
+                        is_active,
+                        delivery_companies(
+                            id,
+                            company_name,
+                            logo_url
+                        )
+                    ),
+                    shop_owners:user_roles_shop(
+                        id,
+                        user_id,
+                        shop_id,
+                        role,
+                        profiles(
+                            full_name,
+                            email
+                        )
+                    )
+                `,
+                )
+                .eq('id', id)
+                .single();
             if (error) throw error;
 
             // If work_hours is not set, initialize with default work hours
@@ -187,7 +226,13 @@ const EditShop = () => {
                 data.gallery = [];
             }
 
-            setForm(data);
+            // Process delivery companies data
+            const deliveryCompanyIds = data.shop_delivery_companies?.filter((sdc: any) => sdc.is_active).map((sdc: any) => sdc.delivery_company_id) || [];
+
+            setForm({
+                ...data,
+                delivery_company_ids: deliveryCompanyIds,
+            });
 
             // Fetch shop categories
             const { data: shopCategoriesData, error: shopCategoriesError } = await supabase.from('categories_shop').select('*').order('title', { ascending: true });
@@ -204,10 +249,11 @@ const EditShop = () => {
             if (deliveryCompaniesError) throw deliveryCompaniesError;
             setDeliveryCompanies(deliveryCompaniesData || []);
 
-            // Fetch delivery pricing data if shop has delivery company
-            if (data.delivery_companies_id) {
-                await fetchPricingData(data.delivery_companies_id);
-            }
+            // Fetch available shop owners (profiles with role = 2)
+            const { data: ownersData, error: ownersError } = await supabase.from('profiles').select('id, full_name, email').eq('role', 2).order('full_name', { ascending: true });
+
+            if (ownersError) throw ownersError;
+            setAvailableOwners(ownersData || []);
         } catch (error) {
             setAlert({ visible: true, message: 'Error fetching shop details', type: 'danger' });
         } finally {
@@ -220,6 +266,17 @@ const EditShop = () => {
             fetchShopData();
         }
     }, [id]);
+
+    // Fetch delivery pricing when delivery companies change
+    useEffect(() => {
+        if (form.delivery_company_ids && form.delivery_company_ids.length > 0) {
+            form.delivery_company_ids.forEach((companyId) => {
+                if (!deliveryPricing[companyId]) {
+                    fetchDeliveryPricing(companyId);
+                }
+            });
+        }
+    }, [form.delivery_company_ids]);
 
     const handleInputChange = (e: React.ChangeEvent<HTMLInputElement | HTMLTextAreaElement | HTMLSelectElement>) => {
         const { name, value, type } = e.target;
@@ -300,124 +357,183 @@ const EditShop = () => {
         setAlert({ visible: true, message: error, type: 'danger' });
     };
 
-    // Pricing handlers
-    const handlePricingChange = (field: string, value: string) => {
-        setDeliveryPrices((prev) => ({
-            express_price: prev?.express_price || 0,
-            fast_price: prev?.fast_price || 0,
-            standard_price: prev?.standard_price || 0,
-            [field]: parseFloat(value) || 0,
+    // Owner management functions
+    const addOwner = (ownerId: string) => {
+        const owner = availableOwners.find((o) => o.id === ownerId);
+        if (owner && !form.shop_owners?.some((o) => o.user_id === ownerId)) {
+            setForm((prev) => ({
+                ...prev,
+                shop_owners: [
+                    ...(prev.shop_owners || []),
+                    {
+                        id: 0, // Will be set when saved
+                        user_id: ownerId,
+                        shop_id: parseInt(id),
+                        role: 'shop_owner',
+                        profiles: {
+                            full_name: owner.full_name,
+                            email: owner.email,
+                        },
+                    },
+                ],
+            }));
+        }
+        setIsOwnerDropdownOpen(false);
+        setSearchOwnerTerm('');
+    };
+
+    const removeOwner = (ownerId: string) => {
+        setForm((prev) => ({
+            ...prev,
+            shop_owners: (prev.shop_owners || []).filter((o) => o.user_id !== ownerId),
         }));
     };
 
-    const handleLocationPriceChange = (id: number, field: string, value: string) => {
-        setLocationPrices((prev) => prev.map((price) => (price.id === id ? { ...price, [field]: value } : price)));
-    };
-
-    const addLocationPrice = () => {
-        if (newLocationPrice.location.trim()) {
-            const newPrice = {
-                id: Date.now(), // Temporary ID
-                delivery_location: newLocationPrice.location,
-                express_price: parseFloat(newLocationPrice.express_price) || 0,
-                fast_price: parseFloat(newLocationPrice.fast_price) || 0,
-                standard_price: parseFloat(newLocationPrice.standard_price) || 0,
-            };
-            setLocationPrices((prev) => [...prev, newPrice]);
-            setNewLocationPrice({
-                location: '',
-                express_price: '',
-                fast_price: '',
-                standard_price: '',
-            });
-        }
-    };
-
-    const removeLocationPrice = (id: number) => {
-        setLocationPrices((prev) => prev.filter((price) => price.id !== id));
-    };
-
-    const fetchPricingData = async (deliveryCompanyId: number) => {
+    // Fetch delivery pricing for a specific company
+    const fetchDeliveryPricing = async (companyId: number) => {
         try {
-            // Fetch base pricing
-            const { data: pricingData, error: pricingError } = await supabase
-                .from('delivery_prices')
-                .select('express_price, fast_price, standard_price')
-                .eq('delivery_companies_id', deliveryCompanyId)
-                .single();
+            setLoadingPricing((prev) => ({ ...prev, [companyId]: true }));
 
-            if (!pricingError && pricingData) {
-                setDeliveryPrices(pricingData);
-            } else {
-                // Set default values if no pricing exists
-                setDeliveryPrices({
-                    express_price: 0,
-                    fast_price: 0,
-                    standard_price: 0,
-                });
-            }
+            // Fetch delivery methods for this company
+            const { data: methodsData, error: methodsError } = await supabase
+                .from('delivery_methods')
+                .select(
+                    `
+                    id,
+                    label,
+                    delivery_time,
+                    price,
+                    is_active,
+                    delivery_location_methods(
+                        id,
+                        location_name,
+                        price_addition,
+                        is_active
+                    )
+                `,
+                )
+                .eq('delivery_company_id', companyId)
+                .eq('is_active', true);
 
-            // Fetch location-based pricing
-            const { data: locationPricesData, error: locationPricesError } = await supabase
-                .from('delivery_location_prices')
-                .select('id, delivery_location, express_price, fast_price, standard_price')
-                .eq('delivery_companies_id', deliveryCompanyId)
-                .order('delivery_location', { ascending: true });
+            if (methodsError) throw methodsError;
 
-            if (!locationPricesError) {
-                setLocationPrices(locationPricesData || []);
-            }
+            // Transform the data to match the DeliveryPricing component format
+            const transformedMethods = (methodsData || []).map((method) => ({
+                id: method.id,
+                label: method.label,
+                delivery_time: method.delivery_time,
+                price: method.price,
+                is_active: method.is_active,
+                location_prices: (method.delivery_location_methods || []).map((loc) => ({
+                    id: loc.id,
+                    location_name: loc.location_name,
+                    price_addition: loc.price_addition,
+                    is_active: loc.is_active,
+                })),
+            }));
+
+            setDeliveryPricing((prev) => ({ ...prev, [companyId]: transformedMethods }));
         } catch (error) {
-            setAlert({ visible: true, message: 'Error fetching pricing data', type: 'danger' });
+            console.error('Error fetching delivery pricing:', error);
+            setAlert({ visible: true, message: 'Error fetching delivery pricing', type: 'danger' });
+        } finally {
+            setLoadingPricing((prev) => ({ ...prev, [companyId]: false }));
         }
     };
 
-    const savePricing = async () => {
-        if (!form.delivery_companies_id || !deliveryPrices) return;
-
+    // Save delivery pricing for a specific company
+    const saveDeliveryPricing = async (companyId: number, methods: any[]) => {
         try {
-            setSaving(true);
+            setSavingPricing((prev) => ({ ...prev, [companyId]: true }));
 
-            // Update base pricing
-            const { error: pricingError } = await supabase.from('delivery_prices').update(deliveryPrices).eq('delivery_companies_id', form.delivery_companies_id);
+            // First, deactivate all existing methods for this company
+            await supabase.from('delivery_methods').update({ is_active: false }).eq('delivery_company_id', companyId);
 
-            if (pricingError) throw pricingError;
+            // Then, insert/update the new methods
+            for (const method of methods) {
+                if (method.label.trim() && method.delivery_time.trim()) {
+                    let methodId = method.id;
 
-            // Update location prices
-            for (const locationPrice of locationPrices) {
-                if (locationPrice.id > 1000000) {
-                    // New location price - insert
-                    const { error: insertError } = await supabase.from('delivery_location_prices').insert({
-                        delivery_companies_id: form.delivery_companies_id,
-                        delivery_location: locationPrice.delivery_location,
-                        express_price: locationPrice.express_price,
-                        fast_price: locationPrice.fast_price,
-                        standard_price: locationPrice.standard_price,
-                    });
+                    if (methodId && methodId > 0) {
+                        // Update existing method
+                        const { error: updateError } = await supabase
+                            .from('delivery_methods')
+                            .update({
+                                label: method.label.trim(),
+                                delivery_time: method.delivery_time.trim(),
+                                price: method.price,
+                                is_active: method.is_active,
+                            })
+                            .eq('id', methodId);
 
-                    if (insertError) throw insertError;
-                } else {
-                    // Existing location price - update
-                    const { error: updateError } = await supabase
-                        .from('delivery_location_prices')
-                        .update({
-                            delivery_location: locationPrice.delivery_location,
-                            express_price: locationPrice.express_price,
-                            fast_price: locationPrice.fast_price,
-                            standard_price: locationPrice.standard_price,
-                        })
-                        .eq('id', locationPrice.id);
+                        if (updateError) throw updateError;
+                    } else {
+                        // Insert new method
+                        const { data: newMethod, error: insertError } = await supabase
+                            .from('delivery_methods')
+                            .insert([
+                                {
+                                    delivery_company_id: companyId,
+                                    label: method.label.trim(),
+                                    delivery_time: method.delivery_time.trim(),
+                                    price: method.price,
+                                    is_active: method.is_active,
+                                },
+                            ])
+                            .select()
+                            .single();
 
-                    if (updateError) throw updateError;
+                        if (insertError) throw insertError;
+                        methodId = newMethod.id;
+                    }
+
+                    // Handle location prices for this method
+                    if (method.location_prices && method.location_prices.length > 0) {
+                        // Deactivate existing location prices for this method
+                        await supabase.from('delivery_location_methods').update({ is_active: false }).eq('delivery_method_id', methodId);
+
+                        // Insert/update location prices
+                        for (const locationPrice of method.location_prices) {
+                            if (locationPrice.location_name.trim()) {
+                                if (locationPrice.id && locationPrice.id > 0) {
+                                    // Update existing location price
+                                    await supabase
+                                        .from('delivery_location_methods')
+                                        .update({
+                                            location_name: locationPrice.location_name.trim(),
+                                            price_addition: locationPrice.price_addition,
+                                            is_active: locationPrice.is_active,
+                                        })
+                                        .eq('id', locationPrice.id);
+                                } else {
+                                    // Insert new location price
+                                    await supabase.from('delivery_location_methods').insert([
+                                        {
+                                            delivery_method_id: methodId,
+                                            location_name: locationPrice.location_name.trim(),
+                                            price_addition: locationPrice.price_addition,
+                                            is_active: locationPrice.is_active,
+                                        },
+                                    ]);
+                                }
+                            }
+                        }
+                    }
                 }
             }
 
-            setAlert({ visible: true, message: 'Pricing updated successfully', type: 'success' });
+            setAlert({ visible: true, message: 'Delivery pricing saved successfully', type: 'success' });
         } catch (error) {
-            setAlert({ visible: true, message: 'Error updating pricing', type: 'danger' });
+            console.error('Error saving delivery pricing:', error);
+            setAlert({ visible: true, message: 'Error saving delivery pricing', type: 'danger' });
         } finally {
-            setSaving(false);
+            setSavingPricing((prev) => ({ ...prev, [companyId]: false }));
         }
+    };
+
+    // Handle delivery pricing change for a specific company
+    const handleDeliveryPricingChange = (companyId: number, methods: any[]) => {
+        setDeliveryPricing((prev) => ({ ...prev, [companyId]: methods }));
     };
 
     const removeGalleryImage = async (index: number) => {
@@ -460,7 +576,7 @@ const EditShop = () => {
                 throw new Error('Shop name is required');
             }
 
-            // Create update payload with all fields
+            // Create update payload (without delivery_companies_id)
             const updatePayload = {
                 shop_name: form.shop_name,
                 shop_desc: form.shop_desc,
@@ -473,7 +589,7 @@ const EditShop = () => {
                 phone_numbers: form.phone_numbers?.filter((phone) => phone.trim() !== '') || [],
                 category_shop_id: form.category_shop_id,
                 subcategory_shop_id: form.subcategory_shop_id,
-                delivery_companies_id: form.delivery_companies_id,
+                // Remove delivery_companies_id - will be handled separately
                 gallery: form.gallery,
                 latitude: form.latitude,
                 longitude: form.longitude,
@@ -483,6 +599,52 @@ const EditShop = () => {
             const { error } = await supabase.from('shops').update(updatePayload).eq('id', id);
 
             if (error) throw error;
+
+            // Update delivery company assignments
+            if (form.delivery_company_ids && form.delivery_company_ids.length > 0) {
+                // First, remove all existing assignments
+                await supabase.from('shop_delivery_companies').delete().eq('shop_id', id);
+
+                // Then, insert new assignments
+                const deliveryCompanyAssignments = form.delivery_company_ids.map((companyId) => ({
+                    shop_id: id,
+                    delivery_company_id: companyId,
+                    is_active: true,
+                }));
+
+                const { error: deliveryError } = await supabase.from('shop_delivery_companies').insert(deliveryCompanyAssignments);
+
+                if (deliveryError) {
+                    console.error('Error updating delivery companies:', deliveryError);
+                    // Don't fail the entire operation, just log the error
+                }
+            } else {
+                // If no delivery companies selected, remove all assignments
+                await supabase.from('shop_delivery_companies').delete().eq('shop_id', id);
+            }
+
+            // Update shop owners
+            if (form.shop_owners && form.shop_owners.length > 0) {
+                // First, remove all existing owner assignments
+                await supabase.from('user_roles_shop').delete().eq('shop_id', id).eq('role', 'shop_owner');
+
+                // Then, insert new owner assignments
+                const ownerAssignments = form.shop_owners.map((owner) => ({
+                    user_id: owner.user_id,
+                    shop_id: id,
+                    role: 'shop_owner',
+                }));
+
+                const { error: ownerError } = await supabase.from('user_roles_shop').insert(ownerAssignments);
+
+                if (ownerError) {
+                    console.error('Error updating shop owners:', ownerError);
+                    // Don't fail the entire operation, just log the error
+                }
+            } else {
+                // If no owners selected, remove all owner assignments
+                await supabase.from('user_roles_shop').delete().eq('shop_id', id).eq('role', 'shop_owner');
+            }
 
             // Fetch the updated shop data to confirm changes
             const { data: updatedShop, error: fetchError } = await supabase.from('shops').select('*, profiles(full_name, email)').eq('id', id).single();
@@ -662,12 +824,6 @@ const EditShop = () => {
                                         {t('shop_name')} <span className="text-red-500">*</span>
                                     </label>
                                     <input type="text" id="shop_name" name="shop_name" className="form-input" value={form.shop_name} onChange={handleInputChange} required />
-                                </div>
-                                <div>
-                                    <label htmlFor="owner" className="mb-2 block text-sm font-semibold text-gray-700 dark:text-white">
-                                        {t('shop_owner')}
-                                    </label>
-                                    <input type="text" id="owner" className="form-input bg-[#eee] dark:bg-[#1b2e4b]" value={form.profiles?.full_name || form.owner} disabled />
                                 </div>
                                 <div className="sm:col-span-2">
                                     <label htmlFor="shop_desc" className="mb-2 block text-sm font-semibold text-gray-700 dark:text-white">
@@ -968,17 +1124,46 @@ const EditShop = () => {
                         </div>
 
                         <div className="grid grid-cols-1 gap-6">
-                            {/* Delivery Company Selection */}
-                            <div ref={deliveryCompanyRef} className="relative">
-                                <label htmlFor="delivery_companies_id" className="block text-sm font-bold text-gray-700 dark:text-white">
-                                    {t('delivery_company')}
-                                </label>
-                                <div className="relative">
+                            {/* Delivery Companies Multi-Selection */}
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 dark:text-white mb-2">Delivery Companies</label>
+                                <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">Select one or more delivery companies for this shop.</p>
+
+                                {/* Selected Delivery Companies */}
+                                {form.delivery_company_ids && form.delivery_company_ids.length > 0 && (
+                                    <div className="mb-4">
+                                        <div className="flex flex-wrap gap-2">
+                                            {form.delivery_company_ids.map((companyId) => {
+                                                const company = deliveryCompanies.find((c) => c.id === companyId);
+                                                return (
+                                                    <div key={companyId} className="flex items-center space-x-2 bg-primary/10 text-primary px-3 py-1 rounded-full">
+                                                        <span className="text-sm font-medium">{company?.company_name}</span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setForm((prev) => ({
+                                                                    ...prev,
+                                                                    delivery_company_ids: prev.delivery_company_ids.filter((id) => id !== companyId),
+                                                                }));
+                                                            }}
+                                                            className="text-primary hover:text-red-500"
+                                                        >
+                                                            <IconX className="h-3 w-3" />
+                                                        </button>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Delivery Company Selection Dropdown */}
+                                <div ref={deliveryCompanyRef} className="relative">
                                     <div
                                         className="cursor-pointer rounded border border-[#e0e6ed] bg-white p-2.5 text-dark dark:border-[#191e3a] dark:bg-black dark:text-white-dark flex items-center justify-between"
                                         onClick={() => setIsDeliveryCompanyDropdownOpen(!isDeliveryCompanyDropdownOpen)}
                                     >
-                                        <span>{form.delivery_companies_id ? deliveryCompanies.find((c) => c.id === form.delivery_companies_id)?.company_name : t('select_delivery_company')}</span>
+                                        <span>Select delivery companies...</span>
                                         <IconCaretDown className={`h-4 w-4 transition-transform duration-300 ${isDeliveryCompanyDropdownOpen ? 'rotate-180' : ''}`} />
                                     </div>
 
@@ -988,7 +1173,7 @@ const EditShop = () => {
                                                 <input
                                                     type="text"
                                                     className="w-full rounded border border-[#e0e6ed] p-2 focus:border-primary focus:outline-none dark:border-[#191e3a] dark:bg-black dark:text-white-dark"
-                                                    placeholder={t('search')}
+                                                    placeholder="Search delivery companies..."
                                                     value={searchDeliveryCompanyTerm}
                                                     onChange={(e) => setSearchDeliveryCompanyTerm(e.target.value)}
                                                 />
@@ -997,21 +1182,26 @@ const EditShop = () => {
                                                 {deliveryCompanies
                                                     .filter((company) => company.company_name.toLowerCase().includes(searchDeliveryCompanyTerm.toLowerCase()))
                                                     .map((company) => (
-                                                        <div
-                                                            key={company.id}
-                                                            className="cursor-pointer px-4 py-2 hover:bg-gray-100 dark:text-white-dark dark:hover:bg-[#191e3a]"
-                                                            onClick={async () => {
-                                                                setForm((prev) => ({
-                                                                    ...prev,
-                                                                    delivery_companies_id: company.id,
-                                                                }));
-                                                                setIsDeliveryCompanyDropdownOpen(false);
-
-                                                                // Fetch pricing data for the selected company
-                                                                await fetchPricingData(company.id);
-                                                            }}
-                                                        >
-                                                            {company.company_name}
+                                                        <div key={company.id} className="flex items-center space-x-3 px-4 py-2 hover:bg-gray-100 dark:text-white-dark dark:hover:bg-[#191e3a]">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={form.delivery_company_ids && form.delivery_company_ids.includes(company.id)}
+                                                                onChange={async (e) => {
+                                                                    if (e.target.checked) {
+                                                                        setForm((prev) => ({
+                                                                            ...prev,
+                                                                            delivery_company_ids: [...(prev.delivery_company_ids || []), company.id],
+                                                                        }));
+                                                                    } else {
+                                                                        setForm((prev) => ({
+                                                                            ...prev,
+                                                                            delivery_company_ids: (prev.delivery_company_ids || []).filter((id) => id !== company.id),
+                                                                        }));
+                                                                    }
+                                                                }}
+                                                                className="form-checkbox"
+                                                            />
+                                                            <span className="flex-1">{company.company_name}</span>
                                                         </div>
                                                     ))}
                                             </div>
@@ -1020,222 +1210,162 @@ const EditShop = () => {
                                 </div>
                             </div>
 
-                            {/* Pricing Section - Only show if delivery company is selected */}
-                            {form.delivery_companies_id && (
-                                <div className="mt-8">
-                                    <div className="mb-5">
-                                        <h5 className="text-lg font-semibold dark:text-white-light">{t('delivery_pricing')}</h5>
-                                        <p className="text-gray-500 dark:text-gray-400 mt-1">{t('manage_delivery_prices_for_shop')}</p>
-                                    </div>
-
-                                    {/* Base Pricing */}
-                                    <div className="panel mb-5 w-full max-w-none">
-                                        <div className="mb-5">
-                                            <h5 className="text-lg font-semibold dark:text-white-light">{t('base_delivery_prices')}</h5>
-                                            <p className="text-gray-500 dark:text-gray-400 mt-1">{t('standard_pricing_for_all_locations')}</p>
-                                        </div>
-                                        <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
-                                            <div>
-                                                <label htmlFor="express_price" className="block text-sm font-bold text-gray-700 dark:text-white">
-                                                    Express (Same Day) <span className="text-red-500">*</span>
-                                                </label>
-                                                <div className="relative">
-                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
-                                                    <input
-                                                        type="number"
-                                                        id="express_price"
-                                                        className="form-input pl-8"
-                                                        value={deliveryPrices?.express_price || ''}
-                                                        onChange={(e) => handlePricingChange('express_price', e.target.value)}
-                                                        placeholder="0.00"
-                                                        step="0.01"
-                                                        min="0"
-                                                        required
-                                                    />
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <label htmlFor="fast_price" className="block text-sm font-bold text-gray-700 dark:text-white">
-                                                    Fast (2-3 Days) <span className="text-red-500">*</span>
-                                                </label>
-                                                <div className="relative">
-                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
-                                                    <input
-                                                        type="number"
-                                                        id="fast_price"
-                                                        className="form-input pl-8"
-                                                        value={deliveryPrices?.fast_price || ''}
-                                                        onChange={(e) => handlePricingChange('fast_price', e.target.value)}
-                                                        placeholder="0.00"
-                                                        step="0.01"
-                                                        min="0"
-                                                        required
-                                                    />
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <label htmlFor="standard_price" className="block text-sm font-bold text-gray-700 dark:text-white">
-                                                    Standard (3-5 Days) <span className="text-red-500">*</span>
-                                                </label>
-                                                <div className="relative">
-                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
-                                                    <input
-                                                        type="number"
-                                                        id="standard_price"
-                                                        className="form-input pl-8"
-                                                        value={deliveryPrices?.standard_price || ''}
-                                                        onChange={(e) => handlePricingChange('standard_price', e.target.value)}
-                                                        placeholder="0.00"
-                                                        step="0.01"
-                                                        min="0"
-                                                        required
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Location Based Prices */}
-                                    <div className="panel">
-                                        <div className="mb-5">
-                                            <h5 className="text-lg font-semibold dark:text-white-light">{t('location_based_prices')}</h5>
-                                            <p className="text-gray-500 dark:text-gray-400 mt-1">{t('set_specific_prices_for_locations')}</p>
-                                        </div>
-
-                                        {/* Add New Location Price */}
-                                        <div className="mb-6 p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
-                                            <h6 className="text-md font-semibold mb-4">{t('add_new_location_price')}</h6>
-                                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 dark:text-white mb-1">{t('location_name')}</label>
-                                                    <input
-                                                        type="text"
-                                                        className="form-input"
-                                                        placeholder={t('enter_location_name')}
-                                                        value={newLocationPrice.location}
-                                                        onChange={(e) => setNewLocationPrice((prev) => ({ ...prev, location: e.target.value }))}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 dark:text-white mb-1">Express ($)</label>
-                                                    <input
-                                                        type="number"
-                                                        className="form-input"
-                                                        placeholder="0.00"
-                                                        step="0.01"
-                                                        min="0"
-                                                        value={newLocationPrice.express_price}
-                                                        onChange={(e) => setNewLocationPrice((prev) => ({ ...prev, express_price: e.target.value }))}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 dark:text-white mb-1">Fast ($)</label>
-                                                    <input
-                                                        type="number"
-                                                        className="form-input"
-                                                        placeholder="0.00"
-                                                        step="0.01"
-                                                        min="0"
-                                                        value={newLocationPrice.fast_price}
-                                                        onChange={(e) => setNewLocationPrice((prev) => ({ ...prev, fast_price: e.target.value }))}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 dark:text-white mb-1">Standard ($)</label>
-                                                    <input
-                                                        type="number"
-                                                        className="form-input"
-                                                        placeholder="0.00"
-                                                        step="0.01"
-                                                        min="0"
-                                                        value={newLocationPrice.standard_price}
-                                                        onChange={(e) => setNewLocationPrice((prev) => ({ ...prev, standard_price: e.target.value }))}
-                                                    />
-                                                </div>
-                                                <div className="flex items-end">
-                                                    <button type="button" className="btn btn-primary w-full" onClick={addLocationPrice}>
-                                                        <IconPlus className="h-4 w-4 mr-1" />
-                                                        {t('add')}
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Existing Location Prices */}
-                                        <div className="grid grid-cols-1 gap-6">
-                                            {locationPrices.map((locationPrice, index) => (
-                                                <div key={locationPrice.id} className="border border-gray-200 dark:border-gray-700 rounded-md p-4">
-                                                    <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
-                                                        <div className="flex items-center flex-1">
-                                                            <h6 className="text-lg font-semibold min-w-[120px]">
-                                                                {t('location')} {index + 1}
-                                                            </h6>
-                                                            <input
-                                                                type="text"
-                                                                className="form-input flex-1 ml-4"
-                                                                placeholder={t('enter_location_name')}
-                                                                value={locationPrice.delivery_location}
-                                                                onChange={(e) => handleLocationPriceChange(locationPrice.id, 'delivery_location', e.target.value)}
-                                                            />
+                            {/* Delivery Companies Summary */}
+                            {form.delivery_company_ids && form.delivery_company_ids.length > 0 && (
+                                <div className="mt-6 p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                    <h6 className="text-sm font-semibold text-gray-700 dark:text-white mb-3">Selected Delivery Companies ({form.delivery_company_ids.length})</h6>
+                                    <div className="space-y-2">
+                                        {form.delivery_company_ids.map((companyId) => {
+                                            const company = deliveryCompanies.find((c) => c.id === companyId);
+                                            return (
+                                                <div key={companyId} className="flex items-center justify-between p-2 bg-white dark:bg-gray-700 rounded border">
+                                                    <div className="flex items-center space-x-3">
+                                                        <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                                            <span className="text-xs font-bold text-primary">{company?.company_name?.charAt(0) || '?'}</span>
                                                         </div>
-                                                        <button type="button" className="btn btn-outline-danger btn-sm" onClick={() => removeLocationPrice(locationPrice.id)}>
+                                                        <span className="text-sm font-medium">{company?.company_name || 'Unknown Company'}</span>
+                                                    </div>
+                                                    <div className="flex items-center space-x-2">
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setForm((prev) => ({
+                                                                    ...prev,
+                                                                    delivery_company_ids: prev.delivery_company_ids.filter((id) => id !== companyId),
+                                                                }));
+                                                            }}
+                                                            className="text-red-500 hover:text-red-700"
+                                                        >
                                                             <IconX className="h-4 w-4" />
                                                         </button>
                                                     </div>
-                                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                                                        <div>
-                                                            <label className="block text-sm font-medium text-gray-700 dark:text-white mb-1">Express ($)</label>
-                                                            <input
-                                                                type="number"
-                                                                className="form-input"
-                                                                placeholder="0.00"
-                                                                step="0.01"
-                                                                min="0"
-                                                                value={locationPrice.express_price}
-                                                                onChange={(e) => handleLocationPriceChange(locationPrice.id, 'express_price', e.target.value)}
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <label className="block text-sm font-medium text-gray-700 dark:text-white mb-1">Fast ($)</label>
-                                                            <input
-                                                                type="number"
-                                                                className="form-input"
-                                                                placeholder="0.00"
-                                                                step="0.01"
-                                                                min="0"
-                                                                value={locationPrice.fast_price}
-                                                                onChange={(e) => handleLocationPriceChange(locationPrice.id, 'fast_price', e.target.value)}
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <label className="block text-sm font-medium text-gray-700 dark:text-white mb-1">Standard ($)</label>
-                                                            <input
-                                                                type="number"
-                                                                className="form-input"
-                                                                placeholder="0.00"
-                                                                step="0.01"
-                                                                min="0"
-                                                                value={locationPrice.standard_price}
-                                                                onChange={(e) => handleLocationPriceChange(locationPrice.id, 'standard_price', e.target.value)}
-                                                            />
+                                                </div>
+                                            );
+                                        })}
+                                    </div>
+                                    <p className="text-xs text-gray-500 dark:text-gray-400 mt-3">💡 Pricing will be configured after shop creation for each delivery company.</p>
+                                </div>
+                            )}
+
+                            {/* Delivery Pricing Section - Only show if delivery companies are selected */}
+                            {form.delivery_company_ids && form.delivery_company_ids.length > 0 && (
+                                <div className="mt-8">
+                                    <div className="mb-5">
+                                        <h5 className="text-lg font-semibold dark:text-white-light">Delivery Pricing</h5>
+                                        <p className="text-gray-500 dark:text-gray-400 mt-1">Configure delivery methods and pricing for each company.</p>
+                                    </div>
+
+                                    {/* Delivery Pricing for Each Company */}
+                                    <div className="space-y-6">
+                                        {form.delivery_company_ids.map((companyId) => {
+                                            const company = deliveryCompanies.find((c) => c.id === companyId);
+                                            const isLoading = loadingPricing[companyId] || false;
+                                            const isSaving = savingPricing[companyId] || false;
+                                            const methods = deliveryPricing[companyId] || [];
+
+                                            return (
+                                                <div key={companyId} className="panel">
+                                                    <div className="mb-4">
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex items-center space-x-3">
+                                                                <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                                                    <span className="text-xs font-bold text-primary">{company?.company_name?.charAt(0) || 'D'}</span>
+                                                                </div>
+                                                                <div>
+                                                                    <h6 className="text-lg font-semibold dark:text-white-light">{company?.company_name || 'Unknown Company'} Pricing</h6>
+                                                                    <p className="text-gray-500 dark:text-gray-400 text-sm">Configure delivery methods and location-based pricing</p>
+                                                                </div>
+                                                            </div>
+                                                            <button type="button" onClick={() => saveDeliveryPricing(companyId, methods)} disabled={isSaving} className="btn btn-primary btn-sm">
+                                                                {isSaving ? 'Saving...' : 'Save Pricing'}
+                                                            </button>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            ))}
-                                        </div>
 
-                                        {/* Save Pricing Button */}
-                                        <div className="mt-6 flex justify-end">
-                                            <button type="button" className="btn btn-primary" onClick={savePricing} disabled={saving}>
-                                                {saving ? t('saving') : t('save_pricing')}
-                                            </button>
-                                        </div>
+                                                    {isLoading ? (
+                                                        <div className="text-center py-8">
+                                                            <div className="inline-block animate-spin rounded-full h-8 w-8 border-b-2 border-primary"></div>
+                                                            <p className="mt-2 text-gray-500 dark:text-gray-400">Loading pricing data...</p>
+                                                        </div>
+                                                    ) : (
+                                                        <DeliveryPricing methods={methods} onChange={(newMethods) => handleDeliveryPricingChange(companyId, newMethods)} disabled={isSaving} />
+                                                    )}
+                                                </div>
+                                            );
+                                        })}
                                     </div>
                                 </div>
                             )}
                         </div>
                     </div>
                 )}
+                {/* Shop Owners Section */}
+                <div className="grid grid-cols-1 gap-6">
+                    <div>
+                        <label className="block text-sm font-bold text-gray-700 dark:text-white mb-2">Shop Owners</label>
+                        <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">Select one or more shop owners for this shop.</p>
+
+                        {/* Selected Shop Owners */}
+                        {form.shop_owners && form.shop_owners.length > 0 && (
+                            <div className="mb-4">
+                                <div className="flex flex-wrap gap-2">
+                                    {form.shop_owners.map((owner) => (
+                                        <div key={owner.user_id} className="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 text-primary rounded-full text-sm">
+                                            <span>{owner.profiles?.full_name || 'Unknown'}</span>
+                                            <button type="button" onClick={() => removeOwner(owner.user_id)} className="hover:text-red-500 transition-colors">
+                                                <IconX className="h-3 w-3" />
+                                            </button>
+                                        </div>
+                                    ))}
+                                </div>
+                            </div>
+                        )}
+
+                        {/* Owner Selection Dropdown */}
+                        <div className="relative" ref={ownerRef}>
+                            <div
+                                className="cursor-pointer rounded border border-[#e0e6ed] bg-white p-2.5 text-dark dark:border-[#191e3a] dark:bg-black dark:text-white-dark flex items-center justify-between"
+                                onClick={() => setIsOwnerDropdownOpen(!isOwnerDropdownOpen)}
+                            >
+                                <span>Select shop owners...</span>
+                                <IconCaretDown className={`h-4 w-4 transition-transform duration-300 ${isOwnerDropdownOpen ? 'rotate-180' : ''}`} />
+                            </div>
+
+                            {isOwnerDropdownOpen && (
+                                <div className="absolute z-50 w-full mt-1 bg-white dark:bg-black border border-[#e0e6ed] dark:border-[#191e3a] rounded shadow-lg">
+                                    <div className="p-2">
+                                        <input
+                                            type="text"
+                                            className="w-full rounded border border-[#e0e6ed] p-2 focus:border-primary focus:outline-none dark:border-[#191e3a] dark:bg-black dark:text-white-dark"
+                                            placeholder="Search owners..."
+                                            value={searchOwnerTerm}
+                                            onChange={(e) => setSearchOwnerTerm(e.target.value)}
+                                        />
+                                    </div>
+                                    <div className="max-h-48 overflow-y-auto">
+                                        {availableOwners
+                                            .filter((owner) => owner.full_name.toLowerCase().includes(searchOwnerTerm.toLowerCase()) && !form.shop_owners?.some((o) => o.user_id === owner.id))
+                                            .map((owner) => (
+                                                <div
+                                                    key={owner.id}
+                                                    className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer flex items-center justify-between"
+                                                    onClick={() => addOwner(owner.id)}
+                                                >
+                                                    <div>
+                                                        <div className="font-medium">{owner.full_name}</div>
+                                                        <div className="text-sm text-gray-500">{owner.email}</div>
+                                                    </div>
+                                                </div>
+                                            ))}
+                                        {availableOwners.filter(
+                                            (owner) => owner.full_name.toLowerCase().includes(searchOwnerTerm.toLowerCase()) && !form.shop_owners?.some((o) => o.user_id === owner.id),
+                                        ).length === 0 && <div className="px-4 py-2 text-gray-500 text-sm">No available owners found</div>}
+                                    </div>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                </div>
                 <div className="flex justify-end gap-4">
                     <button type="button" className="btn btn-outline-danger" onClick={() => router.back()}>
                         Cancel

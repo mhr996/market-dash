@@ -6,6 +6,8 @@ import supabase from '@/lib/supabase';
 import Link from 'next/link';
 import dynamic from 'next/dynamic';
 import { getTranslation } from '@/i18n';
+import { useAuth } from '@/hooks/useAuth';
+import { useRouter } from 'next/navigation';
 
 // Dynamically import ReactApexChart with SSR disabled
 const ReactApexChart = dynamic(() => import('react-apexcharts'), {
@@ -50,6 +52,8 @@ interface Stats {
 }
 
 const HomePage = () => {
+    const { user, loading } = useAuth();
+    const router = useRouter();
     const isDark = useSelector((state: IRootState) => state.themeConfig.theme === 'dark' || state.themeConfig.isDarkMode);
     const isRtl = useSelector((state: IRootState) => state.themeConfig.rtlClass) === 'rtl';
     const [isMounted, setIsMounted] = useState(false);
@@ -77,6 +81,22 @@ const HomePage = () => {
     useEffect(() => {
         setIsMounted(true);
     }, []);
+
+    // Access control
+    useEffect(() => {
+        if (loading) return;
+
+        if (!user || user.role === 6) {
+            router.push('/no-access');
+            return;
+        }
+
+        // Redirect shop_editor to orders page
+        if (user.role_name === 'shop_editor') {
+            router.push('/orders');
+            return;
+        }
+    }, [user, loading, router]);
 
     // Calculate growth percentage
     const calculateGrowth = (current: number, previous: number) => {
@@ -335,6 +355,18 @@ const HomePage = () => {
         const date = item.type === 'user' ? new Date(item.registration_date || item.created_at) : new Date(item.created_at);
         return date.toLocaleDateString('en-US', { year: 'numeric', month: 'short', day: 'numeric' });
     };
+
+    if (loading) {
+        return (
+            <div className="flex items-center justify-center h-64">
+                <div className="animate-spin rounded-full h-32 w-32 border-b-2 border-primary"></div>
+            </div>
+        );
+    }
+
+    if (!user || user.role === 6) {
+        return null;
+    }
 
     return (
         <div>

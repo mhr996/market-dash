@@ -31,7 +31,7 @@ export default async function handler(req, res) {
         }
 
         // Get user data from request body
-        const { email, userData, profileData, role, shop_ids, delivery_company_ids } = req.body;
+        const { email, userData, profileData, role, shop_ids } = req.body;
 
         // Get role ID from role name
         let roleId = 6; // Default to 'user' role (ID 6)
@@ -125,7 +125,7 @@ export default async function handler(req, res) {
             return res.status(400).json({ error: profileOperation.error.message });
         }
 
-        // NEW: Add role assignments to junction tables
+        // Add role assignments to junction tables
         try {
             // Add to shop roles if shop_ids are provided
             if (shop_ids && shop_ids.length > 0 && ['shop_owner', 'shop_editor'].includes(role)) {
@@ -139,22 +139,6 @@ export default async function handler(req, res) {
 
                 if (shopRoleError) {
                     console.error('Error assigning shop roles:', shopRoleError);
-                    // Don't fail the entire operation, just log it
-                }
-            }
-
-            // Add to delivery roles if delivery_company_ids are provided
-            if (delivery_company_ids && delivery_company_ids.length > 0 && ['delivery_owner', 'driver'].includes(role)) {
-                const deliveryAssignments = delivery_company_ids.map((deliveryCompanyId) => ({
-                    user_id: userId,
-                    delivery_company_id: deliveryCompanyId,
-                    role: role,
-                }));
-
-                const { error: deliveryRoleError } = await supabaseAdmin.from('user_roles_delivery').insert(deliveryAssignments);
-
-                if (deliveryRoleError) {
-                    console.error('Error assigning delivery roles:', deliveryRoleError);
                     // Don't fail the entire operation, just log it
                 }
             }

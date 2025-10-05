@@ -485,45 +485,78 @@ const ActionsMenu = ({ orderId, onView, onDownload, onDelete }: { orderId: numbe
 };
 
 // Assignment Modal Component
-const AssignmentModal = ({ order, isOpen, onClose, onAssign }: { order: any; isOpen: boolean; onClose: () => void; onAssign: (driverId: number) => void }) => {
+const AssignmentModal = ({ order, isOpen, onClose, onAssign }: { order: any; isOpen: boolean; onClose: () => void; onAssign: (companyId: number, driverId: number) => void }) => {
+    const [step, setStep] = useState<'company' | 'driver'>('company');
+    const [selectedCompany, setSelectedCompany] = useState<number | null>(null);
     const [selectedDriver, setSelectedDriver] = useState<number | null>(null);
+    const [companies, setCompanies] = useState<any[]>([]);
     const [drivers, setDrivers] = useState<any[]>([]);
     const [loading, setLoading] = useState(false);
 
     useEffect(() => {
         if (order && isOpen) {
-            fetchDrivers();
+            fetchCompanies();
+            setStep('company');
+            setSelectedCompany(null);
+            setSelectedDriver(null);
         }
     }, [order, isOpen]);
 
-    const fetchDrivers = async () => {
+    const fetchCompanies = async () => {
         try {
             setLoading(true);
             // Get the product's shop ID
             const { data: productData } = await supabase.from('products').select('shop').eq('id', order.product_id).single();
 
             if (productData?.shop) {
-                // Get the shop's delivery company
-                const { data: shopData } = await supabase.from('shops').select('delivery_companies_id').eq('id', productData.shop).single();
+                // Get the shop's delivery companies through the junction table
+                const { data: shopDeliveryData } = await supabase
+                    .from('shop_delivery_companies')
+                    .select('delivery_company_id, delivery_companies(company_name)')
+                    .eq('shop_id', productData.shop)
+                    .eq('is_active', true);
 
-                if (shopData?.delivery_companies_id) {
-                    // Fetch drivers for this delivery company
-                    const { data: driversData } = await supabase.from('delivery_drivers').select('id, name, phone, avatar_url').eq('delivery_companies_id', shopData.delivery_companies_id);
-
-                    setDrivers(driversData || []);
-                }
+                setCompanies(shopDeliveryData || []);
             }
         } catch (error) {
-            // Error fetching drivers
+            console.error('Error fetching companies:', error);
         } finally {
             setLoading(false);
         }
     };
 
-    const handleAssign = () => {
-        if (selectedDriver) {
-            onAssign(selectedDriver);
+    const fetchDrivers = async (companyId: number) => {
+        try {
+            setLoading(true);
+            // Fetch drivers for the selected company
+            const { data: driversData, error } = await supabase.from('delivery_drivers').select('id, name, phone, avatar_url, delivery_companies_id').eq('delivery_companies_id', companyId);
+
+            if (error) throw error;
+
+            setDrivers(driversData || []);
+        } catch (error) {
+            console.error('Error fetching drivers:', error);
+        } finally {
+            setLoading(false);
         }
+    };
+
+    const handleCompanySelect = (companyId: number) => {
+        setSelectedCompany(companyId);
+        fetchDrivers(companyId);
+        setStep('driver');
+    };
+
+    const handleAssign = () => {
+        if (selectedCompany && selectedDriver) {
+            onAssign(selectedCompany, selectedDriver);
+        }
+    };
+
+    const handleBack = () => {
+        setStep('company');
+        setSelectedDriver(null);
+        setDrivers([]);
     };
 
     if (!isOpen) return null;
@@ -531,31 +564,64 @@ const AssignmentModal = ({ order, isOpen, onClose, onAssign }: { order: any; isO
     return (
         <div className="fixed inset-0 bg-black bg-opacity-50 flex items-center justify-center z-50">
             <div className="bg-white dark:bg-gray-800 p-6 rounded-lg w-96">
-                <h3 className="text-lg font-semibold mb-4">Assign Driver</h3>
+                <h3 className="text-lg font-semibold mb-4">{step === 'company' ? 'Step 1: Select Delivery Company' : 'Step 2: Select Driver'}</h3>
 
                 {loading ? (
-                    <div>Loading drivers...</div>
+                    <div>Loading...</div>
                 ) : (
                     <div className="space-y-4">
-                        <div>
-                            <label className="block text-sm font-medium mb-2">Select Driver:</label>
-                            <select value={selectedDriver || ''} onChange={(e) => setSelectedDriver(Number(e.target.value))} className="form-select w-full">
-                                <option value="">Choose Driver</option>
-                                {drivers.map((driver) => (
-                                    <option key={driver.id} value={driver.id}>
-                                        {driver.name} - {driver.phone}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
+                        {step === 'company' ? (
+                            <div>
+                                <label className="block text-sm font-medium mb-2">Select Company:</label>
+                                <div className="space-y-2">
+                                    {companies.map((company) => (
+                                        <button
+                                            key={company.delivery_company_id}
+                                            onClick={() => handleCompanySelect(company.delivery_company_id)}
+                                            className="w-full text-left p-3 rounded-lg border border-gray-200 dark:border-gray-700 hover:bg-gray-50 dark:hover:bg-gray-700"
+                                        >
+                                            <div className="font-medium">{company.delivery_companies?.company_name}</div>
+                                        </button>
+                                    ))}
+                                </div>
+                            </div>
+                        ) : (
+                            <div>
+                                <div className="mb-4 p-3 bg-blue-50 dark:bg-blue-900/20 rounded-lg">
+                                    <div className="text-sm text-blue-600 dark:text-blue-400">
+                                        Selected Company: {companies.find((c) => c.delivery_company_id === selectedCompany)?.delivery_companies?.company_name}
+                                    </div>
+                                </div>
+                                <label className="block text-sm font-medium mb-2">Select Driver:</label>
+                                <select value={selectedDriver || ''} onChange={(e) => setSelectedDriver(Number(e.target.value))} className="form-select w-full">
+                                    <option value="">Choose Driver</option>
+                                    {drivers.map((driver) => (
+                                        <option key={driver.id} value={driver.id}>
+                                            {driver.name} - {driver.phone}
+                                        </option>
+                                    ))}
+                                </select>
+                            </div>
+                        )}
 
-                        <div className="flex gap-2 justify-end">
-                            <button onClick={onClose} className="btn btn-outline">
-                                Cancel
-                            </button>
-                            <button onClick={handleAssign} disabled={!selectedDriver} className="btn btn-primary">
-                                Assign Driver
-                            </button>
+                        <div className="flex gap-2 justify-between">
+                            <div>
+                                {step === 'driver' && (
+                                    <button onClick={handleBack} className="btn btn-outline">
+                                        Back
+                                    </button>
+                                )}
+                            </div>
+                            <div className="flex gap-2">
+                                <button onClick={onClose} className="btn btn-outline">
+                                    Cancel
+                                </button>
+                                {step === 'driver' && (
+                                    <button onClick={handleAssign} disabled={!selectedDriver} className="btn btn-primary">
+                                        Assign Driver
+                                    </button>
+                                )}
+                            </div>
                         </div>
                     </div>
                 )}
@@ -575,6 +641,7 @@ interface OrderData {
     shipping_address: any;
     payment_method: any;
     assigned_driver_id?: number;
+    assigned_delivery_company_id?: number;
     confirmed?: boolean;
     total?: string;
     comment?: string;
@@ -588,7 +655,6 @@ interface OrderData {
         shop: number;
         shops?: {
             shop_name: string;
-            delivery_companies_id?: number;
         }[];
     };
     profiles?: {
@@ -601,6 +667,10 @@ interface OrderData {
         name: string;
         phone: string;
         avatar_url?: string;
+    };
+    assigned_delivery_company?: {
+        id: number;
+        company_name: string;
     };
     delivery_methods?: {
         id: number;
@@ -684,7 +754,8 @@ const formatOrderForDisplay = (order: OrderData) => {
         delivery_type: deliveryType,
         assigned_driver_id: order.assigned_driver_id,
         assigned_driver: order.assigned_driver,
-        delivery_company_id: order.products?.shops?.[0]?.delivery_companies_id,
+        assigned_delivery_company_id: order.assigned_delivery_company_id,
+        assigned_delivery_company: order.assigned_delivery_company,
         confirmed: order.confirmed || false,
         comment: order.comment || '',
         delivery_methods: order.delivery_methods,
@@ -889,11 +960,12 @@ const DeliveryOrdersList = () => {
         setOrderToDelete(null);
     };
 
-    const handleAssignDriver = async (orderId: number, driverId: number) => {
+    const handleAssignDriver = async (orderId: number, companyId: number, driverId: number) => {
         try {
             const { error } = await supabase
                 .from('orders')
                 .update({
+                    assigned_delivery_company_id: companyId,
                     assigned_driver_id: driverId,
                     status: 'on_the_way', // Automatically change status to on_the_way when driver is assigned
                 })
@@ -1125,6 +1197,7 @@ const DeliveryOrdersList = () => {
                     products(id, title, price, images, shop),
                     profiles(id, full_name, email),
                     assigned_driver:delivery_drivers(id, name, phone, avatar_url),
+                    assigned_delivery_company:delivery_companies(id, company_name),
                     delivery_methods(id, label, delivery_time, price),
                     delivery_location_methods(id, location_name, price_addition)
                 `,
@@ -1211,8 +1284,8 @@ const DeliveryOrdersList = () => {
                 return;
             }
 
-            // Get shops with their delivery company info
-            const { data: shopsData, error: shopsError } = await supabase.from('shops').select('id, shop_name, delivery_companies_id').in('id', shopIds);
+            // Get shops info (delivery company info no longer needed at shop level)
+            const { data: shopsData, error: shopsError } = await supabase.from('shops').select('id, shop_name').in('id', shopIds);
 
             if (shopsError) throw shopsError;
 
@@ -1288,9 +1361,9 @@ const DeliveryOrdersList = () => {
                         setShowAssignModal(false);
                         setSelectedOrder(null);
                     }}
-                    onAssign={(driverId) => {
+                    onAssign={(companyId, driverId) => {
                         if (selectedOrder) {
-                            handleAssignDriver(selectedOrder.id, driverId);
+                            handleAssignDriver(selectedOrder.id, companyId, driverId);
                         }
                     }}
                 />
@@ -1621,6 +1694,26 @@ const DeliveryOrdersList = () => {
                                         const config = statusConfig[status as keyof typeof statusConfig] || { color: 'bg-gray-100 text-gray-800', label: status };
 
                                         return <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color}`}>{config.label}</span>;
+                                    },
+                                },
+                                {
+                                    accessor: 'assigned_delivery_company',
+                                    title: 'Delivery Company',
+                                    sortable: false,
+                                    render: ({ assigned_delivery_company, id, status }) => {
+                                        if (assigned_delivery_company) {
+                                            return (
+                                                <div className="flex items-center gap-2">
+                                                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                                                        <IconTruck className="h-4 w-4 text-blue-600" />
+                                                    </div>
+                                                    <div className="flex-1">
+                                                        <div className="text-sm font-medium">{assigned_delivery_company.company_name}</div>
+                                                    </div>
+                                                </div>
+                                            );
+                                        }
+                                        return <span className="text-gray-500">-</span>;
                                     },
                                 },
                                 {

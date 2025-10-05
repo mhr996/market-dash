@@ -29,6 +29,18 @@ interface Profile {
     id: string;
     full_name: string;
     avatar_url?: string;
+    email?: string;
+}
+
+interface ShopOwner {
+    id: number;
+    user_id: string;
+    shop_id: number;
+    role: string;
+    profiles?: {
+        full_name: string;
+        email?: string;
+    };
 }
 
 interface ShopCategory {
@@ -64,7 +76,7 @@ const AddShopPage = () => {
         shop_desc: '',
         logo_url: '',
         cover_image_url: '',
-        owner: '',
+        shop_owners: [] as ShopOwner[],
         public: true, // Renamed from active to public - controls shop visibility
         status: 'Approved',
         statusDropdownOpen: false, // Track if status dropdown is open
@@ -73,7 +85,7 @@ const AddShopPage = () => {
         phone_numbers: [''],
         category_shop_id: null as number | null,
         subcategory_shop_id: null as number | null,
-        delivery_companies_id: null as number | null,
+        delivery_company_ids: [] as number[], // Changed to array for multiple selection
         gallery: [] as string[],
         latitude: null as number | null, // Shop location coordinates
         longitude: null as number | null, // Shop location coordinates
@@ -108,6 +120,12 @@ const AddShopPage = () => {
     const [isDeliveryCompanyDropdownOpen, setIsDeliveryCompanyDropdownOpen] = useState(false);
     const [searchDeliveryCompanyTerm, setSearchDeliveryCompanyTerm] = useState('');
     const deliveryCompanyRef = useRef<HTMLDivElement>(null);
+
+    // Shop owners states
+    const [availableOwners, setAvailableOwners] = useState<Profile[]>([]);
+    const [isOwnerDropdownOpen, setIsOwnerDropdownOpen] = useState(false);
+    const [searchOwnerTerm, setSearchOwnerTerm] = useState('');
+    const ownerRef = useRef<HTMLDivElement>(null);
 
     // Pricing states
     const [deliveryPrices, setDeliveryPrices] = useState<{
@@ -170,20 +188,15 @@ const AddShopPage = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                // Get current user
-                const {
-                    data: { user },
-                } = await supabase.auth.getUser();
-                if (user) {
-                    setForm((prev) => ({ ...prev, owner: user.id }));
-                }
+                // Fetch available shop owners (profiles with role = 2)
+                const { data: ownersData, error: ownersError } = await supabase
+                    .from('profiles')
+                    .select('id, full_name, avatar_url')
+                    .eq('role', 2)
+                    .order('full_name', { ascending: true });
 
-                // Fetch all users
-                const { data: profiles, error } = await supabase.from('profiles').select('id, full_name, avatar_url');
-
-                if (error) throw error;
-                setUsers(profiles || []);
-                setFilteredUsers(profiles || []);
+                if (ownersError) throw ownersError;
+                setAvailableOwners(ownersData || []);
 
                 // Fetch all shop categories
                 const { data: shopCategoriesData, error: shopCategoriesError } = await supabase.from('categories_shop').select('*').order('title', { ascending: true });
@@ -206,11 +219,37 @@ const AddShopPage = () => {
         fetchData();
     }, []);
 
-    // Filter users based on search term
-    useEffect(() => {
-        const filtered = users.filter((user) => user.full_name?.toLowerCase().includes(searchTerm.toLowerCase()));
-        setFilteredUsers(filtered);
-    }, [searchTerm, users]); // Handle click outside for user dropdown
+    // Owner management functions
+    const addOwner = (ownerId: string) => {
+        const owner = availableOwners.find((o) => o.id === ownerId);
+        if (owner && !form.shop_owners?.some((o) => o.user_id === ownerId)) {
+            setForm((prev) => ({
+                ...prev,
+                shop_owners: [
+                    ...(prev.shop_owners || []),
+                    {
+                        id: 0, // Will be set when saved
+                        user_id: ownerId,
+                        shop_id: 0, // Will be set when saved
+                        role: 'shop_owner',
+                        profiles: {
+                            full_name: owner.full_name,
+                            email: owner.email || '',
+                        },
+                    },
+                ],
+            }));
+        }
+        setIsOwnerDropdownOpen(false);
+        setSearchOwnerTerm('');
+    };
+
+    const removeOwner = (ownerId: string) => {
+        setForm((prev) => ({
+            ...prev,
+            shop_owners: (prev.shop_owners || []).filter((o) => o.user_id !== ownerId),
+        }));
+    };
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -224,6 +263,9 @@ const AddShopPage = () => {
             }
             if (deliveryCompanyRef.current && !deliveryCompanyRef.current.contains(event.target as Node)) {
                 setIsDeliveryCompanyDropdownOpen(false);
+            }
+            if (ownerRef.current && !ownerRef.current.contains(event.target as Node)) {
+                setIsOwnerDropdownOpen(false);
             }
         };
 
@@ -402,14 +444,14 @@ const AddShopPage = () => {
         e.preventDefault();
         setLoading(true);
 
-        // Basic validation: shop name and owner are required.
+        // Basic validation: shop name and at least one owner are required.
         if (!form.shop_name) {
             setAlert({ visible: true, message: t('shop_name_required'), type: 'danger' });
             setLoading(false);
             return;
         }
-        if (!form.owner) {
-            setAlert({ visible: true, message: t('shop_owner_required'), type: 'danger' });
+        if (!form.shop_owners || form.shop_owners.length === 0) {
+            setAlert({ visible: true, message: 'At least one shop owner is required', type: 'danger' });
             setLoading(false);
             return;
         }
@@ -421,7 +463,6 @@ const AddShopPage = () => {
                 shop_desc: form.shop_desc,
                 logo_url: '', // Will be set after upload
                 cover_image_url: '', // Will be set after upload
-                owner: form.owner,
                 public: form.public,
                 status: form.status,
                 address: form.address,
@@ -429,7 +470,7 @@ const AddShopPage = () => {
                 phone_numbers: form.phone_numbers.filter((phone) => phone.trim() !== ''),
                 category_shop_id: form.category_shop_id,
                 subcategory_shop_id: form.subcategory_shop_id,
-                delivery_companies_id: form.delivery_companies_id,
+                // Remove delivery_companies_id - will be handled separately
                 gallery: form.gallery,
                 latitude: form.latitude,
                 longitude: form.longitude,
@@ -439,6 +480,22 @@ const AddShopPage = () => {
             const { data: newShop, error } = await supabase.from('shops').insert([insertPayload]).select().single();
 
             if (error) throw error;
+
+            // Insert shop owners
+            if (form.shop_owners && form.shop_owners.length > 0) {
+                const ownerAssignments = form.shop_owners.map((owner) => ({
+                    user_id: owner.user_id,
+                    shop_id: newShop.id,
+                    role: 'shop_owner',
+                }));
+
+                const { error: ownerError } = await supabase.from('user_roles_shop').insert(ownerAssignments);
+
+                if (ownerError) {
+                    console.error('Error inserting shop owners:', ownerError);
+                    // Don't fail the entire operation, just log the error
+                }
+            }
 
             // Initialize the improved folder structure for the new shop
             await StorageManager.initializeShopStructure(newShop.id);
@@ -470,6 +527,22 @@ const AddShopPage = () => {
                         cover_image_url: finalCoverUrl,
                     })
                     .eq('id', newShop.id);
+            }
+
+            // Assign delivery companies to the shop
+            if (form.delivery_company_ids.length > 0) {
+                const deliveryCompanyAssignments = form.delivery_company_ids.map((companyId) => ({
+                    shop_id: newShop.id,
+                    delivery_company_id: companyId,
+                    is_active: true,
+                }));
+
+                const { error: deliveryError } = await supabase.from('shop_delivery_companies').insert(deliveryCompanyAssignments);
+
+                if (deliveryError) {
+                    console.error('Error assigning delivery companies:', deliveryError);
+                    // Don't fail the entire operation, just log the error
+                }
             }
 
             setAlert({ visible: true, message: t('shop_added_successfully'), type: 'success' });
@@ -624,49 +697,85 @@ const AddShopPage = () => {
                                         rows={4}
                                     />
                                 </div>
-                                <div className="relative" ref={dropdownRef}>
-                                    <label htmlFor="owner" className="block text-sm font-bold text-gray-700 dark:text-white">
-                                        {t('shop_owner')} <span className="text-red-500">*</span>
-                                    </label>{' '}
-                                    <div className="relative">
-                                        <input
-                                            type="text"
-                                            placeholder={t('search_users')}
-                                            className="form-input pr-8"
-                                            value={searchTerm}
-                                            onChange={(e) => {
-                                                setSearchTerm(e.target.value);
-                                                setShowDropdown(true);
-                                            }}
-                                            onFocus={() => setShowDropdown(true)}
-                                        />
-                                        {searchTerm && (
-                                            <button type="button" className="absolute right-2 top-1/2 -translate-y-1/2 hover:text-danger" onClick={handleClearSearch}>
-                                                <IconX className="h-4 w-4" />
-                                            </button>
-                                        )}
-                                        {showDropdown && (
-                                            <div className="absolute z-10 w-full mt-1 bg-white dark:bg-[#1b2e4b] border border-[#ebedf2] dark:border-[#191e3a] rounded-md shadow-lg max-h-60 overflow-auto">
-                                                <div className="py-1">
-                                                    {filteredUsers.map((user) => (
-                                                        <div
-                                                            key={user.id}
-                                                            className="flex items-center px-4 py-2 cursor-pointer hover:bg-primary/10 dark:hover:bg-primary/10"
-                                                            onClick={() => {
-                                                                setForm((prev) => ({ ...prev, owner: user.id }));
-                                                                setSearchTerm(user.full_name);
-                                                                setShowDropdown(false);
-                                                            }}
+                                {/* Shop Owners Selection */}
+                                <div>
+                                    <label className="block text-sm font-bold text-gray-700 dark:text-white mb-2">
+                                        Shop Owners <span className="text-red-500">*</span>
+                                    </label>
+                                    <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">Select one or more shop owners for this shop.</p>
+
+                                    {/* Selected Shop Owners */}
+                                    {form.shop_owners && form.shop_owners.length > 0 && (
+                                        <div className="mb-4">
+                                            <div className="flex flex-wrap gap-2">
+                                                {form.shop_owners.map((owner) => (
+                                                    <div
+                                                        key={owner.user_id}
+                                                        className="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 text-primary rounded-full text-sm"
+                                                    >
+                                                        <span>{owner.profiles?.full_name || 'Unknown'}</span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => removeOwner(owner.user_id)}
+                                                            className="hover:text-red-500 transition-colors"
                                                         >
-                                                            <img src={user.avatar_url || '/assets/images/user-placeholder.webp'} alt={user.full_name} className="w-8 h-8 rounded-full mr-2" />
-                                                            <span className="text-black dark:text-white">{user.full_name}</span>
-                                                        </div>
-                                                    ))}
+                                                            <IconX className="h-3 w-3" />
+                                                        </button>
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </div>
+                                    )}
+
+                                    {/* Owner Selection Dropdown */}
+                                    <div className="relative" ref={ownerRef}>
+                                        <div
+                                            className="cursor-pointer rounded border border-[#e0e6ed] bg-white p-2.5 text-dark dark:border-[#191e3a] dark:bg-black dark:text-white-dark flex items-center justify-between"
+                                            onClick={() => setIsOwnerDropdownOpen(!isOwnerDropdownOpen)}
+                                        >
+                                            <span>Select shop owners...</span>
+                                            <IconCaretDown className={`h-4 w-4 transition-transform duration-300 ${isOwnerDropdownOpen ? 'rotate-180' : ''}`} />
+                                        </div>
+
+                                        {isOwnerDropdownOpen && (
+                                            <div className="absolute z-50 w-full mt-1 bg-white dark:bg-black border border-[#e0e6ed] dark:border-[#191e3a] rounded shadow-lg">
+                                                <div className="p-2">
+                                                    <input
+                                                        type="text"
+                                                        className="w-full rounded border border-[#e0e6ed] p-2 focus:border-primary focus:outline-none dark:border-[#191e3a] dark:bg-black dark:text-white-dark"
+                                                        placeholder="Search owners..."
+                                                        value={searchOwnerTerm}
+                                                        onChange={(e) => setSearchOwnerTerm(e.target.value)}
+                                                    />
+                                                </div>
+                                                <div className="max-h-48 overflow-y-auto">
+                                                    {availableOwners
+                                                        .filter((owner) => 
+                                                            owner.full_name.toLowerCase().includes(searchOwnerTerm.toLowerCase()) &&
+                                                            !form.shop_owners?.some((o) => o.user_id === owner.id)
+                                                        )
+                                                        .map((owner) => (
+                                                            <div
+                                                                key={owner.id}
+                                                                className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer flex items-center justify-between"
+                                                                onClick={() => addOwner(owner.id)}
+                                                            >
+                                                                <div>
+                                                                    <div className="font-medium">{owner.full_name}</div>
+                                                                </div>
+                                                            </div>
+                                                        ))}
+                                                    {availableOwners.filter((owner) => 
+                                                        owner.full_name.toLowerCase().includes(searchOwnerTerm.toLowerCase()) &&
+                                                        !form.shop_owners?.some((o) => o.user_id === owner.id)
+                                                    ).length === 0 && (
+                                                        <div className="px-4 py-2 text-gray-500 text-sm">No available owners found</div>
+                                                    )}
                                                 </div>
                                             </div>
                                         )}
                                     </div>
-                                </div>{' '}
+                                </div>
                                 <div ref={categoryRef} className="relative">
                                     <label htmlFor="category_id" className="block text-sm font-bold text-gray-700 dark:text-white">
                                         {t('category')}
@@ -960,17 +1069,46 @@ const AddShopPage = () => {
                         </div>
 
                         <div className="grid grid-cols-1 gap-6">
-                            {/* Delivery Company Selection */}
-                            <div ref={deliveryCompanyRef} className="relative">
-                                <label htmlFor="delivery_companies_id" className="block text-sm font-bold text-gray-700 dark:text-white">
-                                    {t('delivery_company')}
-                                </label>
-                                <div className="relative">
+                            {/* Delivery Companies Multi-Selection */}
+                            <div>
+                                <label className="block text-sm font-bold text-gray-700 dark:text-white mb-2">Delivery Companies</label>
+                                <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">Select one or more delivery companies for this shop. You can mark one as primary.</p>
+
+                                {/* Selected Delivery Companies */}
+                                {form.delivery_company_ids.length > 0 && (
+                                    <div className="mb-4">
+                                        <div className="flex flex-wrap gap-2">
+                                            {form.delivery_company_ids.map((companyId) => {
+                                                const company = deliveryCompanies.find((c) => c.id === companyId);
+                                                return (
+                                                    <div key={companyId} className="flex items-center space-x-2 bg-primary/10 text-primary px-3 py-1 rounded-full">
+                                                        <span className="text-sm font-medium">{company?.company_name}</span>
+                                                        <button
+                                                            type="button"
+                                                            onClick={() => {
+                                                                setForm((prev) => ({
+                                                                    ...prev,
+                                                                    delivery_company_ids: prev.delivery_company_ids.filter((id) => id !== companyId),
+                                                                }));
+                                                            }}
+                                                            className="text-primary hover:text-red-500"
+                                                        >
+                                                            <IconX className="h-3 w-3" />
+                                                        </button>
+                                                    </div>
+                                                );
+                                            })}
+                                        </div>
+                                    </div>
+                                )}
+
+                                {/* Delivery Company Selection Dropdown */}
+                                <div ref={deliveryCompanyRef} className="relative">
                                     <div
                                         className="cursor-pointer rounded border border-[#e0e6ed] bg-white p-2.5 text-dark dark:border-[#191e3a] dark:bg-black dark:text-white-dark flex items-center justify-between"
                                         onClick={() => setIsDeliveryCompanyDropdownOpen(!isDeliveryCompanyDropdownOpen)}
                                     >
-                                        <span>{form.delivery_companies_id ? deliveryCompanies.find((c) => c.id === form.delivery_companies_id)?.company_name : t('select_delivery_company')}</span>
+                                        <span>Select delivery companies...</span>
                                         <IconCaretDown className={`h-4 w-4 transition-transform duration-300 ${isDeliveryCompanyDropdownOpen ? 'rotate-180' : ''}`} />
                                     </div>
 
@@ -980,7 +1118,7 @@ const AddShopPage = () => {
                                                 <input
                                                     type="text"
                                                     className="w-full rounded border border-[#e0e6ed] p-2 focus:border-primary focus:outline-none dark:border-[#191e3a] dark:bg-black dark:text-white-dark"
-                                                    placeholder={t('search')}
+                                                    placeholder="Search delivery companies..."
                                                     value={searchDeliveryCompanyTerm}
                                                     onChange={(e) => setSearchDeliveryCompanyTerm(e.target.value)}
                                                 />
@@ -989,20 +1127,26 @@ const AddShopPage = () => {
                                                 {deliveryCompanies
                                                     .filter((company) => company.company_name.toLowerCase().includes(searchDeliveryCompanyTerm.toLowerCase()))
                                                     .map((company) => (
-                                                        <div
-                                                            key={company.id}
-                                                            className="cursor-pointer px-4 py-2 hover:bg-gray-100 dark:text-white-dark dark:hover:bg-[#191e3a]"
-                                                            onClick={() => {
-                                                                setForm((prev) => ({
-                                                                    ...prev,
-                                                                    delivery_companies_id: company.id,
-                                                                }));
-                                                                setIsDeliveryCompanyDropdownOpen(false);
-                                                                // Fetch pricing data for the selected company
-                                                                fetchPricingData(company.id);
-                                                            }}
-                                                        >
-                                                            {company.company_name}
+                                                        <div key={company.id} className="flex items-center space-x-3 px-4 py-2 hover:bg-gray-100 dark:text-white-dark dark:hover:bg-[#191e3a]">
+                                                            <input
+                                                                type="checkbox"
+                                                                checked={form.delivery_company_ids.includes(company.id)}
+                                                                onChange={(e) => {
+                                                                    if (e.target.checked) {
+                                                                        setForm((prev) => ({
+                                                                            ...prev,
+                                                                            delivery_company_ids: [...prev.delivery_company_ids, company.id],
+                                                                        }));
+                                                                    } else {
+                                                                        setForm((prev) => ({
+                                                                            ...prev,
+                                                                            delivery_company_ids: prev.delivery_company_ids.filter((id) => id !== company.id),
+                                                                        }));
+                                                                    }
+                                                                }}
+                                                                className="form-checkbox"
+                                                            />
+                                                            <span className="flex-1">{company.company_name}</span>
                                                         </div>
                                                     ))}
                                             </div>
@@ -1011,208 +1155,43 @@ const AddShopPage = () => {
                                 </div>
                             </div>
 
-                            {/* Pricing Section - Only show if delivery company is selected */}
-                            {form.delivery_companies_id && (
+                            {/* Pricing Section - Only show if delivery companies are selected */}
+                            {form.delivery_company_ids.length > 0 && (
                                 <div className="mt-8">
                                     <div className="mb-5">
                                         <h5 className="text-lg font-semibold dark:text-white-light">{t('delivery_pricing')}</h5>
                                         <p className="text-gray-500 dark:text-gray-400 mt-1">{t('manage_delivery_prices_for_shop')}</p>
                                     </div>
 
-                                    {/* Base Pricing */}
+                                    {/* Delivery Company Pricing Info */}
                                     <div className="panel mb-5 w-full max-w-none">
                                         <div className="mb-5">
-                                            <h5 className="text-lg font-semibold dark:text-white-light">{t('base_delivery_prices')}</h5>
-                                            <p className="text-gray-500 dark:text-gray-400 mt-1">{t('standard_pricing_for_all_locations')}</p>
-                                        </div>
-                                        <div className="grid grid-cols-1 gap-5 sm:grid-cols-3">
-                                            <div>
-                                                <label htmlFor="express_price" className="block text-sm font-bold text-gray-700 dark:text-white">
-                                                    Express (Same Day) <span className="text-red-500">*</span>
-                                                </label>
-                                                <div className="relative">
-                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
-                                                    <input
-                                                        type="number"
-                                                        id="express_price"
-                                                        className="form-input pl-8"
-                                                        value={deliveryPrices?.express_price || ''}
-                                                        onChange={(e) => handlePricingChange('express_price', e.target.value)}
-                                                        placeholder="0.00"
-                                                        step="0.01"
-                                                        min="0"
-                                                        required
-                                                    />
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <label htmlFor="fast_price" className="block text-sm font-bold text-gray-700 dark:text-white">
-                                                    Fast (2-3 Days) <span className="text-red-500">*</span>
-                                                </label>
-                                                <div className="relative">
-                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
-                                                    <input
-                                                        type="number"
-                                                        id="fast_price"
-                                                        className="form-input pl-8"
-                                                        value={deliveryPrices?.fast_price || ''}
-                                                        onChange={(e) => handlePricingChange('fast_price', e.target.value)}
-                                                        placeholder="0.00"
-                                                        step="0.01"
-                                                        min="0"
-                                                        required
-                                                    />
-                                                </div>
-                                            </div>
-                                            <div>
-                                                <label htmlFor="standard_price" className="block text-sm font-bold text-gray-700 dark:text-white">
-                                                    Standard (3-5 Days) <span className="text-red-500">*</span>
-                                                </label>
-                                                <div className="relative">
-                                                    <span className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500">$</span>
-                                                    <input
-                                                        type="number"
-                                                        id="standard_price"
-                                                        className="form-input pl-8"
-                                                        value={deliveryPrices?.standard_price || ''}
-                                                        onChange={(e) => handlePricingChange('standard_price', e.target.value)}
-                                                        placeholder="0.00"
-                                                        step="0.01"
-                                                        min="0"
-                                                        required
-                                                    />
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    {/* Location Based Prices */}
-                                    <div className="panel">
-                                        <div className="mb-5">
-                                            <h5 className="text-lg font-semibold dark:text-white-light">{t('location_based_prices')}</h5>
-                                            <p className="text-gray-500 dark:text-gray-400 mt-1">{t('set_specific_prices_for_locations')}</p>
+                                            <h5 className="text-lg font-semibold dark:text-white-light">Delivery Company Pricing</h5>
+                                            <p className="text-gray-500 dark:text-gray-400 mt-1">
+                                                Pricing will be configured after shop creation. You can manage delivery company pricing from the shop edit page.
+                                            </p>
                                         </div>
 
-                                        {/* Add New Location Price */}
-                                        <div className="mb-6 p-4 border border-gray-200 dark:border-gray-700 rounded-lg">
-                                            <h6 className="text-md font-semibold mb-4">{t('add_new_location_price')}</h6>
-                                            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-5">
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 dark:text-white mb-1">{t('location_name')}</label>
-                                                    <input
-                                                        type="text"
-                                                        className="form-input"
-                                                        placeholder={t('enter_location_name')}
-                                                        value={newLocationPrice.location}
-                                                        onChange={(e) => setNewLocationPrice((prev) => ({ ...prev, location: e.target.value }))}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 dark:text-white mb-1">Express ($)</label>
-                                                    <input
-                                                        type="number"
-                                                        className="form-input"
-                                                        placeholder="0.00"
-                                                        step="0.01"
-                                                        min="0"
-                                                        value={newLocationPrice.express_price}
-                                                        onChange={(e) => setNewLocationPrice((prev) => ({ ...prev, express_price: e.target.value }))}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 dark:text-white mb-1">Fast ($)</label>
-                                                    <input
-                                                        type="number"
-                                                        className="form-input"
-                                                        placeholder="0.00"
-                                                        step="0.01"
-                                                        min="0"
-                                                        value={newLocationPrice.fast_price}
-                                                        onChange={(e) => setNewLocationPrice((prev) => ({ ...prev, fast_price: e.target.value }))}
-                                                    />
-                                                </div>
-                                                <div>
-                                                    <label className="block text-sm font-medium text-gray-700 dark:text-white mb-1">Standard ($)</label>
-                                                    <input
-                                                        type="number"
-                                                        className="form-input"
-                                                        placeholder="0.00"
-                                                        step="0.01"
-                                                        min="0"
-                                                        value={newLocationPrice.standard_price}
-                                                        onChange={(e) => setNewLocationPrice((prev) => ({ ...prev, standard_price: e.target.value }))}
-                                                    />
-                                                </div>
-                                                <div className="flex items-end">
-                                                    <button type="button" className="btn btn-primary w-full" onClick={addLocationPrice}>
-                                                        <IconPlus className="h-4 w-4 mr-1" />
-                                                        {t('add')}
-                                                    </button>
-                                                </div>
-                                            </div>
-                                        </div>
-
-                                        {/* Existing Location Prices */}
-                                        <div className="grid grid-cols-1 gap-6">
-                                            {locationPrices.map((locationPrice, index) => (
-                                                <div key={locationPrice.id} className="border border-gray-200 dark:border-gray-700 rounded-md p-4">
-                                                    <div className="flex flex-wrap items-center justify-between gap-4 mb-4">
-                                                        <div className="flex items-center flex-1">
-                                                            <h6 className="text-lg font-semibold min-w-[120px]">
-                                                                {t('location')} {index + 1}
-                                                            </h6>
-                                                            <input
-                                                                type="text"
-                                                                className="form-input flex-1 ml-4"
-                                                                placeholder={t('enter_location_name')}
-                                                                value={locationPrice.delivery_location}
-                                                                onChange={(e) => handleLocationPriceChange(locationPrice.id, 'delivery_location', e.target.value)}
-                                                            />
+                                        <div className="space-y-4">
+                                            {form.delivery_company_ids.map((companyId) => {
+                                                const company = deliveryCompanies.find((c) => c.id === companyId);
+                                                return (
+                                                    <div key={companyId} className="flex items-center justify-between p-4 bg-gray-50 dark:bg-gray-800 rounded-lg">
+                                                        <div className="flex items-center space-x-3">
+                                                            <div className="w-10 h-10 bg-primary/10 rounded-full flex items-center justify-center">
+                                                                <span className="text-primary font-semibold">{company?.company_name?.charAt(0) || 'D'}</span>
+                                                            </div>
+                                                            <div>
+                                                                <h6 className="font-semibold text-gray-900 dark:text-white">{company?.company_name || `Company ${companyId}`}</h6>
+                                                                <p className="text-sm text-gray-500 dark:text-gray-400">Delivery company</p>
+                                                            </div>
                                                         </div>
-                                                        <button type="button" className="btn btn-outline-danger btn-sm" onClick={() => removeLocationPrice(locationPrice.id)}>
-                                                            <IconX className="h-4 w-4" />
-                                                        </button>
-                                                    </div>
-                                                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                                                        <div>
-                                                            <label className="block text-sm font-medium text-gray-700 dark:text-white mb-1">Express ($)</label>
-                                                            <input
-                                                                type="number"
-                                                                className="form-input"
-                                                                placeholder="0.00"
-                                                                step="0.01"
-                                                                min="0"
-                                                                value={locationPrice.express_price}
-                                                                onChange={(e) => handleLocationPriceChange(locationPrice.id, 'express_price', e.target.value)}
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <label className="block text-sm font-medium text-gray-700 dark:text-white mb-1">Fast ($)</label>
-                                                            <input
-                                                                type="number"
-                                                                className="form-input"
-                                                                placeholder="0.00"
-                                                                step="0.01"
-                                                                min="0"
-                                                                value={locationPrice.fast_price}
-                                                                onChange={(e) => handleLocationPriceChange(locationPrice.id, 'fast_price', e.target.value)}
-                                                            />
-                                                        </div>
-                                                        <div>
-                                                            <label className="block text-sm font-medium text-gray-700 dark:text-white mb-1">Standard ($)</label>
-                                                            <input
-                                                                type="number"
-                                                                className="form-input"
-                                                                placeholder="0.00"
-                                                                step="0.01"
-                                                                min="0"
-                                                                value={locationPrice.standard_price}
-                                                                onChange={(e) => handleLocationPriceChange(locationPrice.id, 'standard_price', e.target.value)}
-                                                            />
+                                                        <div className="text-right">
+                                                            <span className="text-sm text-gray-500 dark:text-gray-400">Pricing to be configured</span>
                                                         </div>
                                                     </div>
-                                                </div>
-                                            ))}
+                                                );
+                                            })}
                                         </div>
                                     </div>
                                 </div>

@@ -4,7 +4,6 @@ import { useParams, useRouter } from 'next/navigation';
 import Link from 'next/link';
 import supabase from '@/lib/supabase';
 import { Alert } from '@/components/elements/alerts/elements-alerts-default';
-import ImprovedImageUpload from '@/components/image-upload/improved-image-upload';
 import StorageManager from '@/utils/storage-manager';
 import IconArrowLeft from '@/components/icon/icon-arrow-left';
 import { getTranslation } from '@/i18n';
@@ -199,19 +198,76 @@ const EditShopCategory = () => {
 
                 <div>
                     <label className="mb-2 block text-sm font-semibold text-gray-700 dark:text-white">Category Image</label>
-                    <ImprovedImageUpload
-                        type="product"
-                        shopId={1}
-                        currentUrl={previewUrl}
-                        onUploadComplete={(url) => {
-                            if (typeof url === 'string') {
-                                setPreviewUrl(url);
-                                setForm({ ...form, image_url: url });
-                            }
-                        }}
-                        onError={(error) => setAlert({ visible: true, message: error, type: 'danger' })}
-                        buttonLabel="Upload Category Image"
-                    />
+                    <div className="relative">
+                        <div
+                            onClick={() => {
+                                const fileInput = document.createElement('input');
+                                fileInput.type = 'file';
+                                fileInput.accept = 'image/*';
+                                fileInput.onchange = async (e) => {
+                                    const file = (e.target as HTMLInputElement).files?.[0];
+                                    if (file) {
+                                        try {
+                                            setSaving(true);
+                                            // Upload image to shop-categories storage
+                                            const fileExt = file.name.split('.').pop()?.toLowerCase();
+                                            const fileName = `${Date.now()}.${fileExt}`;
+                                            const filePath = `${categoryId}/${fileName}`;
+
+                                            const { data, error } = await supabase.storage.from('shop-categories').upload(filePath, file);
+
+                                            if (error) throw error;
+
+                                            const {
+                                                data: { publicUrl },
+                                            } = supabase.storage.from('shop-categories').getPublicUrl(filePath);
+
+                                            setPreviewUrl(publicUrl);
+                                            setForm({ ...form, image_url: publicUrl });
+                                        } catch (error) {
+                                            setAlert({ visible: true, message: 'Error uploading image', type: 'danger' });
+                                        } finally {
+                                            setSaving(false);
+                                        }
+                                    }
+                                };
+                                fileInput.click();
+                            }}
+                            className="relative flex h-32 w-32 cursor-pointer flex-col items-center justify-center rounded-lg border-2 border-dashed border-gray-300 bg-gray-50 hover:border-primary hover:bg-gray-100 dark:border-[#1b2e4b] dark:bg-black dark:hover:border-primary dark:hover:bg-[#1b2e4b] overflow-hidden"
+                        >
+                            {previewUrl ? (
+                                <>
+                                    <img src={previewUrl} alt="Category" className="h-full w-full rounded-lg object-cover" />
+                                    <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-50 transition-all duration-200 flex items-center justify-center">
+                                        <div className="opacity-0 group-hover:opacity-100 transition-opacity duration-200 text-white text-center">
+                                            <svg className="h-8 w-8 mx-auto mb-2" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                                <path
+                                                    strokeLinecap="round"
+                                                    strokeLinejoin="round"
+                                                    strokeWidth={2}
+                                                    d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+                                                />
+                                                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                            </svg>
+                                        </div>
+                                    </div>
+                                </>
+                            ) : (
+                                <>
+                                    <svg className="mb-2 h-6 w-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={2}
+                                            d="M3 9a2 2 0 012-2h.93a2 2 0 001.664-.89l.812-1.22A2 2 0 0110.07 4h3.86a2 2 0 011.664.89l.812 1.22A2 2 0 0018.07 7H19a2 2 0 012 2v9a2 2 0 01-2 2H5a2 2 0 01-2-2V9z"
+                                        />
+                                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15 13a3 3 0 11-6 0 3 3 0 016 0z" />
+                                    </svg>
+                                    <p className="text-xs text-gray-600 dark:text-gray-400">Upload Category Image</p>
+                                </>
+                            )}
+                        </div>
+                    </div>
                 </div>
 
                 <div className="flex justify-end gap-4">

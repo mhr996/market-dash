@@ -16,6 +16,7 @@ interface Product {
     images: string[];
     category: number | null;
     subcategory_id: number | null;
+    brand_id?: number | null;
     shops: {
         shop_name: string;
         owner: string;
@@ -27,6 +28,12 @@ interface Product {
     categories_sub?: {
         title: string;
         desc: string;
+    };
+    categories_brands?: {
+        id: number;
+        brand: string;
+        description: string;
+        image_url?: string;
     };
     sale_price?: number | null;
     discount_type?: 'percentage' | 'fixed' | null;
@@ -73,7 +80,11 @@ const ProductDetailsPage = ({ params }: ProductDetailsPageProps) => {
     useEffect(() => {
         const fetchProduct = async () => {
             try {
-                const { data, error } = await supabase.from('products').select('*, shops(shop_name, owner), categories(title, desc), categories_sub(title, desc)').eq('id', params.id).single();
+                const { data, error } = await supabase
+                    .from('products')
+                    .select('*, shops(shop_name, owner), categories(title, desc), categories_sub(title, desc), categories_brands!brand_id(*)')
+                    .eq('id', params.id)
+                    .single();
 
                 if (error) throw error;
                 setProduct(data);
@@ -297,6 +308,21 @@ const ProductDetailsPage = ({ params }: ProductDetailsPageProps) => {
                                 <div className="mt-2">
                                     <h4 className="font-medium">{product.categories_sub.title}</h4>
                                     <p className="text-gray-600 dark:text-gray-400">{product.categories_sub.desc}</p>
+                                </div>
+                            </div>
+                        )}
+
+                        {product.categories_brands && (
+                            <div>
+                                <h3 className="text-lg font-semibold">Brand</h3>
+                                <div className="mt-2 flex items-center gap-3">
+                                    {product.categories_brands.image_url && (
+                                        <img src={product.categories_brands.image_url} alt={product.categories_brands.brand} className="h-12 w-12 rounded-lg object-cover" />
+                                    )}
+                                    <div>
+                                        <h4 className="font-medium">{product.categories_brands.brand}</h4>
+                                        <p className="text-gray-600 dark:text-gray-400">{product.categories_brands.description}</p>
+                                    </div>
                                 </div>
                             </div>
                         )}
