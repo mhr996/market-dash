@@ -227,8 +227,8 @@ const DeliveryCompaniesList = () => {
                 <div className="relative">
                     {viewMode === 'grid' ? (
                         // Card Grid View
-                        <div className="p-6">
-                            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                        <div className="p-3">
+                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8">
                                 {initialRecords.slice((page - 1) * pageSize, page * pageSize).map((company) => (
                                     <div
                                         key={company.id}
@@ -236,16 +236,16 @@ const DeliveryCompaniesList = () => {
                                     >
                                         {/* Company Logo */}
                                         <div className="relative">
-                                            <img className="h-48 w-full object-cover rounded-t-xl" src={company.logo_url || `/assets/images/company-placeholder.jpg`} alt={company.company_name} />
+                                            <img className="h-20 w-full object-cover rounded-t-xl" src={company.logo_url || `/assets/images/company-placeholder.jpg`} alt={company.company_name} />
                                         </div>
 
                                         {/* Company Details */}
-                                        <div className="p-6 flex-1">
-                                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 line-clamp-2">{company.company_name}</h3>
-                                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-3 line-clamp-2">Owner: {company.owner_name}</p>
+                                        <div className="p-3 flex-1">
+                                            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1 line-clamp-2">{company.company_name}</h3>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 line-clamp-1">Owner: {company.owner_name}</p>
 
                                             {/* Company Info */}
-                                            <div className="space-y-2 text-sm">
+                                            <div className="space-y-1 text-xs">
                                                 <div className="flex items-center justify-between">
                                                     <span className="text-gray-500 dark:text-gray-400">Methods</span>
                                                     <span className="font-medium">{company.delivery_methods?.length || 0}</span>
@@ -254,31 +254,27 @@ const DeliveryCompaniesList = () => {
                                                     <span className="text-gray-500 dark:text-gray-400">Shops</span>
                                                     <span className="font-medium">{company.shop_delivery_companies?.length || 0}</span>
                                                 </div>
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-gray-500 dark:text-gray-400">Created</span>
-                                                    <span className="font-medium">{new Date(company.created_at || '').toLocaleDateString()}</span>
-                                                </div>
                                             </div>
                                         </div>
 
                                         {/* Action Buttons */}
-                                        <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700/50 rounded-b-xl">
+                                        <div className="px-3 py-2 bg-gray-50 dark:bg-gray-700/50 rounded-b-xl">
                                             <div className="flex items-center justify-between">
-                                                <div className="flex space-x-3">
+                                                <div className="flex space-x-1">
                                                     <Link
                                                         href={`/delivery/companies/edit/${company.id}`}
-                                                        className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
+                                                        className="inline-flex items-center px-2 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-primary dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
                                                         title="Edit Company"
                                                     >
-                                                        <IconEdit className="h-4 w-4 mr-1" />
+                                                        <IconEdit className="h-3 w-3 mr-1" />
                                                         Edit
                                                     </Link>
                                                     <Link
                                                         href={`/delivery/companies/preview/${company.id}`}
-                                                        className="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-primary border border-transparent rounded-lg hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                                                        className="inline-flex items-center px-2 py-1 text-xs font-medium text-white bg-primary border border-transparent rounded hover:bg-primary/90 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-primary"
                                                         title="View Company"
                                                     >
-                                                        <IconEye className="h-4 w-4 mr-1" />
+                                                        <IconEye className="h-3 w-3 mr-1" />
                                                         View
                                                     </Link>
                                                 </div>
@@ -288,10 +284,10 @@ const DeliveryCompaniesList = () => {
                                                         setCompanyToDelete(company);
                                                         setShowConfirmModal(true);
                                                     }}
-                                                    className="inline-flex items-center p-2 text-sm font-medium text-red-600 hover:text-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                                                    className="inline-flex items-center p-1 text-xs font-medium text-red-600 hover:text-red-800 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-red-500"
                                                     title="Delete Company"
                                                 >
-                                                    <IconTrashLines className="h-4 w-4" />
+                                                    <IconTrashLines className="h-3 w-3" />
                                                 </button>
                                             </div>
                                         </div>

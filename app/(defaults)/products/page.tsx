@@ -11,13 +11,16 @@ import { sortBy } from 'lodash';
 import { DataTableSortStatus, DataTable } from 'mantine-datatable';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import supabase from '@/lib/supabase';
 import StorageManager from '@/utils/storage-manager';
 import { Alert } from '@/components/elements/alerts/elements-alerts-default';
 import ConfirmModal from '@/components/modals/confirm-modal';
 import { getTranslation } from '@/i18n';
+import EditProductDialog from './components/EditProductDialog';
 import MultiSelect from '@/components/multi-select';
+import CategoryFilters from '@/components/filters/category-filters';
+import HorizontalFilter from '@/components/filters/horizontal-filter';
 import { useAuth } from '@/hooks/useAuth';
 
 interface Category {
@@ -39,14 +42,17 @@ interface SubCategory {
 interface Product {
     id: string;
     created_at: string;
+    updated_at: string;
     shop: string;
     title: string;
     desc: string;
-    price: string;
+    price: number;
     images: string[];
     category: number | null;
     subcategory_id: number | null;
-    brand_id?: number | null;
+    brand_id: number | null;
+    active: boolean;
+    onsale: boolean;
     shops?: {
         shop_name: string;
     };
@@ -64,7 +70,6 @@ interface Product {
     discount_start?: string | null;
     discount_end?: string | null;
     onSale?: boolean;
-    active: boolean;
 }
 
 const ProductsList = () => {
@@ -122,6 +127,10 @@ const ProductsList = () => {
         message: '',
         type: 'success',
     });
+
+    // Edit dialog state
+    const [showEditDialog, setShowEditDialog] = useState(false);
+    const [productToEdit, setProductToEdit] = useState<Product | null>(null);
 
     useEffect(() => {
         if (authLoading) return;
@@ -248,6 +257,16 @@ const ProductsList = () => {
         }
     };
 
+    const handleEditClick = (product: Product) => {
+        setProductToEdit(product);
+        setShowEditDialog(true);
+    };
+
+    const handleEditSuccess = () => {
+        // Refresh the products list
+        fetchProducts();
+    };
+
     const confirmDeletion = async () => {
         if (!productToDelete) return;
         try {
@@ -301,48 +320,38 @@ const ProductsList = () => {
                     <h3 className="text-lg font-semibold text-black dark:text-white-light">Filters</h3>
                 </div>
 
-                <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+                <div className="space-y-6">
                     {/* Shop Filter */}
                     <div>
                         <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Filter by Shops</label>
-                        <MultiSelect
-                            options={availableShops.map((shop) => ({ id: shop.id, name: shop.shop_name, logo_url: shop.logo_url || undefined }))}
-                            selectedValues={selectedShops}
-                            onChange={setSelectedShops}
-                            placeholder="Select shops"
-                            isRtl={false}
+                        <HorizontalFilter
+                            items={availableShops.map((shop) => ({
+                                id: shop.id,
+                                name: shop.shop_name,
+                                image_url: shop.logo_url || undefined,
+                            }))}
+                            selectedItems={selectedShops}
+                            onSelectionChange={setSelectedShops}
+                            placeholder="No shops available"
+                            showImages={true}
                         />
                     </div>
 
-                    {/* Category Filter */}
-                    <div>
-                        <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Filter by Categories</label>
-                        <MultiSelect
-                            options={availableCategories.map((category) => ({ id: category.id, name: category.title, logo_url: category.image_url || undefined }))}
-                            selectedValues={selectedCategories}
-                            onChange={setSelectedCategories}
-                            placeholder="Select categories"
-                            isRtl={false}
-                        />
-                    </div>
-
-                    {/* Subcategory Filter */}
-                    <div>
-                        <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Filter by Subcategories</label>
-                        <MultiSelect
-                            options={availableSubcategories.map((subcategory) => ({ id: subcategory.id, name: subcategory.title }))}
-                            selectedValues={selectedSubcategories}
-                            onChange={setSelectedSubcategories}
-                            placeholder="Select subcategories"
-                            isRtl={false}
-                        />
-                    </div>
+                    {/* Category and Subcategory Filters */}
+                    <CategoryFilters
+                        categories={availableCategories}
+                        subcategories={availableSubcategories}
+                        selectedCategories={selectedCategories}
+                        selectedSubcategories={selectedSubcategories}
+                        onCategoriesChange={useCallback((categoryIds: number[]) => setSelectedCategories(categoryIds), [])}
+                        onSubcategoriesChange={useCallback((subcategoryIds: number[]) => setSelectedSubcategories(subcategoryIds), [])}
+                    />
 
                     {/* Clear Filters */}
-                    <div className="flex items-end">
+                    <div className="flex justify-end">
                         <button
                             type="button"
-                            className="btn btn-outline-danger w-full"
+                            className="btn btn-outline-danger"
                             onClick={() => {
                                 setSelectedShops([]);
                                 setSelectedCategories([]);
@@ -350,7 +359,7 @@ const ProductsList = () => {
                             }}
                         >
                             <IconX className="h-4 w-4 mr-2" />
-                            Clear Filters
+                            Clear All Filters
                         </button>
                     </div>
                 </div>
@@ -403,8 +412,8 @@ const ProductsList = () => {
                 <div className="relative">
                     {viewMode === 'grid' ? (
                         // Card Grid View
-                        <div className="p-6">
-                            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                        <div className="p-3">
+                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8">
                                 {initialRecords.slice((page - 1) * pageSize, page * pageSize).map((product) => {
                                     let imageList: any[] = [];
                                     imageList = typeof product.images === 'string' ? JSON.parse(product.images || '[]') : product.images;
@@ -416,40 +425,40 @@ const ProductsList = () => {
                                         >
                                             {/* Product Image */}
                                             <div className="relative">
-                                                <img className="h-48 w-full object-cover rounded-t-xl" src={imageList[0] || `/assets/images/product-placeholder.jpg`} alt={product.title} />
+                                                <img className="h-20 w-full object-cover rounded-t-xl" src={imageList[0] || `/assets/images/product-placeholder.jpg`} alt={product.title} />
                                                 {product.onSale && (
-                                                    <div className="absolute top-2 right-2">
-                                                        <span className="bg-orange-500 text-white px-2 py-1 rounded-full text-xs font-medium">ON SALE</span>
+                                                    <div className="absolute top-1 right-1">
+                                                        <span className="bg-orange-500 text-white px-1 py-0.5 rounded-full text-xs font-medium">SALE</span>
                                                     </div>
                                                 )}
                                             </div>
 
                                             {/* Product Details */}
-                                            <div className="p-6 flex-1">
-                                                <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 line-clamp-2">{product.title}</h3>
-                                                <p className="text-sm text-gray-500 dark:text-gray-400 mb-3 line-clamp-2">{product.desc}</p>
+                                            <div className="p-3 flex-1">
+                                                <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1 line-clamp-2">{product.title}</h3>
+                                                <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 line-clamp-1">{product.desc}</p>
 
                                                 {/* Price */}
-                                                <div className="mb-3">
+                                                <div className="mb-2">
                                                     {product.sale_price ? (
-                                                        <div className="flex items-center gap-2">
-                                                            <span className="line-through text-gray-500 text-sm">${parseFloat(product.price).toFixed(2)}</span>
-                                                            <span className="text-lg font-bold text-success">${product.sale_price.toFixed(2)}</span>
+                                                        <div className="flex items-center gap-1">
+                                                            <span className="line-through text-gray-500 text-xs">${product.price.toFixed(2)}</span>
+                                                            <span className="text-sm font-bold text-success">${product.sale_price.toFixed(2)}</span>
                                                         </div>
                                                     ) : (
-                                                        <span className="text-lg font-bold text-gray-900 dark:text-white">${parseFloat(product.price).toFixed(2)}</span>
+                                                        <span className="text-sm font-bold text-gray-900 dark:text-white">${product.price.toFixed(2)}</span>
                                                     )}
                                                 </div>
 
                                                 {/* Shop and Category */}
-                                                <div className="space-y-2 text-sm">
+                                                <div className="space-y-1 text-xs">
                                                     <div className="flex items-center justify-between">
                                                         <span className="text-gray-500 dark:text-gray-400">Shop</span>
-                                                        <span className="font-medium">{product.shops?.shop_name || 'N/A'}</span>
+                                                        <span className="font-medium truncate">{product.shops?.shop_name || 'N/A'}</span>
                                                     </div>
                                                     <div className="flex items-center justify-between">
                                                         <span className="text-gray-500 dark:text-gray-400">Category</span>
-                                                        <span className="font-medium">{product.categories?.title || 'N/A'}</span>
+                                                        <span className="font-medium truncate">{product.categories?.title || 'N/A'}</span>
                                                     </div>
                                                     <div className="flex items-center justify-between">
                                                         <span className="text-gray-500 dark:text-gray-400">Status</span>
@@ -459,23 +468,26 @@ const ProductsList = () => {
                                             </div>
 
                                             {/* Action Buttons */}
-                                            <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700/50 rounded-b-xl">
+                                            <div className="px-3 py-2 bg-gray-50 dark:bg-gray-700/50 rounded-b-xl">
                                                 <div className="flex items-center justify-between">
-                                                    <div className="flex space-x-3">
-                                                        <Link
-                                                            href={`/products/edit/${product.id}`}
-                                                            className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
+                                                    <div className="flex space-x-1">
+                                                        <button
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                handleEditClick(product);
+                                                            }}
+                                                            className="inline-flex items-center px-2 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-primary dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
                                                             title="Edit Product"
                                                         >
-                                                            <IconEdit className="h-4 w-4 mr-1" />
+                                                            <IconEdit className="h-3 w-3 mr-1" />
                                                             Edit
-                                                        </Link>
+                                                        </button>
                                                         <Link
                                                             href={`/products/preview/${product.id}`}
-                                                            className="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-primary border border-transparent rounded-lg hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                                                            className="inline-flex items-center px-2 py-1 text-xs font-medium text-white bg-primary border border-transparent rounded hover:bg-primary/90 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-primary"
                                                             title="View Product"
                                                         >
-                                                            <IconEye className="h-4 w-4 mr-1" />
+                                                            <IconEye className="h-3 w-3 mr-1" />
                                                             View
                                                         </Link>
                                                     </div>
@@ -485,10 +497,10 @@ const ProductsList = () => {
                                                             setProductToDelete(product);
                                                             setShowConfirmModal(true);
                                                         }}
-                                                        className="inline-flex items-center p-2 text-sm font-medium text-red-600 hover:text-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                                                        className="inline-flex items-center p-1 text-xs font-medium text-red-600 hover:text-red-800 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-red-500"
                                                         title="Delete Product"
                                                     >
-                                                        <IconTrashLines className="h-4 w-4" />
+                                                        <IconTrashLines className="h-3 w-3" />
                                                     </button>
                                                 </div>
                                             </div>
@@ -581,7 +593,7 @@ const ProductsList = () => {
                                                 {sale_price ? (
                                                     <div className="flex flex-col">
                                                         <div className="flex items-center gap-2">
-                                                            <span className="line-through text-gray-500">${parseFloat(price).toFixed(2)}</span>
+                                                            <span className="line-through text-gray-500">${price.toFixed(2)}</span>
                                                             {onSale && <span className="text-xs bg-orange-500 text-white px-2 py-0.5 rounded-full font-medium">ON SALE</span>}
                                                         </div>
                                                         <span className="text-success font-bold">${sale_price.toFixed(2)}</span>
@@ -596,7 +608,7 @@ const ProductsList = () => {
                                                     </div>
                                                 ) : (
                                                     <div className="flex items-center gap-2">
-                                                        <span>${parseFloat(price).toFixed(2)}</span>
+                                                        <span>${price.toFixed(2)}</span>
                                                         {onSale && <span className="text-xs bg-orange-500 text-white px-2 py-0.5 rounded-full font-medium">ON SALE</span>}
                                                     </div>
                                                 )}
@@ -658,26 +670,35 @@ const ProductsList = () => {
                                         title: t('actions'),
                                         sortable: false,
                                         textAlignment: 'center',
-                                        render: ({ id }) => (
-                                            <div className="mx-auto flex w-max items-center gap-4">
-                                                <Link href={`/products/edit/${id}`} className="flex hover:text-info" onClick={(e) => e.stopPropagation()}>
-                                                    <IconEdit className="h-4.5 w-4.5" />
-                                                </Link>
-                                                <Link href={`/products/preview/${id}`} className="flex hover:text-primary" onClick={(e) => e.stopPropagation()}>
-                                                    <IconEye />
-                                                </Link>
-                                                <button
-                                                    type="button"
-                                                    className="flex hover:text-danger"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        deleteRow(id);
-                                                    }}
-                                                >
-                                                    <IconTrashLines />
-                                                </button>
-                                            </div>
-                                        ),
+                                        render: ({ id }) => {
+                                            const product = items.find((p) => p.id === id);
+                                            return (
+                                                <div className="mx-auto flex w-max items-center gap-4">
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            if (product) handleEditClick(product);
+                                                        }}
+                                                        className="flex hover:text-info"
+                                                    >
+                                                        <IconEdit className="h-4.5 w-4.5" />
+                                                    </button>
+                                                    <Link href={`/products/preview/${id}`} className="flex hover:text-primary" onClick={(e) => e.stopPropagation()}>
+                                                        <IconEye />
+                                                    </Link>
+                                                    <button
+                                                        type="button"
+                                                        className="flex hover:text-danger"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            deleteRow(id);
+                                                        }}
+                                                    >
+                                                        <IconTrashLines />
+                                                    </button>
+                                                </div>
+                                            );
+                                        },
                                     },
                                 ]}
                                 highlightOnHover
@@ -712,6 +733,16 @@ const ProductsList = () => {
                 confirmLabel={t('delete')}
                 cancelLabel={t('cancel')}
                 size="sm"
+            />
+            {/* Edit Product Dialog */}
+            <EditProductDialog
+                isOpen={showEditDialog}
+                onClose={() => {
+                    setShowEditDialog(false);
+                    setProductToEdit(null);
+                }}
+                product={productToEdit}
+                onSuccess={handleEditSuccess}
             />
         </div>
     );

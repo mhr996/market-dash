@@ -14,6 +14,7 @@ import supabase from '@/lib/supabase';
 import { Alert } from '@/components/elements/alerts/elements-alerts-default';
 import { getTranslation } from '@/i18n';
 import { useAuth } from '@/hooks/useAuth';
+import EditCustomerDialog from './components/EditCustomerDialog';
 
 const CustomersList = () => {
     const { t } = getTranslation();
@@ -62,37 +63,41 @@ const CustomersList = () => {
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [customerToDelete, setCustomerToDelete] = useState<any>(null);
 
-    useEffect(() => {
-        const fetchCustomers = async () => {
-            if (authLoading) return;
+    // Edit dialog state
+    const [showEditDialog, setShowEditDialog] = useState(false);
+    const [customerToEdit, setCustomerToEdit] = useState<any>(null);
 
-            try {
-                // Only fetch users with role = 4 (customers)
-                const { data: customers, error } = await supabase
-                    .from('profiles')
-                    .select(
-                        `
-                        *,
-                        user_roles!inner (
-                            id,
-                            name,
-                            display_name
-                        )
-                    `,
+    const fetchCustomers = async () => {
+        if (authLoading) return;
+
+        try {
+            // Only fetch users with role = 4 (customers)
+            const { data: customers, error } = await supabase
+                .from('profiles')
+                .select(
+                    `
+                    *,
+                    user_roles!inner (
+                        id,
+                        name,
+                        display_name
                     )
-                    .eq('role', 6) // Only customers
-                    .order('registration_date', { ascending: false });
+                `,
+                )
+                .eq('role', 6) // Only customers
+                .order('registration_date', { ascending: false });
 
-                if (error) throw error;
+            if (error) throw error;
 
-                setItems(customers || []);
-            } catch (error) {
-                console.error('Error fetching customers:', error);
-            } finally {
-                setLoading(false);
-            }
-        };
+            setItems(customers || []);
+        } catch (error) {
+            console.error('Error fetching customers:', error);
+        } finally {
+            setLoading(false);
+        }
+    };
 
+    useEffect(() => {
         fetchCustomers();
     }, [authLoading]);
 
@@ -108,6 +113,16 @@ const CustomersList = () => {
             console.error('Error deleting customer:', error);
             setAlert({ visible: true, message: 'Error deleting customer', type: 'danger' });
         }
+    };
+
+    const handleEditClick = (customer: any) => {
+        setCustomerToEdit(customer);
+        setShowEditDialog(true);
+    };
+
+    const handleEditSuccess = () => {
+        // Refresh the customers list
+        fetchCustomers();
     };
 
     // Handle delete confirmation
@@ -209,8 +224,8 @@ const CustomersList = () => {
                 <div className="relative">
                     {viewMode === 'grid' ? (
                         // Card Grid View - Redesigned
-                        <div className="p-6">
-                            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                        <div className="p-3">
+                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8">
                                 {records.map((customer) => (
                                     <div
                                         key={customer.id}
@@ -230,8 +245,8 @@ const CustomersList = () => {
                                                     />
                                                 </div>
                                                 <div className="flex-1 min-w-0">
-                                                    <h3 className="text-lg font-semibold text-gray-900 dark:text-white truncate">{customer.full_name}</h3>
-                                                    <p className="text-sm text-gray-500 dark:text-gray-400 truncate">{customer.email}</p>
+                                                    <h3 className="text-sm font-semibold text-gray-900 dark:text-white truncate">{customer.full_name}</h3>
+                                                    <p className="text-xs text-gray-500 dark:text-gray-400 truncate">{customer.email}</p>
                                                     <span className="inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium mt-1 bg-gray-100 text-gray-800 dark:bg-gray-700 dark:text-gray-200">
                                                         {customer.user_roles?.display_name || 'Customer'}
                                                     </span>
@@ -240,12 +255,12 @@ const CustomersList = () => {
                                         </div>
 
                                         {/* Customer Details */}
-                                        <div className="px-6 pb-4">
-                                            <div className="space-y-3">
-                                                <div className="flex items-center justify-between text-sm">
+                                        <div className="px-3 pb-2">
+                                            <div className="space-y-1">
+                                                <div className="flex items-center justify-between text-xs">
                                                     <span className="text-gray-500 dark:text-gray-400">Status</span>
                                                     <span
-                                                        className={`inline-flex items-center px-2.5 py-1 rounded-full text-xs font-medium ${
+                                                        className={`inline-flex items-center px-2 py-1 rounded-full text-xs font-medium ${
                                                             customer.status === 'Active'
                                                                 ? 'bg-green-100 text-green-800 dark:bg-green-900 dark:text-green-200'
                                                                 : 'bg-red-100 text-red-800 dark:bg-red-900 dark:text-red-200'
@@ -254,7 +269,7 @@ const CustomersList = () => {
                                                         {customer.status}
                                                     </span>
                                                 </div>
-                                                <div className="flex items-center justify-between text-sm">
+                                                <div className="flex items-center justify-between text-xs">
                                                     <span className="text-gray-500 dark:text-gray-400">Joined</span>
                                                     <span className="text-gray-900 dark:text-white">
                                                         {customer.registration_date ? new Date(customer.registration_date).toLocaleDateString('TR') : 'N/A'}
@@ -267,13 +282,16 @@ const CustomersList = () => {
                                         <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700/50 rounded-b-xl">
                                             <div className="flex items-center justify-between">
                                                 <div className="flex space-x-3">
-                                                    <Link
-                                                        href={`/customers/edit/${customer.id}`}
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleEditClick(customer);
+                                                        }}
                                                         className="inline-flex items-center justify-center w-10 h-10 text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
                                                         title="Edit Customer"
                                                     >
                                                         <IconEdit className="h-4 w-4" />
-                                                    </Link>
+                                                    </button>
                                                     <Link
                                                         href={`/customers/preview/${customer.id}`}
                                                         className="inline-flex items-center justify-center w-10 h-10 text-white bg-primary border border-transparent rounded-lg hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
@@ -346,16 +364,25 @@ const CustomersList = () => {
                                     accessor: 'actions',
                                     title: 'Actions',
                                     titleClassName: '!text-center',
-                                    render: ({ id }) => (
-                                        <div className="flex items-center gap-2 justify-center">
-                                            <Link href={`/customers/edit/${id}`} className="btn btn-sm btn-outline-primary">
-                                                <IconEdit className="h-4 w-4" />
-                                            </Link>
-                                            <Link href={`/customers/preview/${id}`} className="btn btn-sm btn-outline-info">
-                                                <IconEye className="h-4 w-4" />
-                                            </Link>
-                                        </div>
-                                    ),
+                                    render: ({ id }) => {
+                                        const customer = items.find((c) => c.id === id);
+                                        return (
+                                            <div className="flex items-center gap-2 justify-center">
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        if (customer) handleEditClick(customer);
+                                                    }}
+                                                    className="btn btn-sm btn-outline-primary"
+                                                >
+                                                    <IconEdit className="h-4 w-4" />
+                                                </button>
+                                                <Link href={`/customers/preview/${id}`} className="btn btn-sm btn-outline-info">
+                                                    <IconEye className="h-4 w-4" />
+                                                </Link>
+                                            </div>
+                                        );
+                                    },
                                 },
                             ]}
                             totalRecords={initialRecords.length}
@@ -384,6 +411,17 @@ const CustomersList = () => {
                 message={`Are you sure you want to delete ${customerToDelete?.full_name}? This action cannot be undone.`}
                 confirmLabel="Delete"
                 cancelLabel="Cancel"
+            />
+
+            {/* Edit Customer Dialog */}
+            <EditCustomerDialog
+                isOpen={showEditDialog}
+                onClose={() => {
+                    setShowEditDialog(false);
+                    setCustomerToEdit(null);
+                }}
+                customer={customerToEdit}
+                onSuccess={handleEditSuccess}
             />
         </div>
     );

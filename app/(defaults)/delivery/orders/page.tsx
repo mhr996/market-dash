@@ -16,6 +16,8 @@ import IconInfoCircle from '@/components/icon/icon-info-circle';
 import IconClock from '@/components/icon/icon-clock';
 import IconSettings from '@/components/icon/icon-settings';
 import IconTruck from '@/components/icon/icon-truck';
+import IconLayoutGrid from '@/components/icon/icon-layout-grid';
+import IconListCheck from '@/components/icon/icon-list-check';
 import { sortBy } from 'lodash';
 import { DataTableSortStatus, DataTable } from 'mantine-datatable';
 import Link from 'next/link';
@@ -29,6 +31,8 @@ import { generateOrderReceiptPDF } from '@/utils/pdf-generator';
 import supabase from '@/lib/supabase';
 import DateRangeSelector from '@/components/date-range-selector';
 import MultiSelect from '@/components/multi-select';
+import HorizontalFilter from '@/components/filters/horizontal-filter';
+import DateRangeInputs from '@/components/filters/date-range-inputs';
 // Removed calculateOrderTotal import - using database total directly
 
 // Comment Modal Component
@@ -403,9 +407,18 @@ const ActionsMenu = ({ orderId, onView, onDownload, onDelete }: { orderId: numbe
     useEffect(() => {
         if (isOpen && triggerRef.current) {
             const rect = triggerRef.current.getBoundingClientRect();
+            const viewportWidth = window.innerWidth;
+            const menuWidth = 120; // Approximate menu width
+
+            // Calculate left position to keep menu in viewport
+            let left = rect.left + window.scrollX;
+            if (left + menuWidth > viewportWidth) {
+                left = viewportWidth - menuWidth - 10; // 10px margin from edge
+            }
+
             setMenuPosition({
                 top: rect.bottom + window.scrollY + 4,
-                left: rect.left + window.scrollX - 100, // Offset to align menu properly
+                left: left,
             });
         }
     }, [isOpen]);
@@ -423,6 +436,7 @@ const ActionsMenu = ({ orderId, onView, onDownload, onDelete }: { orderId: numbe
                 className="hover:text-gray-600 dark:hover:text-gray-300"
                 title="More Actions"
                 onClick={(e) => {
+                    e.preventDefault();
                     e.stopPropagation();
                     setIsOpen(!isOpen);
                 }}
@@ -795,7 +809,13 @@ const DeliveryOrdersList = () => {
         columnAccessor: 'date',
         direction: 'desc',
     });
+
+    // View mode state
+    const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
+
     const [dateRange, setDateRange] = useState<Date[]>([]);
+    const [fromDate, setFromDate] = useState('');
+    const [toDate, setToDate] = useState('');
     const [selectedShops, setSelectedShops] = useState<number[]>([]);
     const [selectedDrivers, setSelectedDrivers] = useState<number[]>([]);
     const [availableShops, setAvailableShops] = useState<any[]>([]);
@@ -902,9 +922,12 @@ const DeliveryOrdersList = () => {
             }
 
             // Filter by date range
-            if (dateRange.length === 2) {
+            if (fromDate || toDate) {
                 const itemDate = new Date(item.date);
-                if (itemDate < dateRange[0] || itemDate > dateRange[1]) {
+                if (fromDate && itemDate < new Date(fromDate)) {
+                    matchesFilter = false;
+                }
+                if (toDate && itemDate > new Date(toDate)) {
                     matchesFilter = false;
                 }
             }
@@ -928,7 +951,7 @@ const DeliveryOrdersList = () => {
             return matchesSearch && matchesFilter;
         });
         setInitialRecords(filtered);
-    }, [search, displayItems, deliveryFilter, dateRange, selectedShops, selectedDrivers]);
+    }, [search, displayItems, deliveryFilter, fromDate, toDate, selectedShops, selectedDrivers]);
 
     useEffect(() => {
         const data = sortBy(initialRecords, sortStatus.columnAccessor);
@@ -1204,8 +1227,11 @@ const DeliveryOrdersList = () => {
             );
 
             // Apply date range filter
-            if (dateRange.length === 2) {
-                query = query.gte('created_at', dateRange[0].toISOString()).lte('created_at', dateRange[1].toISOString());
+            if (fromDate) {
+                query = query.gte('created_at', fromDate);
+            }
+            if (toDate) {
+                query = query.lte('created_at', toDate);
             }
 
             // Apply delivery type filter - only delivery orders
@@ -1408,50 +1434,59 @@ const DeliveryOrdersList = () => {
                         <h3 className="text-lg font-semibold text-black dark:text-white-light">Filters</h3>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+                    <div className="space-y-6">
                         {/* Date Range Filter */}
                         <div>
                             <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Date Range</label>
-                            <DateRangeSelector value={dateRange} onChange={setDateRange} placeholder="Select date range" isRtl={false} />
+                            <DateRangeInputs fromDate={fromDate} toDate={toDate} onFromDateChange={setFromDate} onToDateChange={setToDate} />
                         </div>
 
                         {/* Shop Filter */}
                         <div>
                             <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Filter by Shops</label>
-                            <MultiSelect
-                                options={availableShops.map((shop) => ({ id: shop.id, name: shop.shop_name, logo_url: shop.logo_url }))}
-                                selectedValues={selectedShops}
-                                onChange={setSelectedShops}
-                                placeholder="Select shops"
-                                isRtl={false}
+                            <HorizontalFilter
+                                items={availableShops.map((shop) => ({
+                                    id: shop.id,
+                                    name: shop.shop_name,
+                                    image_url: shop.logo_url || undefined,
+                                }))}
+                                selectedItems={selectedShops}
+                                onSelectionChange={setSelectedShops}
+                                placeholder="No shops available"
+                                showImages={true}
                             />
                         </div>
 
                         {/* Driver Filter */}
                         <div>
                             <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Filter by Driver</label>
-                            <MultiSelect
-                                options={availableDrivers.map((driver) => ({ id: driver.id, name: `${driver.name} - ${driver.phone}`, logo_url: driver.avatar_url }))}
-                                selectedValues={selectedDrivers}
-                                onChange={setSelectedDrivers}
-                                placeholder="Select drivers"
-                                isRtl={false}
+                            <HorizontalFilter
+                                items={availableDrivers.map((driver) => ({
+                                    id: driver.id,
+                                    name: `${driver.name} - ${driver.phone}`,
+                                    image_url: driver.avatar_url || undefined,
+                                }))}
+                                selectedItems={selectedDrivers}
+                                onSelectionChange={setSelectedDrivers}
+                                placeholder="No drivers available"
+                                showImages={true}
                             />
                         </div>
 
                         {/* Clear Filters */}
-                        <div className="flex items-end">
+                        <div className="flex justify-end pt-2 border-t border-gray-200 dark:border-gray-700">
                             <button
                                 type="button"
-                                className="btn btn-outline-danger w-full"
+                                className="btn btn-outline-danger"
                                 onClick={() => {
-                                    setDateRange([]);
+                                    setFromDate('');
+                                    setToDate('');
                                     setSelectedShops([]);
                                     setSelectedDrivers([]);
                                 }}
                             >
                                 <IconX className="h-4 w-4 mr-2" />
-                                Clear Filters
+                                Clear All Filters
                             </button>
                         </div>
                     </div>
@@ -1524,317 +1559,563 @@ const DeliveryOrdersList = () => {
                                 </button>
                             </div>
                         </div>
+
+                        {/* View Toggle Buttons */}
+                        <div className="flex items-center gap-2">
+                            <div className="flex rounded-lg border border-gray-200 dark:border-gray-700">
+                                <button
+                                    onClick={() => setViewMode('grid')}
+                                    className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-l-lg transition-colors ${
+                                        viewMode === 'grid' ? 'bg-primary text-white' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                                    }`}
+                                >
+                                    <IconLayoutGrid className="h-4 w-4" />
+                                    Grid
+                                </button>
+                                <button
+                                    onClick={() => setViewMode('table')}
+                                    className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-r-lg transition-colors ${
+                                        viewMode === 'table' ? 'bg-primary text-white' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                                    }`}
+                                >
+                                    <IconListCheck className="h-4 w-4" />
+                                    Table
+                                </button>
+                            </div>
+                        </div>
+
                         <div className="ltr:ml-auto rtl:mr-auto">
                             <input type="text" className="form-input w-auto" placeholder={t('search')} value={search} onChange={(e) => setSearch(e.target.value)} />
                         </div>
                     </div>
 
-                    <div className="datatables w-full max-w-none">
-                        <DataTable
-                            className={`${loading ? 'pointer-events-none' : 'cursor-pointer'} w-full max-w-none`}
-                            records={records}
-                            minHeight={200}
-                            withBorder={false}
-                            withColumnBorders={false}
-                            striped
-                            highlightOnHover
-                            onRowClick={(record) => {
-                                router.push(`/delivery/orders/preview/${record.id}`);
-                            }}
-                            columns={[
-                                {
-                                    accessor: 'id',
-                                    title: t('order_id'),
-                                    sortable: true,
-                                    render: ({ id }) => <strong className="text-info">#{id}</strong>,
-                                },
-                                {
-                                    accessor: 'date',
-                                    title: t('date'),
-                                    sortable: true,
-                                    render: ({ date }) => new Date(date).toLocaleDateString(),
-                                },
-                                {
-                                    accessor: 'shop_name',
-                                    title: t('shop_name'),
-                                    sortable: true,
-                                    render: ({ shop_name }) => <span className="font-medium">{shop_name}</span>,
-                                },
-                                {
-                                    accessor: 'image',
-                                    title: t('image'),
-                                    sortable: false,
-                                    render: ({ image }) => (
-                                        <div className="flex items-center font-semibold">
-                                            <div className="w-max rounded-full bg-white-dark/30 p-0.5 ltr:mr-2 rtl:ml-2">
-                                                <img className="h-8 w-8 rounded-full object-cover" src={image || '/assets/images/product-placeholder.jpg'} alt="order image" />
-                                            </div>
-                                        </div>
-                                    ),
-                                },
-                                {
-                                    accessor: 'name',
-                                    title: t('order_name'),
-                                    sortable: true,
-                                },
-                                {
-                                    accessor: 'buyer',
-                                    title: t('customer'),
-                                    sortable: true,
-                                },
-                                {
-                                    accessor: 'city',
-                                    title: t('city'),
-                                    sortable: true,
-                                    render: ({ city }) => <span className="">{city}</span>,
-                                },
-                                {
-                                    accessor: 'total',
-                                    title: t('total'),
-                                    sortable: true,
-                                    render: (record: any) => (
-                                        <div className="flex items-center">
-                                            <span className="font-semibold text-success">{record.total}</span>
-                                            <OrderTotalTooltip order={record} />
-                                        </div>
-                                    ),
-                                },
-                                {
-                                    accessor: 'payment_method',
-                                    title: 'Payment',
-                                    sortable: true,
-                                    width: 120,
-                                    render: ({ payment_method }) => {
-                                        if (!payment_method) return <span className="text-gray-500">-</span>;
-
-                                        const paymentType = payment_method.type || payment_method;
-                                        const getPaymentBadge = (type: string) => {
-                                            switch (type) {
-                                                case 'Credit Card':
-                                                    return (
-                                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary whitespace-nowrap">
-                                                            Credit Card
-                                                        </span>
-                                                    );
-                                                case 'Bank Transfer':
-                                                    return (
-                                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-info/10 text-info whitespace-nowrap">
-                                                            Bank Transfer
-                                                        </span>
-                                                    );
-                                                case 'Cash on Delivery':
-                                                    return (
-                                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-warning/10 text-warning whitespace-nowrap">
-                                                            Cash on Delivery
-                                                        </span>
-                                                    );
-                                                case 'In-store':
-                                                    return (
-                                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-success/10 text-success whitespace-nowrap">
-                                                            In-store
-                                                        </span>
-                                                    );
-                                                default:
-                                                    return (
-                                                        <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-secondary/10 text-secondary whitespace-nowrap">
-                                                            {type}
-                                                        </span>
-                                                    );
-                                            }
-                                        };
-
-                                        return getPaymentBadge(paymentType);
-                                    },
-                                },
-                                {
-                                    accessor: 'delivery_type',
-                                    title: 'Type',
-                                    sortable: true,
-                                    render: ({ delivery_type }) => (
-                                        <span
-                                            className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
-                                                delivery_type === 'delivery' ? 'bg-primary/10 text-primary' : 'bg-secondary/10 text-secondary'
-                                            }`}
+                    <div className="relative">
+                        {viewMode === 'grid' ? (
+                            // Card Grid View
+                            <div className="p-6">
+                                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                                    {initialRecords.slice((page - 1) * pageSize, page * pageSize).map((order) => (
+                                        <div
+                                            key={order.id}
+                                            className="group relative bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-lg transition-shadow duration-200 flex flex-col h-full"
                                         >
-                                            {delivery_type === 'delivery' ? 'Delivery' : 'Pickup'}
-                                        </span>
-                                    ),
-                                },
-                                {
-                                    accessor: 'status',
-                                    title: t('status'),
-                                    sortable: true,
-                                    render: ({ status, id, assigned_driver }) => {
-                                        // Show Complete Order button for on_the_way status
-                                        if (status === 'on_the_way') {
-                                            return (
-                                                <button
-                                                    type="button"
-                                                    className="btn btn-outline-success btn-sm"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        const order = displayItems.find((d) => d.id === id);
-                                                        setOrderToComplete(order);
-                                                        setShowCompleteModal(true);
-                                                    }}
-                                                >
-                                                    Complete Order
-                                                </button>
-                                            );
-                                        }
-
-                                        // Show status as label for other statuses
-                                        const statusConfig = {
-                                            processing: { color: 'bg-info/10 text-info', label: 'Processing' },
-                                            completed: { color: 'bg-success/10 text-success', label: 'Completed' },
-                                            cancelled: { color: 'bg-danger/10 text-danger', label: 'Cancelled' },
-                                            rejected: { color: 'bg-danger/10 text-danger', label: 'Rejected' },
-                                        };
-
-                                        const config = statusConfig[status as keyof typeof statusConfig] || { color: 'bg-gray-100 text-gray-800', label: status };
-
-                                        return <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color}`}>{config.label}</span>;
-                                    },
-                                },
-                                {
-                                    accessor: 'assigned_delivery_company',
-                                    title: 'Delivery Company',
-                                    sortable: false,
-                                    render: ({ assigned_delivery_company, id, status }) => {
-                                        if (assigned_delivery_company) {
-                                            return (
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
-                                                        <IconTruck className="h-4 w-4 text-blue-600" />
+                                            {/* Section 1: Product Image and Details */}
+                                            <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                                                <div className="flex items-start gap-3">
+                                                    <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0">
+                                                        <img className="w-full h-full object-cover" src={order.image || '/assets/images/product-placeholder.jpg'} alt={order.name} />
                                                     </div>
-                                                    <div className="flex-1">
-                                                        <div className="text-sm font-medium">{assigned_delivery_company.company_name}</div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1 line-clamp-2">{order.name}</h3>
+                                                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Order #{order.id}</p>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-xs text-gray-500 dark:text-gray-400">Shop:</span>
+                                                            <span className="text-xs font-medium">{order.shop_name}</span>
+                                                        </div>
                                                     </div>
                                                 </div>
-                                            );
-                                        }
-                                        return <span className="text-gray-500">-</span>;
-                                    },
-                                },
-                                {
-                                    accessor: 'assigned_driver',
-                                    title: 'Driver',
-                                    sortable: false,
-                                    render: ({ assigned_driver, id, status }) => {
-                                        if (assigned_driver) {
-                                            return (
-                                                <div className="flex items-center gap-2">
-                                                    <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
-                                                        <IconUser className="h-4 w-4 text-primary" />
+                                            </div>
+
+                                            {/* Section 2: Customer Details */}
+                                            <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <IconUser className="h-4 w-4 text-gray-500" />
+                                                        <span className="text-sm font-medium">{order.buyer}</span>
                                                     </div>
-                                                    <div className="flex-1">
-                                                        <div className="text-sm font-medium">{assigned_driver.name}</div>
-                                                        <div className="text-xs text-gray-500">{assigned_driver.phone}</div>
+                                                    <div className="flex items-center gap-2">
+                                                        <IconTruck className="h-4 w-4 text-gray-500" />
+                                                        <span className="text-xs text-gray-500">{order.city}</span>
                                                     </div>
-                                                    {/* Only show unassign button for processing status */}
-                                                    {status === 'processing' && (
-                                                        <button
-                                                            type="button"
-                                                            className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-red-100 rounded-full"
-                                                            title="Unassign Driver"
-                                                            onClick={(e) => {
-                                                                e.stopPropagation();
-                                                                handleRemoveDriver(id);
-                                                            }}
-                                                        >
-                                                            <IconX className="h-4 w-4 text-red-500" />
-                                                        </button>
+                                                    <div className="flex items-center gap-2">
+                                                        <IconClock className="h-4 w-4 text-gray-500" />
+                                                        <span className="text-xs text-gray-500">{new Date(order.date).toLocaleDateString()}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Section 3: Payment and Delivery */}
+                                            <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-xs text-gray-500">Total</span>
+                                                        <span className="text-sm font-bold text-gray-900 dark:text-white">{order.total}</span>
+                                                    </div>
+                                                    {order.assigned_driver && (
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-xs text-gray-500">Driver</span>
+                                                            <span className="text-xs font-medium">{order.assigned_driver.name}</span>
+                                                        </div>
                                                     )}
                                                 </div>
-                                            );
-                                        }
-                                        // Only show assign button for processing status
-                                        if (status === 'processing') {
-                                            return (
-                                                <button
-                                                    type="button"
-                                                    className="btn btn-outline-success btn-sm"
-                                                    title="Assign Driver"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        const order = displayItems.find((d) => d.id === id);
-                                                        setSelectedOrder(order);
-                                                        setShowAssignModal(true);
-                                                    }}
-                                                >
-                                                    <IconUser className="h-4 w-4" />
-                                                    <span className="ml-1">ASSIGN</span>
-                                                </button>
-                                            );
-                                        }
-                                        // Show "Unassigned" for other statuses
-                                        return <span className="text-gray-500 text-sm">Unassigned</span>;
-                                    },
-                                },
-                                {
-                                    accessor: 'action',
-                                    title: t('actions'),
-                                    titleClassName: '!text-center',
-                                    render: ({ id }) => {
-                                        const order = displayItems.find((d) => d.id === id);
-                                        const showDangerIcon = order?.status === 'processing' || order?.status === 'on_the_way';
+                                            </div>
 
-                                        return (
-                                            <div className="flex items-center justify-center gap-2">
-                                                <button
-                                                    type="button"
-                                                    className="hover:text-warning relative"
-                                                    title="Add Comment"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        setSelectedOrderForComment(order);
-                                                        setShowCommentModal(true);
-                                                    }}
-                                                >
-                                                    <IconMessage className="h-5 w-5" />
-                                                    {ordersWithComments.has(id) ? <span className="absolute -top-1 -right-1 h-2 w-2 bg-warning rounded-full"></span> : null}
-                                                </button>
-                                                {showDangerIcon && (
+                                            {/* Section 4: Status and Actions */}
+                                            <div className="p-4 flex-1 flex flex-col justify-between">
+                                                {/* Status Badge or Action Button */}
+                                                <div className="mb-3">
+                                                    {order.status === 'on_the_way' ? (
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-success btn-sm w-full"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setOrderToComplete(order);
+                                                                setShowCompleteModal(true);
+                                                            }}
+                                                        >
+                                                            <IconCheck className="h-4 w-4 mr-1" />
+                                                            Complete Order
+                                                        </button>
+                                                    ) : (
+                                                        <span
+                                                            className={`badge ${
+                                                                order.status === 'completed'
+                                                                    ? 'badge-success'
+                                                                    : order.status === 'processing'
+                                                                      ? 'badge-primary'
+                                                                      : order.status === 'on_the_way'
+                                                                        ? 'badge-warning'
+                                                                        : 'badge-danger'
+                                                            }`}
+                                                        >
+                                                            {order.status === 'completed'
+                                                                ? 'Completed'
+                                                                : order.status === 'processing'
+                                                                  ? 'Processing'
+                                                                  : order.status === 'on_the_way'
+                                                                    ? 'On The Way'
+                                                                    : order.status}
+                                                        </span>
+                                                    )}
+                                                </div>
+
+                                                {/* Driver Assignment */}
+                                                <div className="mb-3">
+                                                    {order.assigned_driver ? (
+                                                        <div className="flex items-center justify-between">
+                                                            <div className="flex items-center gap-2">
+                                                                <div className="w-6 h-6 rounded-full bg-primary/10 flex items-center justify-center">
+                                                                    <IconUser className="h-3 w-3 text-primary" />
+                                                                </div>
+                                                                <div className="flex-1">
+                                                                    <div className="text-xs font-medium">{order.assigned_driver.name}</div>
+                                                                    <div className="text-xs text-gray-500">{order.assigned_driver.phone}</div>
+                                                                </div>
+                                                            </div>
+                                                            {order.status === 'processing' && (
+                                                                <button
+                                                                    type="button"
+                                                                    className="btn btn-outline-danger btn-xs"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleRemoveDriver(order.id);
+                                                                    }}
+                                                                    title="Remove Driver"
+                                                                >
+                                                                    <IconX className="h-3 w-3" />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    ) : order.status === 'processing' ? (
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-primary btn-sm w-full"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setSelectedOrder(order);
+                                                                setShowAssignModal(true);
+                                                            }}
+                                                            title="Assign Driver"
+                                                        >
+                                                            <IconUser className="h-4 w-4 mr-1" />
+                                                            ASSIGN DRIVER
+                                                        </button>
+                                                    ) : (
+                                                        <span className="text-xs text-gray-500">No driver assigned</span>
+                                                    )}
+                                                </div>
+
+                                                {/* Action Menu */}
+                                                <div className="flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
                                                     <button
                                                         type="button"
-                                                        className="hover:text-danger"
-                                                        title="Cancel/Reject Order"
+                                                        className="hover:text-info relative"
+                                                        title="Add Comment"
                                                         onClick={(e) => {
                                                             e.stopPropagation();
                                                             setSelectedOrderForComment(order);
-                                                            setShowDangerModal(true);
+                                                            setShowCommentModal(true);
                                                         }}
                                                     >
-                                                        <IconAlertTriangle className="h-5 w-5" />
+                                                        <IconMessage className="h-4 w-4" />
+                                                        {ordersWithComments.has(order.id) && <span className="absolute -top-1 -right-1 h-2 w-2 bg-info rounded-full"></span>}
                                                     </button>
-                                                )}
-                                                <ActionsMenu
-                                                    orderId={id}
-                                                    onView={() => router.push(`/delivery/orders/preview/${id}`)}
-                                                    onDownload={() => handleDownloadOrderPDF(id)}
-                                                    onDelete={() => {
-                                                        const order = items.find((d) => d.id === id);
-                                                        setOrderToDelete(order || null);
-                                                        setShowConfirmModal(true);
-                                                    }}
-                                                />
+
+                                                    <ActionsMenu
+                                                        orderId={order.id}
+                                                        onView={() => router.push(`/delivery/orders/preview/${order.id}`)}
+                                                        onDownload={() => handleDownloadOrderPDF(order.id)}
+                                                        onDelete={() => handleDelete(displayItems.find((d) => d.id === order.id) || null)}
+                                                    />
+                                                </div>
                                             </div>
-                                        );
-                                    },
-                                },
-                            ]}
-                            totalRecords={initialRecords.length}
-                            recordsPerPage={pageSize}
-                            page={page}
-                            onPageChange={(p) => setPage(p)}
-                            recordsPerPageOptions={PAGE_SIZES}
-                            onRecordsPerPageChange={setPageSize}
-                            sortStatus={sortStatus}
-                            onSortStatusChange={setSortStatus}
-                            selectedRecords={selectedRecords}
-                            onSelectedRecordsChange={setSelectedRecords}
-                            paginationText={({ from, to, totalRecords }) => `${t('showing')} ${from} ${t('to')} ${to} ${t('of')} ${totalRecords} ${t('entries')}`}
-                        />
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {initialRecords.length === 0 && (
+                                    <div className="text-center py-10">
+                                        <p className="text-gray-500 dark:text-gray-400">No orders found.</p>
+                                    </div>
+                                )}
+
+                                {/* Pagination for Grid View */}
+                                <div className="mt-6 flex items-center justify-between">
+                                    <div className="flex items-center space-x-2">
+                                        <span className="text-sm text-gray-700 dark:text-gray-300">
+                                            {t('showing')} {(page - 1) * pageSize + 1} {t('to')} {Math.min(page * pageSize, initialRecords.length)} {t('of')} {initialRecords.length} {t('entries')}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))} className="form-select text-sm">
+                                            {PAGE_SIZES.map((size) => (
+                                                <option key={size} value={size}>
+                                                    {size} per page
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <div className="flex space-x-1">
+                                            <button
+                                                onClick={() => setPage(page - 1)}
+                                                disabled={page === 1}
+                                                className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-600 dark:hover:bg-gray-700"
+                                            >
+                                                Previous
+                                            </button>
+                                            <button
+                                                onClick={() => setPage(page + 1)}
+                                                disabled={page * pageSize >= initialRecords.length}
+                                                className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-600 dark:hover:bg-gray-700"
+                                            >
+                                                Next
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            // Table View
+                            <div className="datatables w-full max-w-none">
+                                <DataTable
+                                    className={`${loading ? 'pointer-events-none' : 'cursor-pointer'} w-full max-w-none`}
+                                    records={records}
+                                    minHeight={200}
+                                    withBorder={false}
+                                    withColumnBorders={false}
+                                    striped
+                                    highlightOnHover
+                                    onRowClick={(record) => {
+                                        router.push(`/delivery/orders/preview/${record.id}`);
+                                    }}
+                                    columns={[
+                                        {
+                                            accessor: 'id',
+                                            title: t('order_id'),
+                                            sortable: true,
+                                            render: ({ id }) => <strong className="text-info">#{id}</strong>,
+                                        },
+                                        {
+                                            accessor: 'date',
+                                            title: t('date'),
+                                            sortable: true,
+                                            render: ({ date }) => new Date(date).toLocaleDateString(),
+                                        },
+                                        {
+                                            accessor: 'shop_name',
+                                            title: t('shop_name'),
+                                            sortable: true,
+                                            render: ({ shop_name }) => <span className="font-medium">{shop_name}</span>,
+                                        },
+                                        {
+                                            accessor: 'image',
+                                            title: t('image'),
+                                            sortable: false,
+                                            render: ({ image }) => (
+                                                <div className="flex items-center font-semibold">
+                                                    <div className="w-max rounded-full bg-white-dark/30 p-0.5 ltr:mr-2 rtl:ml-2">
+                                                        <img className="h-8 w-8 rounded-full object-cover" src={image || '/assets/images/product-placeholder.jpg'} alt="order image" />
+                                                    </div>
+                                                </div>
+                                            ),
+                                        },
+                                        {
+                                            accessor: 'name',
+                                            title: t('order_name'),
+                                            sortable: true,
+                                        },
+                                        {
+                                            accessor: 'buyer',
+                                            title: t('customer'),
+                                            sortable: true,
+                                        },
+                                        {
+                                            accessor: 'city',
+                                            title: t('city'),
+                                            sortable: true,
+                                            render: ({ city }) => <span className="">{city}</span>,
+                                        },
+                                        {
+                                            accessor: 'total',
+                                            title: t('total'),
+                                            sortable: true,
+                                            render: (record: any) => (
+                                                <div className="flex items-center">
+                                                    <span className="font-semibold text-success">{record.total}</span>
+                                                    <OrderTotalTooltip order={record} />
+                                                </div>
+                                            ),
+                                        },
+                                        {
+                                            accessor: 'payment_method',
+                                            title: 'Payment',
+                                            sortable: true,
+                                            width: 120,
+                                            render: ({ payment_method }) => {
+                                                if (!payment_method) return <span className="text-gray-500">-</span>;
+
+                                                const paymentType = payment_method.type || payment_method;
+                                                const getPaymentBadge = (type: string) => {
+                                                    switch (type) {
+                                                        case 'Credit Card':
+                                                            return (
+                                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-primary/10 text-primary whitespace-nowrap">
+                                                                    Credit Card
+                                                                </span>
+                                                            );
+                                                        case 'Bank Transfer':
+                                                            return (
+                                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-info/10 text-info whitespace-nowrap">
+                                                                    Bank Transfer
+                                                                </span>
+                                                            );
+                                                        case 'Cash on Delivery':
+                                                            return (
+                                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-warning/10 text-warning whitespace-nowrap">
+                                                                    Cash on Delivery
+                                                                </span>
+                                                            );
+                                                        case 'In-store':
+                                                            return (
+                                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-success/10 text-success whitespace-nowrap">
+                                                                    In-store
+                                                                </span>
+                                                            );
+                                                        default:
+                                                            return (
+                                                                <span className="inline-flex items-center px-2 py-0.5 rounded-full text-xs font-medium bg-secondary/10 text-secondary whitespace-nowrap">
+                                                                    {type}
+                                                                </span>
+                                                            );
+                                                    }
+                                                };
+
+                                                return getPaymentBadge(paymentType);
+                                            },
+                                        },
+                                        {
+                                            accessor: 'delivery_type',
+                                            title: 'Type',
+                                            sortable: true,
+                                            render: ({ delivery_type }) => (
+                                                <span
+                                                    className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                                        delivery_type === 'delivery' ? 'bg-primary/10 text-primary' : 'bg-secondary/10 text-secondary'
+                                                    }`}
+                                                >
+                                                    {delivery_type === 'delivery' ? 'Delivery' : 'Pickup'}
+                                                </span>
+                                            ),
+                                        },
+                                        {
+                                            accessor: 'status',
+                                            title: t('status'),
+                                            sortable: true,
+                                            render: ({ status, id, assigned_driver }) => {
+                                                // Show Complete Order button for on_the_way status
+                                                if (status === 'on_the_way') {
+                                                    return (
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-outline-success btn-sm"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                const order = displayItems.find((d) => d.id === id);
+                                                                setOrderToComplete(order);
+                                                                setShowCompleteModal(true);
+                                                            }}
+                                                        >
+                                                            Complete Order
+                                                        </button>
+                                                    );
+                                                }
+
+                                                // Show status as label for other statuses
+                                                const statusConfig = {
+                                                    processing: { color: 'bg-info/10 text-info', label: 'Processing' },
+                                                    completed: { color: 'bg-success/10 text-success', label: 'Completed' },
+                                                    cancelled: { color: 'bg-danger/10 text-danger', label: 'Cancelled' },
+                                                    rejected: { color: 'bg-danger/10 text-danger', label: 'Rejected' },
+                                                };
+
+                                                const config = statusConfig[status as keyof typeof statusConfig] || { color: 'bg-gray-100 text-gray-800', label: status };
+
+                                                return <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${config.color}`}>{config.label}</span>;
+                                            },
+                                        },
+                                        {
+                                            accessor: 'assigned_delivery_company',
+                                            title: 'Delivery Company',
+                                            sortable: false,
+                                            render: ({ assigned_delivery_company, id, status }) => {
+                                                if (assigned_delivery_company) {
+                                                    return (
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                                                                <IconTruck className="h-4 w-4 text-blue-600" />
+                                                            </div>
+                                                            <div className="flex-1">
+                                                                <div className="text-sm font-medium">{assigned_delivery_company.company_name}</div>
+                                                            </div>
+                                                        </div>
+                                                    );
+                                                }
+                                                return <span className="text-gray-500">-</span>;
+                                            },
+                                        },
+                                        {
+                                            accessor: 'assigned_driver',
+                                            title: 'Driver',
+                                            sortable: false,
+                                            render: ({ assigned_driver, id, status }) => {
+                                                if (assigned_driver) {
+                                                    return (
+                                                        <div className="flex items-center gap-2">
+                                                            <div className="w-8 h-8 rounded-full bg-primary/10 flex items-center justify-center">
+                                                                <IconUser className="h-4 w-4 text-primary" />
+                                                            </div>
+                                                            <div className="flex-1">
+                                                                <div className="text-sm font-medium">{assigned_driver.name}</div>
+                                                                <div className="text-xs text-gray-500">{assigned_driver.phone}</div>
+                                                            </div>
+                                                            {/* Only show unassign button for processing status */}
+                                                            {status === 'processing' && (
+                                                                <button
+                                                                    type="button"
+                                                                    className="opacity-0 group-hover:opacity-100 transition-opacity p-1 hover:bg-red-100 rounded-full"
+                                                                    title="Unassign Driver"
+                                                                    onClick={(e) => {
+                                                                        e.stopPropagation();
+                                                                        handleRemoveDriver(id);
+                                                                    }}
+                                                                >
+                                                                    <IconX className="h-4 w-4 text-red-500" />
+                                                                </button>
+                                                            )}
+                                                        </div>
+                                                    );
+                                                }
+                                                // Only show assign button for processing status
+                                                if (status === 'processing') {
+                                                    return (
+                                                        <button
+                                                            type="button"
+                                                            className="btn btn-outline-success btn-sm"
+                                                            title="Assign Driver"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                const order = displayItems.find((d) => d.id === id);
+                                                                setSelectedOrder(order);
+                                                                setShowAssignModal(true);
+                                                            }}
+                                                        >
+                                                            <IconUser className="h-4 w-4" />
+                                                            <span className="ml-1">ASSIGN</span>
+                                                        </button>
+                                                    );
+                                                }
+                                                // Show "Unassigned" for other statuses
+                                                return <span className="text-gray-500 text-sm">Unassigned</span>;
+                                            },
+                                        },
+                                        {
+                                            accessor: 'action',
+                                            title: t('actions'),
+                                            titleClassName: '!text-center',
+                                            render: ({ id }) => {
+                                                const order = displayItems.find((d) => d.id === id);
+                                                const showDangerIcon = order?.status === 'processing' || order?.status === 'on_the_way';
+
+                                                return (
+                                                    <div className="flex items-center justify-center gap-2">
+                                                        <button
+                                                            type="button"
+                                                            className="hover:text-warning relative"
+                                                            title="Add Comment"
+                                                            onClick={(e) => {
+                                                                e.stopPropagation();
+                                                                setSelectedOrderForComment(order);
+                                                                setShowCommentModal(true);
+                                                            }}
+                                                        >
+                                                            <IconMessage className="h-5 w-5" />
+                                                            {ordersWithComments.has(id) ? <span className="absolute -top-1 -right-1 h-2 w-2 bg-warning rounded-full"></span> : null}
+                                                        </button>
+                                                        {showDangerIcon && (
+                                                            <button
+                                                                type="button"
+                                                                className="hover:text-danger"
+                                                                title="Cancel/Reject Order"
+                                                                onClick={(e) => {
+                                                                    e.stopPropagation();
+                                                                    setSelectedOrderForComment(order);
+                                                                    setShowDangerModal(true);
+                                                                }}
+                                                            >
+                                                                <IconAlertTriangle className="h-5 w-5" />
+                                                            </button>
+                                                        )}
+                                                        <ActionsMenu
+                                                            orderId={id}
+                                                            onView={() => router.push(`/delivery/orders/preview/${id}`)}
+                                                            onDownload={() => handleDownloadOrderPDF(id)}
+                                                            onDelete={() => {
+                                                                const order = items.find((d) => d.id === id);
+                                                                setOrderToDelete(order || null);
+                                                                setShowConfirmModal(true);
+                                                            }}
+                                                        />
+                                                    </div>
+                                                );
+                                            },
+                                        },
+                                    ]}
+                                    totalRecords={initialRecords.length}
+                                    recordsPerPage={pageSize}
+                                    page={page}
+                                    onPageChange={(p) => setPage(p)}
+                                    recordsPerPageOptions={PAGE_SIZES}
+                                    onRecordsPerPageChange={setPageSize}
+                                    sortStatus={sortStatus}
+                                    onSortStatusChange={setSortStatus}
+                                    selectedRecords={selectedRecords}
+                                    onSelectedRecordsChange={setSelectedRecords}
+                                    paginationText={({ from, to, totalRecords }) => `${t('showing')} ${from} ${t('to')} ${to} ${t('of')} ${totalRecords} ${t('entries')}`}
+                                />
+                            </div>
+                        )}
+
+                        {loading && <div className="absolute inset-0 z-10 flex items-center justify-center bg-white dark:bg-black-dark-light bg-opacity-60 backdrop-blur-sm" />}
                     </div>
                 </div>
             </div>

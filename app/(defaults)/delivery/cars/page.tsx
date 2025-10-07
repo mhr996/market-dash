@@ -14,6 +14,7 @@ import supabase from '@/lib/supabase';
 import { Alert } from '@/components/elements/alerts/elements-alerts-default';
 import ConfirmModal from '@/components/modals/confirm-modal';
 import { getTranslation } from '@/i18n';
+import EditCarDialog from './components/EditCarDialog';
 
 interface DeliveryCar {
     id: number;
@@ -63,6 +64,10 @@ const DeliveryCarsList = () => {
         message: '',
         type: 'success',
     });
+
+    // Edit dialog state
+    const [showEditDialog, setShowEditDialog] = useState(false);
+    const [carToEdit, setCarToEdit] = useState<DeliveryCar | null>(null);
 
     useEffect(() => {
         const fetchCars = async () => {
@@ -130,6 +135,37 @@ const DeliveryCarsList = () => {
                 setShowConfirmModal(true);
             }
         }
+    };
+
+    const handleEditClick = (car: DeliveryCar) => {
+        setCarToEdit(car);
+        setShowEditDialog(true);
+    };
+
+    const handleEditSuccess = () => {
+        // Refresh the cars list
+        const fetchCars = async () => {
+            try {
+                const { data, error } = await supabase
+                    .from('delivery_cars')
+                    .select(
+                        `
+                        *,
+                        delivery_drivers(
+                            id,
+                            name,
+                            phone
+                        )
+                    `,
+                    )
+                    .order('created_at', { ascending: false });
+                if (error) throw error;
+                setItems(data as DeliveryCar[]);
+            } catch (error) {
+                // Error fetching delivery cars
+            }
+        };
+        fetchCars();
     };
 
     // Confirm deletion callback.
@@ -207,8 +243,8 @@ const DeliveryCarsList = () => {
                 <div className="relative">
                     {viewMode === 'grid' ? (
                         // Card Grid View
-                        <div className="p-6">
-                            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                        <div className="p-3">
+                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8">
                                 {initialRecords.slice((page - 1) * pageSize, page * pageSize).map((car) => (
                                     <div
                                         key={car.id}
@@ -216,21 +252,21 @@ const DeliveryCarsList = () => {
                                     >
                                         {/* Car Image */}
                                         <div className="relative">
-                                            <img className="h-48 w-full object-cover rounded-t-xl" src={`/assets/images/car-placeholder.jpg`} alt={`${car.brand} ${car.model}`} />
+                                            <img className="h-20 w-full object-cover rounded-t-xl" src={`/assets/images/car-placeholder.jpg`} alt={`${car.brand} ${car.model}`} />
                                         </div>
 
                                         {/* Car Details */}
-                                        <div className="p-6 flex-1">
-                                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 line-clamp-2">
+                                        <div className="p-3 flex-1">
+                                            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1 line-clamp-2">
                                                 {car.brand} {car.model}
                                             </h3>
-                                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-3 line-clamp-2">Plate: {car.plate_number}</p>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 line-clamp-1">Plate: {car.plate_number}</p>
 
                                             {/* Car Info */}
-                                            <div className="space-y-2 text-sm">
+                                            <div className="space-y-1 text-xs">
                                                 <div className="flex items-center justify-between">
                                                     <span className="text-gray-500 dark:text-gray-400">Color</span>
-                                                    <span className="font-medium">{car.color || 'N/A'}</span>
+                                                    <span className="font-medium truncate">{car.color || 'N/A'}</span>
                                                 </div>
                                                 <div className="flex items-center justify-between">
                                                     <span className="text-gray-500 dark:text-gray-400">Capacity</span>
@@ -238,33 +274,32 @@ const DeliveryCarsList = () => {
                                                 </div>
                                                 <div className="flex items-center justify-between">
                                                     <span className="text-gray-500 dark:text-gray-400">Driver</span>
-                                                    <span className="font-medium">{car.delivery_drivers?.name || 'Unassigned'}</span>
-                                                </div>
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-gray-500 dark:text-gray-400">Created</span>
-                                                    <span className="font-medium">{new Date(car.created_at || '').toLocaleDateString()}</span>
+                                                    <span className="font-medium truncate">{car.delivery_drivers?.name || 'Unassigned'}</span>
                                                 </div>
                                             </div>
                                         </div>
 
                                         {/* Action Buttons */}
-                                        <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700/50 rounded-b-xl">
+                                        <div className="px-3 py-2 bg-gray-50 dark:bg-gray-700/50 rounded-b-xl">
                                             <div className="flex items-center justify-between">
-                                                <div className="flex space-x-3">
-                                                    <Link
-                                                        href={`/delivery/cars/edit/${car.id}`}
-                                                        className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
+                                                <div className="flex space-x-1">
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleEditClick(car);
+                                                        }}
+                                                        className="inline-flex items-center px-2 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-primary dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
                                                         title="Edit Car"
                                                     >
-                                                        <IconEdit className="h-4 w-4 mr-1" />
+                                                        <IconEdit className="h-3 w-3 mr-1" />
                                                         Edit
-                                                    </Link>
+                                                    </button>
                                                     <Link
                                                         href={`/delivery/cars/preview/${car.id}`}
-                                                        className="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-primary border border-transparent rounded-lg hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                                                        className="inline-flex items-center px-2 py-1 text-xs font-medium text-white bg-primary border border-transparent rounded hover:bg-primary/90 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-primary"
                                                         title="View Car"
                                                     >
-                                                        <IconEye className="h-4 w-4 mr-1" />
+                                                        <IconEye className="h-3 w-3 mr-1" />
                                                         View
                                                     </Link>
                                                 </div>
@@ -274,10 +309,10 @@ const DeliveryCarsList = () => {
                                                         setCarToDelete(car);
                                                         setShowConfirmModal(true);
                                                     }}
-                                                    className="inline-flex items-center p-2 text-sm font-medium text-red-600 hover:text-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                                                    className="inline-flex items-center p-1 text-xs font-medium text-red-600 hover:text-red-800 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-red-500"
                                                     title="Delete Car"
                                                 >
-                                                    <IconTrashLines className="h-4 w-4" />
+                                                    <IconTrashLines className="h-3 w-3" />
                                                 </button>
                                             </div>
                                         </div>
@@ -386,26 +421,35 @@ const DeliveryCarsList = () => {
                                         title: t('actions'),
                                         sortable: false,
                                         textAlignment: 'center',
-                                        render: ({ id }) => (
-                                            <div className="mx-auto flex w-max items-center gap-4">
-                                                <Link href={`/delivery/cars/edit/${id}`} className="flex hover:text-info" onClick={(e) => e.stopPropagation()}>
-                                                    <IconEdit className="h-4.5 w-4.5" />
-                                                </Link>
-                                                <Link href={`/delivery/cars/preview/${id}`} className="flex hover:text-primary" onClick={(e) => e.stopPropagation()}>
-                                                    <IconEye />
-                                                </Link>
-                                                <button
-                                                    type="button"
-                                                    className="flex hover:text-danger"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        deleteRow(id);
-                                                    }}
-                                                >
-                                                    <IconTrashLines />
-                                                </button>
-                                            </div>
-                                        ),
+                                        render: ({ id }) => {
+                                            const car = items.find((c) => c.id === id);
+                                            return (
+                                                <div className="mx-auto flex w-max items-center gap-4">
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            if (car) handleEditClick(car);
+                                                        }}
+                                                        className="flex hover:text-info"
+                                                    >
+                                                        <IconEdit className="h-4.5 w-4.5" />
+                                                    </button>
+                                                    <Link href={`/delivery/cars/preview/${id}`} className="flex hover:text-primary" onClick={(e) => e.stopPropagation()}>
+                                                        <IconEye />
+                                                    </Link>
+                                                    <button
+                                                        type="button"
+                                                        className="flex hover:text-danger"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            deleteRow(id);
+                                                        }}
+                                                    >
+                                                        <IconTrashLines />
+                                                    </button>
+                                                </div>
+                                            );
+                                        },
                                     },
                                 ]}
                                 highlightOnHover
@@ -442,6 +486,17 @@ const DeliveryCarsList = () => {
                 confirmLabel={t('delete')}
                 cancelLabel={t('cancel')}
                 size="sm"
+            />
+
+            {/* Edit Car Dialog */}
+            <EditCarDialog
+                isOpen={showEditDialog}
+                onClose={() => {
+                    setShowEditDialog(false);
+                    setCarToEdit(null);
+                }}
+                car={carToEdit}
+                onSuccess={handleEditSuccess}
             />
         </div>
     );

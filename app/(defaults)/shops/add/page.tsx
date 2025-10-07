@@ -32,17 +32,6 @@ interface Profile {
     email?: string;
 }
 
-interface ShopOwner {
-    id: number;
-    user_id: string;
-    shop_id: number;
-    role: string;
-    profiles?: {
-        full_name: string;
-        email?: string;
-    };
-}
-
 interface ShopCategory {
     id: number;
     title: string;
@@ -76,7 +65,6 @@ const AddShopPage = () => {
         shop_desc: '',
         logo_url: '',
         cover_image_url: '',
-        shop_owners: [] as ShopOwner[],
         public: true, // Renamed from active to public - controls shop visibility
         status: 'Approved',
         statusDropdownOpen: false, // Track if status dropdown is open
@@ -120,12 +108,6 @@ const AddShopPage = () => {
     const [isDeliveryCompanyDropdownOpen, setIsDeliveryCompanyDropdownOpen] = useState(false);
     const [searchDeliveryCompanyTerm, setSearchDeliveryCompanyTerm] = useState('');
     const deliveryCompanyRef = useRef<HTMLDivElement>(null);
-
-    // Shop owners states
-    const [availableOwners, setAvailableOwners] = useState<Profile[]>([]);
-    const [isOwnerDropdownOpen, setIsOwnerDropdownOpen] = useState(false);
-    const [searchOwnerTerm, setSearchOwnerTerm] = useState('');
-    const ownerRef = useRef<HTMLDivElement>(null);
 
     // Pricing states
     const [deliveryPrices, setDeliveryPrices] = useState<{
@@ -188,16 +170,6 @@ const AddShopPage = () => {
     useEffect(() => {
         const fetchData = async () => {
             try {
-                // Fetch available shop owners (profiles with role = 2)
-                const { data: ownersData, error: ownersError } = await supabase
-                    .from('profiles')
-                    .select('id, full_name, avatar_url')
-                    .eq('role', 2)
-                    .order('full_name', { ascending: true });
-
-                if (ownersError) throw ownersError;
-                setAvailableOwners(ownersData || []);
-
                 // Fetch all shop categories
                 const { data: shopCategoriesData, error: shopCategoriesError } = await supabase.from('categories_shop').select('*').order('title', { ascending: true });
                 const { data: shopSubCategoriesData, error: shopSubCategoriesError } = await supabase.from('categories_sub_shop').select('*').order('title', { ascending: true });
@@ -219,37 +191,6 @@ const AddShopPage = () => {
         fetchData();
     }, []);
 
-    // Owner management functions
-    const addOwner = (ownerId: string) => {
-        const owner = availableOwners.find((o) => o.id === ownerId);
-        if (owner && !form.shop_owners?.some((o) => o.user_id === ownerId)) {
-            setForm((prev) => ({
-                ...prev,
-                shop_owners: [
-                    ...(prev.shop_owners || []),
-                    {
-                        id: 0, // Will be set when saved
-                        user_id: ownerId,
-                        shop_id: 0, // Will be set when saved
-                        role: 'shop_owner',
-                        profiles: {
-                            full_name: owner.full_name,
-                            email: owner.email || '',
-                        },
-                    },
-                ],
-            }));
-        }
-        setIsOwnerDropdownOpen(false);
-        setSearchOwnerTerm('');
-    };
-
-    const removeOwner = (ownerId: string) => {
-        setForm((prev) => ({
-            ...prev,
-            shop_owners: (prev.shop_owners || []).filter((o) => o.user_id !== ownerId),
-        }));
-    };
     useEffect(() => {
         const handleClickOutside = (event: MouseEvent) => {
             if (dropdownRef.current && !dropdownRef.current.contains(event.target as Node)) {
@@ -263,9 +204,6 @@ const AddShopPage = () => {
             }
             if (deliveryCompanyRef.current && !deliveryCompanyRef.current.contains(event.target as Node)) {
                 setIsDeliveryCompanyDropdownOpen(false);
-            }
-            if (ownerRef.current && !ownerRef.current.contains(event.target as Node)) {
-                setIsOwnerDropdownOpen(false);
             }
         };
 
@@ -444,14 +382,9 @@ const AddShopPage = () => {
         e.preventDefault();
         setLoading(true);
 
-        // Basic validation: shop name and at least one owner are required.
+        // Basic validation: shop name is required.
         if (!form.shop_name) {
             setAlert({ visible: true, message: t('shop_name_required'), type: 'danger' });
-            setLoading(false);
-            return;
-        }
-        if (!form.shop_owners || form.shop_owners.length === 0) {
-            setAlert({ visible: true, message: 'At least one shop owner is required', type: 'danger' });
             setLoading(false);
             return;
         }
@@ -480,22 +413,6 @@ const AddShopPage = () => {
             const { data: newShop, error } = await supabase.from('shops').insert([insertPayload]).select().single();
 
             if (error) throw error;
-
-            // Insert shop owners
-            if (form.shop_owners && form.shop_owners.length > 0) {
-                const ownerAssignments = form.shop_owners.map((owner) => ({
-                    user_id: owner.user_id,
-                    shop_id: newShop.id,
-                    role: 'shop_owner',
-                }));
-
-                const { error: ownerError } = await supabase.from('user_roles_shop').insert(ownerAssignments);
-
-                if (ownerError) {
-                    console.error('Error inserting shop owners:', ownerError);
-                    // Don't fail the entire operation, just log the error
-                }
-            }
 
             // Initialize the improved folder structure for the new shop
             await StorageManager.initializeShopStructure(newShop.id);
@@ -696,85 +613,6 @@ const AddShopPage = () => {
                                         placeholder={t('enter_shop_description')}
                                         rows={4}
                                     />
-                                </div>
-                                {/* Shop Owners Selection */}
-                                <div>
-                                    <label className="block text-sm font-bold text-gray-700 dark:text-white mb-2">
-                                        Shop Owners <span className="text-red-500">*</span>
-                                    </label>
-                                    <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">Select one or more shop owners for this shop.</p>
-
-                                    {/* Selected Shop Owners */}
-                                    {form.shop_owners && form.shop_owners.length > 0 && (
-                                        <div className="mb-4">
-                                            <div className="flex flex-wrap gap-2">
-                                                {form.shop_owners.map((owner) => (
-                                                    <div
-                                                        key={owner.user_id}
-                                                        className="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 text-primary rounded-full text-sm"
-                                                    >
-                                                        <span>{owner.profiles?.full_name || 'Unknown'}</span>
-                                                        <button
-                                                            type="button"
-                                                            onClick={() => removeOwner(owner.user_id)}
-                                                            className="hover:text-red-500 transition-colors"
-                                                        >
-                                                            <IconX className="h-3 w-3" />
-                                                        </button>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    )}
-
-                                    {/* Owner Selection Dropdown */}
-                                    <div className="relative" ref={ownerRef}>
-                                        <div
-                                            className="cursor-pointer rounded border border-[#e0e6ed] bg-white p-2.5 text-dark dark:border-[#191e3a] dark:bg-black dark:text-white-dark flex items-center justify-between"
-                                            onClick={() => setIsOwnerDropdownOpen(!isOwnerDropdownOpen)}
-                                        >
-                                            <span>Select shop owners...</span>
-                                            <IconCaretDown className={`h-4 w-4 transition-transform duration-300 ${isOwnerDropdownOpen ? 'rotate-180' : ''}`} />
-                                        </div>
-
-                                        {isOwnerDropdownOpen && (
-                                            <div className="absolute z-50 w-full mt-1 bg-white dark:bg-black border border-[#e0e6ed] dark:border-[#191e3a] rounded shadow-lg">
-                                                <div className="p-2">
-                                                    <input
-                                                        type="text"
-                                                        className="w-full rounded border border-[#e0e6ed] p-2 focus:border-primary focus:outline-none dark:border-[#191e3a] dark:bg-black dark:text-white-dark"
-                                                        placeholder="Search owners..."
-                                                        value={searchOwnerTerm}
-                                                        onChange={(e) => setSearchOwnerTerm(e.target.value)}
-                                                    />
-                                                </div>
-                                                <div className="max-h-48 overflow-y-auto">
-                                                    {availableOwners
-                                                        .filter((owner) => 
-                                                            owner.full_name.toLowerCase().includes(searchOwnerTerm.toLowerCase()) &&
-                                                            !form.shop_owners?.some((o) => o.user_id === owner.id)
-                                                        )
-                                                        .map((owner) => (
-                                                            <div
-                                                                key={owner.id}
-                                                                className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer flex items-center justify-between"
-                                                                onClick={() => addOwner(owner.id)}
-                                                            >
-                                                                <div>
-                                                                    <div className="font-medium">{owner.full_name}</div>
-                                                                </div>
-                                                            </div>
-                                                        ))}
-                                                    {availableOwners.filter((owner) => 
-                                                        owner.full_name.toLowerCase().includes(searchOwnerTerm.toLowerCase()) &&
-                                                        !form.shop_owners?.some((o) => o.user_id === owner.id)
-                                                    ).length === 0 && (
-                                                        <div className="px-4 py-2 text-gray-500 text-sm">No available owners found</div>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        )}
-                                    </div>
                                 </div>
                                 <div ref={categoryRef} className="relative">
                                     <label htmlFor="category_id" className="block text-sm font-bold text-gray-700 dark:text-white">

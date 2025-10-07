@@ -53,17 +53,6 @@ interface DeliveryCompany {
     company_name: string;
 }
 
-interface ShopOwner {
-    id: number;
-    user_id: string;
-    shop_id: number;
-    role: string;
-    profiles?: {
-        full_name: string;
-        email?: string;
-    };
-}
-
 interface Shop {
     id: number;
     created_at: string;
@@ -83,7 +72,6 @@ interface Shop {
     gallery?: string[];
     latitude?: number | null;
     longitude?: number | null;
-    shop_owners?: ShopOwner[];
 }
 
 const EditShop = () => {
@@ -106,12 +94,7 @@ const EditShop = () => {
     const [isDeliveryCompanyDropdownOpen, setIsDeliveryCompanyDropdownOpen] = useState(false);
     const [searchDeliveryCompanyTerm, setSearchDeliveryCompanyTerm] = useState('');
 
-    // Shop owners states
-    const [availableOwners, setAvailableOwners] = useState<{ id: string; full_name: string; email?: string }[]>([]);
-    const [isOwnerDropdownOpen, setIsOwnerDropdownOpen] = useState(false);
-    const [searchOwnerTerm, setSearchOwnerTerm] = useState('');
     const deliveryCompanyRef = useRef<HTMLDivElement>(null);
-    const ownerRef = useRef<HTMLDivElement>(null);
 
     // State for delivery methods per company
     const [deliveryMethods, setDeliveryMethods] = useState<{ [companyId: number]: any[] }>({});
@@ -167,9 +150,6 @@ const EditShop = () => {
             if (deliveryCompanyRef.current && !deliveryCompanyRef.current.contains(event.target as Node)) {
                 setIsDeliveryCompanyDropdownOpen(false);
             }
-            if (ownerRef.current && !ownerRef.current.contains(event.target as Node)) {
-                setIsOwnerDropdownOpen(false);
-            }
         };
 
         document.addEventListener('mousedown', handleClickOutside);
@@ -195,42 +175,40 @@ const EditShop = () => {
                             logo_url
                         )
                     ),
-                    shop_owners:user_roles_shop(
-                        id,
-                        user_id,
-                        shop_id,
-                        role,
-                        profiles(
-                            full_name,
-                            email
-                        )
-                    )
                 `,
                 )
                 .eq('id', id)
                 .single();
             if (error) throw error;
 
+            // Check if data is valid (not a ParserError)
+            if (!data || typeof data !== 'object' || 'code' in data) {
+                throw new Error('Invalid shop data received');
+            }
+
+            // Type assertion to ensure data is treated as the expected shop type
+            const shopData = data as any;
+
             // If work_hours is not set, initialize with default work hours
-            if (!data.work_hours) {
-                data.work_hours = defaultWorkHours;
+            if (!shopData.work_hours) {
+                shopData.work_hours = defaultWorkHours;
             }
 
             // If phone_numbers is not set, initialize with an empty array
-            if (!data.phone_numbers) {
-                data.phone_numbers = [''];
+            if (!shopData.phone_numbers) {
+                shopData.phone_numbers = [''];
             }
 
             // If gallery is not set, initialize with an empty array
-            if (!data.gallery) {
-                data.gallery = [];
+            if (!shopData.gallery) {
+                shopData.gallery = [];
             }
 
             // Process delivery companies data
-            const deliveryCompanyIds = data.shop_delivery_companies?.filter((sdc: any) => sdc.is_active).map((sdc: any) => sdc.delivery_company_id) || [];
+            const deliveryCompanyIds = shopData.shop_delivery_companies?.filter((sdc: any) => sdc.is_active).map((sdc: any) => sdc.delivery_company_id) || [];
 
             setForm({
-                ...data,
+                ...shopData,
                 delivery_company_ids: deliveryCompanyIds,
             });
 
@@ -248,12 +226,6 @@ const EditShop = () => {
 
             if (deliveryCompaniesError) throw deliveryCompaniesError;
             setDeliveryCompanies(deliveryCompaniesData || []);
-
-            // Fetch available shop owners (profiles with role = 2)
-            const { data: ownersData, error: ownersError } = await supabase.from('profiles').select('id, full_name, email').eq('role', 2).order('full_name', { ascending: true });
-
-            if (ownersError) throw ownersError;
-            setAvailableOwners(ownersData || []);
         } catch (error) {
             setAlert({ visible: true, message: 'Error fetching shop details', type: 'danger' });
         } finally {
@@ -355,38 +327,6 @@ const EditShop = () => {
 
     const handleGalleryError = (error: string) => {
         setAlert({ visible: true, message: error, type: 'danger' });
-    };
-
-    // Owner management functions
-    const addOwner = (ownerId: string) => {
-        const owner = availableOwners.find((o) => o.id === ownerId);
-        if (owner && !form.shop_owners?.some((o) => o.user_id === ownerId)) {
-            setForm((prev) => ({
-                ...prev,
-                shop_owners: [
-                    ...(prev.shop_owners || []),
-                    {
-                        id: 0, // Will be set when saved
-                        user_id: ownerId,
-                        shop_id: parseInt(id),
-                        role: 'shop_owner',
-                        profiles: {
-                            full_name: owner.full_name,
-                            email: owner.email,
-                        },
-                    },
-                ],
-            }));
-        }
-        setIsOwnerDropdownOpen(false);
-        setSearchOwnerTerm('');
-    };
-
-    const removeOwner = (ownerId: string) => {
-        setForm((prev) => ({
-            ...prev,
-            shop_owners: (prev.shop_owners || []).filter((o) => o.user_id !== ownerId),
-        }));
     };
 
     // Fetch delivery pricing for a specific company
@@ -621,29 +561,6 @@ const EditShop = () => {
             } else {
                 // If no delivery companies selected, remove all assignments
                 await supabase.from('shop_delivery_companies').delete().eq('shop_id', id);
-            }
-
-            // Update shop owners
-            if (form.shop_owners && form.shop_owners.length > 0) {
-                // First, remove all existing owner assignments
-                await supabase.from('user_roles_shop').delete().eq('shop_id', id).eq('role', 'shop_owner');
-
-                // Then, insert new owner assignments
-                const ownerAssignments = form.shop_owners.map((owner) => ({
-                    user_id: owner.user_id,
-                    shop_id: id,
-                    role: 'shop_owner',
-                }));
-
-                const { error: ownerError } = await supabase.from('user_roles_shop').insert(ownerAssignments);
-
-                if (ownerError) {
-                    console.error('Error updating shop owners:', ownerError);
-                    // Don't fail the entire operation, just log the error
-                }
-            } else {
-                // If no owners selected, remove all owner assignments
-                await supabase.from('user_roles_shop').delete().eq('shop_id', id).eq('role', 'shop_owner');
             }
 
             // Fetch the updated shop data to confirm changes
@@ -1299,73 +1216,6 @@ const EditShop = () => {
                         </div>
                     </div>
                 )}
-                {/* Shop Owners Section */}
-                <div className="grid grid-cols-1 gap-6">
-                    <div>
-                        <label className="block text-sm font-bold text-gray-700 dark:text-white mb-2">Shop Owners</label>
-                        <p className="text-gray-500 dark:text-gray-400 text-sm mb-4">Select one or more shop owners for this shop.</p>
-
-                        {/* Selected Shop Owners */}
-                        {form.shop_owners && form.shop_owners.length > 0 && (
-                            <div className="mb-4">
-                                <div className="flex flex-wrap gap-2">
-                                    {form.shop_owners.map((owner) => (
-                                        <div key={owner.user_id} className="inline-flex items-center gap-2 px-3 py-1 bg-primary/10 text-primary rounded-full text-sm">
-                                            <span>{owner.profiles?.full_name || 'Unknown'}</span>
-                                            <button type="button" onClick={() => removeOwner(owner.user_id)} className="hover:text-red-500 transition-colors">
-                                                <IconX className="h-3 w-3" />
-                                            </button>
-                                        </div>
-                                    ))}
-                                </div>
-                            </div>
-                        )}
-
-                        {/* Owner Selection Dropdown */}
-                        <div className="relative" ref={ownerRef}>
-                            <div
-                                className="cursor-pointer rounded border border-[#e0e6ed] bg-white p-2.5 text-dark dark:border-[#191e3a] dark:bg-black dark:text-white-dark flex items-center justify-between"
-                                onClick={() => setIsOwnerDropdownOpen(!isOwnerDropdownOpen)}
-                            >
-                                <span>Select shop owners...</span>
-                                <IconCaretDown className={`h-4 w-4 transition-transform duration-300 ${isOwnerDropdownOpen ? 'rotate-180' : ''}`} />
-                            </div>
-
-                            {isOwnerDropdownOpen && (
-                                <div className="absolute z-50 w-full mt-1 bg-white dark:bg-black border border-[#e0e6ed] dark:border-[#191e3a] rounded shadow-lg">
-                                    <div className="p-2">
-                                        <input
-                                            type="text"
-                                            className="w-full rounded border border-[#e0e6ed] p-2 focus:border-primary focus:outline-none dark:border-[#191e3a] dark:bg-black dark:text-white-dark"
-                                            placeholder="Search owners..."
-                                            value={searchOwnerTerm}
-                                            onChange={(e) => setSearchOwnerTerm(e.target.value)}
-                                        />
-                                    </div>
-                                    <div className="max-h-48 overflow-y-auto">
-                                        {availableOwners
-                                            .filter((owner) => owner.full_name.toLowerCase().includes(searchOwnerTerm.toLowerCase()) && !form.shop_owners?.some((o) => o.user_id === owner.id))
-                                            .map((owner) => (
-                                                <div
-                                                    key={owner.id}
-                                                    className="px-4 py-2 hover:bg-gray-100 dark:hover:bg-gray-800 cursor-pointer flex items-center justify-between"
-                                                    onClick={() => addOwner(owner.id)}
-                                                >
-                                                    <div>
-                                                        <div className="font-medium">{owner.full_name}</div>
-                                                        <div className="text-sm text-gray-500">{owner.email}</div>
-                                                    </div>
-                                                </div>
-                                            ))}
-                                        {availableOwners.filter(
-                                            (owner) => owner.full_name.toLowerCase().includes(searchOwnerTerm.toLowerCase()) && !form.shop_owners?.some((o) => o.user_id === owner.id),
-                                        ).length === 0 && <div className="px-4 py-2 text-gray-500 text-sm">No available owners found</div>}
-                                    </div>
-                                </div>
-                            )}
-                        </div>
-                    </div>
-                </div>
                 <div className="flex justify-end gap-4">
                     <button type="button" className="btn btn-outline-danger" onClick={() => router.back()}>
                         Cancel

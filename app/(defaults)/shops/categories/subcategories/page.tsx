@@ -14,6 +14,7 @@ import supabase from '@/lib/supabase';
 import { Alert } from '@/components/elements/alerts/elements-alerts-default';
 import ConfirmModal from '@/components/modals/confirm-modal';
 import { getTranslation } from '@/i18n';
+import EditShopSubCategoryDialog from './components/EditShopSubCategoryDialog';
 
 interface ShopCategory {
     id: number;
@@ -62,6 +63,10 @@ const ShopSubCategoriesList = () => {
         message: '',
         type: 'success',
     });
+
+    // Edit dialog state
+    const [showEditDialog, setShowEditDialog] = useState(false);
+    const [subCategoryToEdit, setSubCategoryToEdit] = useState<ShopSubCategory | null>(null);
 
     useEffect(() => {
         const fetchSubCategories = async () => {
@@ -114,6 +119,25 @@ const ShopSubCategoriesList = () => {
                 setShowConfirmModal(true);
             }
         }
+    };
+
+    const handleEditClick = (subCategory: ShopSubCategory) => {
+        setSubCategoryToEdit(subCategory);
+        setShowEditDialog(true);
+    };
+
+    const handleEditSuccess = () => {
+        // Refresh the subcategories list
+        const fetchSubCategories = async () => {
+            try {
+                const { data, error } = await supabase.from('categories_sub_shop').select('*, categories_shop(*)').order('created_at', { ascending: false });
+                if (error) throw error;
+                setItems(data as ShopSubCategory[]);
+            } catch (error) {
+                // Error fetching subcategories
+            }
+        };
+        fetchSubCategories();
     };
 
     const confirmDeletion = async () => {
@@ -190,8 +214,8 @@ const ShopSubCategoriesList = () => {
                 <div className="relative">
                     {viewMode === 'grid' ? (
                         // Card Grid View
-                        <div className="p-6">
-                            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                        <div className="p-3">
+                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8">
                                 {initialRecords.slice((page - 1) * pageSize, page * pageSize).map((subcategory) => (
                                     <div
                                         key={subcategory.id}
@@ -200,48 +224,47 @@ const ShopSubCategoriesList = () => {
                                         {/* Subcategory Image */}
                                         <div className="relative">
                                             <img
-                                                className="h-48 w-full object-cover rounded-t-xl"
+                                                className="h-20 w-full object-cover rounded-t-xl"
                                                 src={subcategory.image_url || `/assets/images/subcategory-placeholder.jpg`}
                                                 alt={subcategory.title}
                                             />
                                         </div>
 
                                         {/* Subcategory Details */}
-                                        <div className="p-6 flex-1">
-                                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 line-clamp-2">{subcategory.title}</h3>
-                                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-3 line-clamp-3">{subcategory.description}</p>
+                                        <div className="p-3 flex-1">
+                                            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1 line-clamp-2">{subcategory.title}</h3>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 line-clamp-2">{subcategory.description}</p>
 
                                             {/* Category and Created Info */}
-                                            <div className="space-y-2 text-sm">
+                                            <div className="space-y-1 text-xs">
                                                 <div className="flex items-center justify-between">
                                                     <span className="text-gray-500 dark:text-gray-400">Category</span>
-                                                    <span className="font-medium">{subcategory.categories_shop?.title || 'N/A'}</span>
-                                                </div>
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-gray-500 dark:text-gray-400">Created</span>
-                                                    <span className="font-medium">{new Date(subcategory.created_at).toLocaleDateString()}</span>
+                                                    <span className="font-medium truncate">{subcategory.categories_shop?.title || 'N/A'}</span>
                                                 </div>
                                             </div>
                                         </div>
 
                                         {/* Action Buttons */}
-                                        <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700/50 rounded-b-xl">
+                                        <div className="px-3 py-2 bg-gray-50 dark:bg-gray-700/50 rounded-b-xl">
                                             <div className="flex items-center justify-between">
-                                                <div className="flex space-x-3">
-                                                    <Link
-                                                        href={`/shops/categories/subcategories/edit/${subcategory.id}`}
-                                                        className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
+                                                <div className="flex space-x-1">
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleEditClick(subcategory);
+                                                        }}
+                                                        className="inline-flex items-center px-2 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-primary dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
                                                         title="Edit Subcategory"
                                                     >
-                                                        <IconEdit className="h-4 w-4 mr-1" />
+                                                        <IconEdit className="h-3 w-3 mr-1" />
                                                         Edit
-                                                    </Link>
+                                                    </button>
                                                     <Link
                                                         href={`/shops/categories/subcategories/preview/${subcategory.id}`}
-                                                        className="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-primary border border-transparent rounded-lg hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                                                        className="inline-flex items-center px-2 py-1 text-xs font-medium text-white bg-primary border border-transparent rounded hover:bg-primary/90 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-primary"
                                                         title="View Subcategory"
                                                     >
-                                                        <IconEye className="h-4 w-4 mr-1" />
+                                                        <IconEye className="h-3 w-3 mr-1" />
                                                         View
                                                     </Link>
                                                 </div>
@@ -251,10 +274,10 @@ const ShopSubCategoriesList = () => {
                                                         setSubCategoryToDelete(subcategory);
                                                         setShowConfirmModal(true);
                                                     }}
-                                                    className="inline-flex items-center p-2 text-sm font-medium text-red-600 hover:text-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                                                    className="inline-flex items-center p-1 text-xs font-medium text-red-600 hover:text-red-800 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-red-500"
                                                     title="Delete Subcategory"
                                                 >
-                                                    <IconTrashLines className="h-4 w-4" />
+                                                    <IconTrashLines className="h-3 w-3" />
                                                 </button>
                                             </div>
                                         </div>
@@ -367,26 +390,35 @@ const ShopSubCategoriesList = () => {
                                         title: t('actions'),
                                         sortable: false,
                                         textAlignment: 'center',
-                                        render: ({ id }) => (
-                                            <div className="mx-auto flex w-max items-center gap-4">
-                                                <Link href={`/shops/categories/subcategories/edit/${id}`} className="flex hover:text-info" onClick={(e) => e.stopPropagation()}>
-                                                    <IconEdit className="h-4.5 w-4.5" />
-                                                </Link>
-                                                <Link href={`/shops/categories/subcategories/preview/${id}`} className="flex hover:text-primary" onClick={(e) => e.stopPropagation()}>
-                                                    <IconEye />
-                                                </Link>
-                                                <button
-                                                    type="button"
-                                                    className="flex hover:text-danger"
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        deleteRow(id);
-                                                    }}
-                                                >
-                                                    <IconTrashLines />
-                                                </button>
-                                            </div>
-                                        ),
+                                        render: ({ id }) => {
+                                            const subcategory = items.find((s) => s.id === id);
+                                            return (
+                                                <div className="mx-auto flex w-max items-center gap-4">
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            if (subcategory) handleEditClick(subcategory);
+                                                        }}
+                                                        className="flex hover:text-info"
+                                                    >
+                                                        <IconEdit className="h-4.5 w-4.5" />
+                                                    </button>
+                                                    <Link href={`/shops/categories/subcategories/preview/${id}`} className="flex hover:text-primary" onClick={(e) => e.stopPropagation()}>
+                                                        <IconEye />
+                                                    </Link>
+                                                    <button
+                                                        type="button"
+                                                        className="flex hover:text-danger"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            deleteRow(id);
+                                                        }}
+                                                    >
+                                                        <IconTrashLines />
+                                                    </button>
+                                                </div>
+                                            );
+                                        },
                                     },
                                 ]}
                                 highlightOnHover
@@ -421,6 +453,17 @@ const ShopSubCategoriesList = () => {
                 confirmLabel={t('delete')}
                 cancelLabel={t('cancel')}
                 size="sm"
+            />
+
+            {/* Edit Shop SubCategory Dialog */}
+            <EditShopSubCategoryDialog
+                isOpen={showEditDialog}
+                onClose={() => {
+                    setShowEditDialog(false);
+                    setSubCategoryToEdit(null);
+                }}
+                subcategory={subCategoryToEdit}
+                onSuccess={handleEditSuccess}
             />
         </div>
     );

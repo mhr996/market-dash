@@ -5,17 +5,21 @@ import IconPlus from '@/components/icon/icon-plus';
 import IconTrashLines from '@/components/icon/icon-trash-lines';
 import IconLayoutGrid from '@/components/icon/icon-layout-grid';
 import IconListCheck from '@/components/icon/icon-list-check';
+import IconSettings from '@/components/icon/icon-settings';
+import IconX from '@/components/icon/icon-x';
 import { sortBy } from 'lodash';
 import { DataTableSortStatus, DataTable } from 'mantine-datatable';
 import Link from 'next/link';
 import { useRouter } from 'next/navigation';
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import supabase from '@/lib/supabase';
 import StorageManager from '@/utils/storage-manager';
 import { Alert } from '@/components/elements/alerts/elements-alerts-default';
 import ConfirmModal from '@/components/modals/confirm-modal';
 import { getTranslation } from '@/i18n';
 import { useAuth } from '@/hooks/useAuth';
+import CategoryFilters from '@/components/filters/category-filters';
+import HorizontalFilter from '@/components/filters/horizontal-filter';
 
 // Updated shop type reflecting the join with profiles, categories, and delivery companies.
 interface ShopDeliveryCompany {
@@ -98,6 +102,10 @@ const ShopsList = () => {
     const [selectedRecords, setSelectedRecords] = useState<any>([]);
 
     const [search, setSearch] = useState('');
+    const [selectedCategories, setSelectedCategories] = useState<number[]>([]);
+    const [selectedSubcategories, setSelectedSubcategories] = useState<number[]>([]);
+    const [availableCategories, setAvailableCategories] = useState<any[]>([]);
+    const [availableSubcategories, setAvailableSubcategories] = useState<any[]>([]);
     const [sortStatus, setSortStatus] = useState<DataTableSortStatus>({
         columnAccessor: 'created_at',
         direction: 'desc',
@@ -169,7 +177,30 @@ const ShopsList = () => {
                 setLoading(false);
             }
         };
+
+        const fetchCategories = async () => {
+            try {
+                const { data: categories, error } = await supabase.from('categories_shop').select('id, title, description, image_url').order('title', { ascending: true });
+                if (error) throw error;
+                setAvailableCategories(categories || []);
+            } catch (error) {
+                console.error('Error fetching shop categories:', error);
+            }
+        };
+
+        const fetchSubcategories = async () => {
+            try {
+                const { data: subcategories, error } = await supabase.from('categories_sub_shop').select('id, title, description, category_shop_id').order('title', { ascending: true });
+                if (error) throw error;
+                setAvailableSubcategories(subcategories || []);
+            } catch (error) {
+                console.error('Error fetching shop subcategories:', error);
+            }
+        };
+
         fetchShops();
+        fetchCategories();
+        fetchSubcategories();
     }, [user?.role_name, authLoading]);
 
     useEffect(() => {
@@ -186,14 +217,27 @@ const ShopsList = () => {
         setInitialRecords(
             items.filter((item) => {
                 const searchTerm = search.toLowerCase();
-                return (
+                const matchesSearch =
                     item.shop_name.toLowerCase().includes(searchTerm) ||
                     // Also search owner names if available.
-                    (item.shop_owners?.some((owner) => owner.profiles?.full_name.toLowerCase().includes(searchTerm)) ?? false)
-                );
+                    (item.shop_owners?.some((owner) => owner.profiles?.full_name.toLowerCase().includes(searchTerm)) ?? false);
+
+                let matchesFilters = true;
+
+                // Apply category filter
+                if (selectedCategories.length > 0) {
+                    matchesFilters = matchesFilters && item.category_shop_id !== null && item.category_shop_id !== undefined && selectedCategories.includes(item.category_shop_id);
+                }
+
+                // Apply subcategory filter
+                if (selectedSubcategories.length > 0) {
+                    matchesFilters = matchesFilters && item.subcategory_shop_id !== null && item.subcategory_shop_id !== undefined && selectedSubcategories.includes(item.subcategory_shop_id);
+                }
+
+                return matchesSearch && matchesFilters;
             }),
         );
-    }, [items, search]);
+    }, [items, search, selectedCategories, selectedSubcategories]);
 
     useEffect(() => {
         const sorted = sortBy(initialRecords, sortStatus.columnAccessor as keyof Shop);
@@ -244,6 +288,52 @@ const ShopsList = () => {
                     />
                 </div>
             )}
+
+            {/* Filters Panel */}
+            <div className="panel mb-6 w-full max-w-none">
+                <div className="mb-4 flex items-center gap-2">
+                    <IconSettings className="h-5 w-5 text-primary" />
+                    <h3 className="text-lg font-semibold text-black dark:text-white-light">Filters</h3>
+                </div>
+
+                <div className="space-y-6">
+                    {/* Category and Subcategory Filters */}
+                    <CategoryFilters
+                        categories={availableCategories.map((cat) => ({
+                            id: cat.id,
+                            title: cat.title,
+                            desc: cat.description,
+                            image_url: cat.image_url,
+                        }))}
+                        subcategories={availableSubcategories.map((sub) => ({
+                            id: sub.id,
+                            title: sub.title,
+                            desc: sub.description,
+                            category_id: sub.category_shop_id,
+                        }))}
+                        selectedCategories={selectedCategories}
+                        selectedSubcategories={selectedSubcategories}
+                        onCategoriesChange={useCallback((categoryIds: number[]) => setSelectedCategories(categoryIds), [])}
+                        onSubcategoriesChange={useCallback((subcategoryIds: number[]) => setSelectedSubcategories(subcategoryIds), [])}
+                    />
+
+                    {/* Clear Filters */}
+                    <div className="flex justify-end">
+                        <button
+                            type="button"
+                            className="btn btn-outline-danger"
+                            onClick={() => {
+                                setSelectedCategories([]);
+                                setSelectedSubcategories([]);
+                            }}
+                        >
+                            <IconX className="h-4 w-4 mr-2" />
+                            Clear All Filters
+                        </button>
+                    </div>
+                </div>
+            </div>
+
             <div className="invoice-table w-full max-w-none">
                 <div className="mb-4.5 flex flex-col gap-5 px-5 md:flex-row md:items-center">
                     <div className="flex items-center gap-2">
@@ -292,8 +382,8 @@ const ShopsList = () => {
                 <div className="relative">
                     {viewMode === 'grid' ? (
                         // Card Grid View
-                        <div className="p-6">
-                            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                        <div className="p-3">
+                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8">
                                 {initialRecords.slice((page - 1) * pageSize, page * pageSize).map((shop) => (
                                     <div
                                         key={shop.id}
@@ -301,19 +391,16 @@ const ShopsList = () => {
                                     >
                                         {/* Shop Logo */}
                                         <div className="relative">
-                                            <img className="h-48 w-full object-cover rounded-t-xl" src={shop.logo_url || `/assets/images/shop-placeholder.jpg`} alt={shop.shop_name} />
-                                            <div className="absolute top-2 right-2">
-                                                <span className={`badge ${shop.active ? 'badge-success' : 'badge-danger'}`}>{shop.active ? 'Active' : 'Inactive'}</span>
-                                            </div>
+                                            <img className="h-20 w-full object-cover rounded-t-xl" src={shop.logo_url || `/assets/images/shop-placeholder.jpg`} alt={shop.shop_name} />
                                         </div>
 
                                         {/* Shop Details */}
-                                        <div className="p-6 flex-1">
-                                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 line-clamp-2">{shop.shop_name}</h3>
-                                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-3 line-clamp-3">{shop.shop_desc}</p>
+                                        <div className="p-3 flex-1">
+                                            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1 line-clamp-2">{shop.shop_name}</h3>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 line-clamp-2">{shop.shop_desc}</p>
 
                                             {/* Shop Info */}
-                                            <div className="space-y-2 text-sm">
+                                            <div className="space-y-1 text-xs">
                                                 <div className="flex items-center justify-between">
                                                     <span className="text-gray-500 dark:text-gray-400">Status</span>
                                                     <span className="font-medium capitalize">{shop.status}</span>
@@ -321,10 +408,6 @@ const ShopsList = () => {
                                                 <div className="flex items-center justify-between">
                                                     <span className="text-gray-500 dark:text-gray-400">Public</span>
                                                     <span className="font-medium">{shop.public ? 'Yes' : 'No'}</span>
-                                                </div>
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-gray-500 dark:text-gray-400">Created</span>
-                                                    <span className="font-medium">{new Date(shop.created_at || '').toLocaleDateString()}</span>
                                                 </div>
                                                 {shop.shop_owners && shop.shop_owners.length > 0 && (
                                                     <div className="flex items-center justify-between">
@@ -336,23 +419,23 @@ const ShopsList = () => {
                                         </div>
 
                                         {/* Action Buttons */}
-                                        <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700/50 rounded-b-xl">
+                                        <div className="px-3 py-2 bg-gray-50 dark:bg-gray-700/50 rounded-b-xl">
                                             <div className="flex items-center justify-between">
-                                                <div className="flex space-x-3">
+                                                <div className="flex space-x-1">
                                                     <Link
                                                         href={`/shops/edit/${shop.id}`}
-                                                        className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
+                                                        className="inline-flex items-center px-2 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-primary dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
                                                         title="Edit Shop"
                                                     >
-                                                        <IconEdit className="h-4 w-4 mr-1" />
+                                                        <IconEdit className="h-3 w-3 mr-1" />
                                                         Edit
                                                     </Link>
                                                     <Link
                                                         href={`/shops/preview/${shop.id}`}
-                                                        className="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-primary border border-transparent rounded-lg hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                                                        className="inline-flex items-center px-2 py-1 text-xs font-medium text-white bg-primary border border-transparent rounded hover:bg-primary/90 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-primary"
                                                         title="View Shop"
                                                     >
-                                                        <IconEye className="h-4 w-4 mr-1" />
+                                                        <IconEye className="h-3 w-3 mr-1" />
                                                         View
                                                     </Link>
                                                 </div>
@@ -362,10 +445,10 @@ const ShopsList = () => {
                                                         setShopToDelete(shop);
                                                         setShowConfirmModal(true);
                                                     }}
-                                                    className="inline-flex items-center p-2 text-sm font-medium text-red-600 hover:text-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                                                    className="inline-flex items-center p-1 text-xs font-medium text-red-600 hover:text-red-800 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-red-500"
                                                     title="Delete Shop"
                                                 >
-                                                    <IconTrashLines className="h-4 w-4" />
+                                                    <IconTrashLines className="h-3 w-3" />
                                                 </button>
                                             </div>
                                         </div>

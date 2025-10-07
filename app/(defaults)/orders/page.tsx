@@ -20,6 +20,8 @@ import IconPackage from '@/components/icon/icon-package';
 import IconChevronDown from '@/components/icon/icon-chevron-down';
 import IconChevronUp from '@/components/icon/icon-chevron-up';
 import IconInfoCircle from '@/components/icon/icon-info-circle';
+import IconLayoutGrid from '@/components/icon/icon-layout-grid';
+import IconListCheck from '@/components/icon/icon-list-check';
 import { sortBy } from 'lodash';
 import { DataTableSortStatus, DataTable } from 'mantine-datatable';
 import Link from 'next/link';
@@ -33,6 +35,8 @@ import { generateOrderReceiptPDF } from '@/utils/pdf-generator';
 import supabase from '@/lib/supabase';
 import DateRangeSelector from '@/components/date-range-selector';
 import MultiSelect from '@/components/multi-select';
+import HorizontalFilter from '@/components/filters/horizontal-filter';
+import DateRangeInputs from '@/components/filters/date-range-inputs';
 import { useAuth } from '@/hooks/useAuth';
 
 // Tooltip Component for Order Total Breakdown
@@ -628,9 +632,18 @@ const ActionsMenu = ({ orderId, onView, onDownload, onDelete }: { orderId: numbe
     useEffect(() => {
         if (isOpen && triggerRef.current) {
             const rect = triggerRef.current.getBoundingClientRect();
+            const viewportWidth = window.innerWidth;
+            const menuWidth = 120; // Approximate menu width
+
+            // Calculate left position to keep menu in viewport
+            let left = rect.left + window.scrollX;
+            if (left + menuWidth > viewportWidth) {
+                left = viewportWidth - menuWidth - 10; // 10px margin from edge
+            }
+
             setMenuPosition({
                 top: rect.bottom + window.scrollY + 4,
-                left: rect.left + window.scrollX - 100, // Offset to align menu properly
+                left: left,
             });
         }
     }, [isOpen]);
@@ -648,6 +661,7 @@ const ActionsMenu = ({ orderId, onView, onDownload, onDelete }: { orderId: numbe
                 className="hover:text-gray-600 dark:hover:text-gray-300"
                 title="More Actions"
                 onClick={(e) => {
+                    e.preventDefault();
                     e.stopPropagation();
                     setIsOpen(!isOpen);
                 }}
@@ -659,7 +673,7 @@ const ActionsMenu = ({ orderId, onView, onDownload, onDelete }: { orderId: numbe
                 createPortal(
                     <div
                         ref={menuRef}
-                        className="fixed z-[9999] rounded-md border border-gray-300 bg-white shadow-xl dark:border-gray-600 dark:bg-gray-800"
+                        className="fixed z-[99999] rounded-md border border-gray-300 bg-white shadow-xl dark:border-gray-600 dark:bg-gray-800"
                         style={{
                             top: menuPosition.top,
                             left: menuPosition.left,
@@ -995,6 +1009,8 @@ const OrdersList = () => {
     const [deliveryFilter, setDeliveryFilter] = useState('unconfirmed'); // 'unconfirmed', 'processing', 'on_the_way', 'completed', 'ready_for_pickup', 'archived'
     const [orderTypeFilter, setOrderTypeFilter] = useState('all'); // 'all', 'delivery', 'pickup'
     const [dateRange, setDateRange] = useState<Date[]>([]);
+    const [fromDate, setFromDate] = useState('');
+    const [toDate, setToDate] = useState('');
     const [selectedShops, setSelectedShops] = useState<number[]>([]);
     const [availableShops, setAvailableShops] = useState<any[]>([]);
     const [expandedSections, setExpandedSections] = useState({
@@ -1005,6 +1021,10 @@ const OrdersList = () => {
         columnAccessor: 'date',
         direction: 'desc',
     });
+
+    // View mode state
+    const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
+
     const [showConfirmModal, setShowConfirmModal] = useState(false);
     const [orderToDelete, setOrderToDelete] = useState<OrderData | null>(null);
     const [showAssignModal, setShowAssignModal] = useState(false);
@@ -1139,10 +1159,28 @@ const OrdersList = () => {
             }
             // If orderTypeFilter === 'all', no additional filtering needed
 
+            // Apply date range filter
+            if (fromDate || toDate) {
+                const itemDate = new Date(item.date);
+                if (fromDate && itemDate < new Date(fromDate)) {
+                    matchesFilter = false;
+                }
+                if (toDate && itemDate > new Date(toDate)) {
+                    matchesFilter = false;
+                }
+            }
+
+            // Apply shop filter
+            if (selectedShops.length > 0) {
+                if (!selectedShops.includes(item.shop)) {
+                    matchesFilter = false;
+                }
+            }
+
             return matchesSearch && matchesFilter;
         });
         setInitialRecords(filtered);
-    }, [search, displayItems, deliveryFilter, orderTypeFilter]);
+    }, [search, displayItems, deliveryFilter, orderTypeFilter, fromDate, toDate, selectedShops]);
 
     useEffect(() => {
         const data = sortBy(initialRecords, sortStatus.columnAccessor);
@@ -1789,8 +1827,11 @@ const OrdersList = () => {
             query = query.in('products.shop', accessibleShopIds);
 
             // Apply date range filter
-            if (dateRange.length === 2) {
-                query = query.gte('created_at', dateRange[0].toISOString()).lte('created_at', dateRange[1].toISOString());
+            if (fromDate) {
+                query = query.gte('created_at', fromDate);
+            }
+            if (toDate) {
+                query = query.lte('created_at', toDate);
             }
 
             const { data, error } = await query.order('created_at', { ascending: false });
@@ -2019,23 +2060,11 @@ const OrdersList = () => {
                         <h3 className="text-lg font-semibold text-black dark:text-white-light">Filters</h3>
                     </div>
 
-                    <div className="grid grid-cols-1 gap-4 lg:grid-cols-4">
+                    <div className="space-y-6">
                         {/* Date Range Filter */}
                         <div>
                             <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Date Range</label>
-                            <DateRangeSelector value={dateRange} onChange={setDateRange} placeholder="Select date range" isRtl={false} />
-                        </div>
-
-                        {/* Shop Filter */}
-                        <div>
-                            <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Filter by Shops</label>
-                            <MultiSelect
-                                options={availableShops.map((shop) => ({ id: shop.id, name: shop.shop_name, logo_url: shop.logo_url }))}
-                                selectedValues={selectedShops}
-                                onChange={setSelectedShops}
-                                placeholder="Select shops"
-                                isRtl={false}
-                            />
+                            <DateRangeInputs fromDate={fromDate} toDate={toDate} onFromDateChange={setFromDate} onToDateChange={setToDate} />
                         </div>
 
                         {/* Order Type Filter */}
@@ -2048,20 +2077,37 @@ const OrdersList = () => {
                             </select>
                         </div>
 
+                        {/* Shop Filter */}
+                        <div>
+                            <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Filter by Shops</label>
+                            <HorizontalFilter
+                                items={availableShops.map((shop) => ({
+                                    id: shop.id,
+                                    name: shop.shop_name,
+                                    image_url: shop.logo_url || undefined,
+                                }))}
+                                selectedItems={selectedShops}
+                                onSelectionChange={setSelectedShops}
+                                placeholder="No shops available"
+                                showImages={true}
+                            />
+                        </div>
+
                         {/* Clear Filters */}
-                        <div className="flex items-end">
+                        <div className="flex justify-end pt-2 border-t border-gray-200 dark:border-gray-700">
                             <button
                                 type="button"
-                                className="btn btn-outline-danger w-full"
+                                className="btn btn-outline-danger"
                                 onClick={() => {
-                                    setDateRange([]);
+                                    setFromDate('');
+                                    setToDate('');
                                     setSelectedShops([]);
                                     setOrderTypeFilter('all');
                                     setDeliveryFilter('unconfirmed');
                                 }}
                             >
                                 <IconX className="h-4 w-4 mr-2" />
-                                Clear Filters
+                                Clear All Filters
                             </button>
                         </div>
                     </div>
@@ -2184,36 +2230,237 @@ const OrdersList = () => {
                                 </button>
                             </div>
                         </div>
+
+                        {/* View Toggle Buttons */}
+                        <div className="flex items-center gap-2">
+                            <div className="flex rounded-lg border border-gray-200 dark:border-gray-700">
+                                <button
+                                    onClick={() => setViewMode('grid')}
+                                    className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-l-lg transition-colors ${
+                                        viewMode === 'grid' ? 'bg-primary text-white' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                                    }`}
+                                >
+                                    <IconLayoutGrid className="h-4 w-4" />
+                                    Grid
+                                </button>
+                                <button
+                                    onClick={() => setViewMode('table')}
+                                    className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-r-lg transition-colors ${
+                                        viewMode === 'table' ? 'bg-primary text-white' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                                    }`}
+                                >
+                                    <IconListCheck className="h-4 w-4" />
+                                    Table
+                                </button>
+                            </div>
+                        </div>
+
                         <div className="ltr:ml-auto rtl:mr-auto">
                             <input type="text" className="form-input w-auto" placeholder={t('search')} value={search} onChange={(e) => setSearch(e.target.value)} />
                         </div>
                     </div>
 
-                    <div className="datatables w-full max-w-none">
-                        <DataTable
-                            className={`${loading ? 'pointer-events-none' : 'cursor-pointer'} w-full max-w-none`}
-                            records={records as any[]}
-                            minHeight={200}
-                            withBorder={false}
-                            withColumnBorders={false}
-                            striped
-                            highlightOnHover
-                            onRowClick={(record: any) => {
-                                router.push(`/orders/preview/${record.id}`);
-                            }}
-                            columns={getColumns()}
-                            totalRecords={initialRecords.length}
-                            recordsPerPage={pageSize}
-                            page={page}
-                            onPageChange={(p) => setPage(p)}
-                            recordsPerPageOptions={PAGE_SIZES}
-                            onRecordsPerPageChange={setPageSize}
-                            sortStatus={sortStatus}
-                            onSortStatusChange={setSortStatus}
-                            selectedRecords={selectedRecords}
-                            onSelectedRecordsChange={setSelectedRecords}
-                            paginationText={({ from, to, totalRecords }) => `${t('showing')} ${from} ${t('to')} ${to} ${t('of')} ${totalRecords} ${t('entries')}`}
-                        />
+                    <div className="relative">
+                        {viewMode === 'grid' ? (
+                            // Card Grid View
+                            <div className="p-6">
+                                <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                                    {initialRecords.slice((page - 1) * pageSize, page * pageSize).map((order) => (
+                                        <div
+                                            key={order.id}
+                                            className="group relative bg-white dark:bg-gray-800 rounded-xl border border-gray-200 dark:border-gray-700 shadow-sm hover:shadow-lg transition-shadow duration-200 flex flex-col h-full"
+                                        >
+                                            {/* Section 1: Product Image and Details */}
+                                            <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                                                <div className="flex items-start gap-3">
+                                                    <div className="w-16 h-16 rounded-lg overflow-hidden flex-shrink-0">
+                                                        <img className="w-full h-full object-cover" src={order.image || '/assets/images/product-placeholder.jpg'} alt={order.name} />
+                                                    </div>
+                                                    <div className="flex-1 min-w-0">
+                                                        <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1 line-clamp-2">{order.name}</h3>
+                                                        <p className="text-xs text-gray-500 dark:text-gray-400 mb-2">Order #{order.id}</p>
+                                                        <div className="flex items-center gap-2">
+                                                            <span className="text-xs text-gray-500 dark:text-gray-400">Shop:</span>
+                                                            <span className="text-xs font-medium">{order.shop_name}</span>
+                                                        </div>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Section 2: Customer Details */}
+                                            <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <IconUser className="h-4 w-4 text-gray-500" />
+                                                        <span className="text-sm font-medium">{order.buyer}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <IconPackage className="h-4 w-4 text-gray-500" />
+                                                        <span className="text-xs text-gray-500">{order.city}</span>
+                                                    </div>
+                                                    <div className="flex items-center gap-2">
+                                                        <IconCalendar className="h-4 w-4 text-gray-500" />
+                                                        <span className="text-xs text-gray-500">{new Date(order.date).toLocaleDateString()}</span>
+                                                    </div>
+                                                </div>
+                                            </div>
+
+                                            {/* Section 3: Payment and Delivery */}
+                                            <div className="p-4 border-b border-gray-200 dark:border-gray-700">
+                                                <div className="space-y-2">
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-xs text-gray-500">Type</span>
+                                                        {!order.confirmed ? (
+                                                            <DeliveryTypeDropdown currentType={order.delivery_type} orderId={order.id} onTypeChange={handleTypeUpdate} isConfirmed={order.confirmed} />
+                                                        ) : (
+                                                            <span
+                                                                className={`text-xs px-2 py-1 rounded-full ${
+                                                                    order.delivery_type === 'delivery'
+                                                                        ? 'bg-blue-100 text-blue-800 dark:bg-blue-900 dark:text-blue-200'
+                                                                        : 'bg-gray-100 text-gray-800 dark:bg-gray-900 dark:text-gray-200'
+                                                                }`}
+                                                            >
+                                                                {order.delivery_type === 'delivery' ? 'Delivery' : 'Pickup'}
+                                                            </span>
+                                                        )}
+                                                    </div>
+                                                    <div className="flex items-center justify-between">
+                                                        <span className="text-xs text-gray-500">Total</span>
+                                                        <div className="flex items-center gap-1">
+                                                            <span className="text-sm font-bold text-gray-900 dark:text-white">{order.total}</span>
+                                                            {order.delivery_methods && <OrderTotalTooltip order={order} />}
+                                                        </div>
+                                                    </div>
+                                                    {order.assigned_driver && (
+                                                        <div className="flex items-center justify-between">
+                                                            <span className="text-xs text-gray-500">Driver</span>
+                                                            <span className="text-xs font-medium">{order.assigned_driver.name}</span>
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            </div>
+
+                                            {/* Section 4: Status and Actions */}
+                                            <div className="p-4 flex-1 flex flex-col justify-between">
+                                                {/* Status Badge or Action Button */}
+                                                <div className="mb-3">
+                                                    <StatusComponent
+                                                        currentStatus={order.status}
+                                                        orderId={order.id}
+                                                        onStatusChange={handleStatusUpdate}
+                                                        deliveryType={order.delivery_type}
+                                                        isConfirmed={order.confirmed}
+                                                        onConfirm={(orderId) => {
+                                                            const orderData = items.find((item) => item.id === orderId);
+                                                            setOrderToConfirm(orderData || null);
+                                                            setShowConfirmOrderModal(true);
+                                                        }}
+                                                        onUnconfirm={handleUnconfirm}
+                                                        onOpenCommentModal={handleOpenCommentModal}
+                                                        onCompleteOrder={handleOpenCompleteOrderModal}
+                                                        hasAssignedDriver={!!order.assigned_driver}
+                                                    />
+                                                </div>
+
+                                                {/* Action Menu */}
+                                                <div className="flex items-center justify-between" onClick={(e) => e.stopPropagation()}>
+                                                    <button
+                                                        type="button"
+                                                        className="hover:text-info relative"
+                                                        title="Add Comment"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setSelectedOrderForComment(order);
+                                                            setShowCommentModal(true);
+                                                        }}
+                                                    >
+                                                        <IconMessage className="h-4 w-4" />
+                                                        {ordersWithComments.has(order.id) && <span className="absolute -top-1 -right-1 h-2 w-2 bg-info rounded-full"></span>}
+                                                    </button>
+
+                                                    <ActionsMenu
+                                                        orderId={order.id}
+                                                        onView={() => router.push(`/orders/preview/${order.id}`)}
+                                                        onDownload={() => handleDownloadOrderPDF(order.id)}
+                                                        onDelete={() => handleDelete(displayItems.find((d) => d.id === order.id) || null)}
+                                                    />
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+
+                                {initialRecords.length === 0 && (
+                                    <div className="text-center py-10">
+                                        <p className="text-gray-500 dark:text-gray-400">No orders found.</p>
+                                    </div>
+                                )}
+
+                                {/* Pagination for Grid View */}
+                                <div className="mt-6 flex items-center justify-between">
+                                    <div className="flex items-center space-x-2">
+                                        <span className="text-sm text-gray-700 dark:text-gray-300">
+                                            {t('showing')} {(page - 1) * pageSize + 1} {t('to')} {Math.min(page * pageSize, initialRecords.length)} {t('of')} {initialRecords.length} {t('entries')}
+                                        </span>
+                                    </div>
+                                    <div className="flex items-center space-x-2">
+                                        <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))} className="form-select text-sm">
+                                            {PAGE_SIZES.map((size) => (
+                                                <option key={size} value={size}>
+                                                    {size} per page
+                                                </option>
+                                            ))}
+                                        </select>
+                                        <div className="flex space-x-1">
+                                            <button
+                                                onClick={() => setPage(page - 1)}
+                                                disabled={page === 1}
+                                                className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-600 dark:hover:bg-gray-700"
+                                            >
+                                                Previous
+                                            </button>
+                                            <button
+                                                onClick={() => setPage(page + 1)}
+                                                disabled={page * pageSize >= initialRecords.length}
+                                                className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-600 dark:hover:bg-gray-700"
+                                            >
+                                                Next
+                                            </button>
+                                        </div>
+                                    </div>
+                                </div>
+                            </div>
+                        ) : (
+                            // Table View
+                            <div className="datatables w-full max-w-none">
+                                <DataTable
+                                    className={`${loading ? 'pointer-events-none' : 'cursor-pointer'} w-full max-w-none`}
+                                    records={records as any[]}
+                                    minHeight={200}
+                                    withBorder={false}
+                                    withColumnBorders={false}
+                                    striped
+                                    highlightOnHover
+                                    onRowClick={(record: any) => {
+                                        router.push(`/orders/preview/${record.id}`);
+                                    }}
+                                    columns={getColumns()}
+                                    totalRecords={initialRecords.length}
+                                    recordsPerPage={pageSize}
+                                    page={page}
+                                    onPageChange={(p) => setPage(p)}
+                                    recordsPerPageOptions={PAGE_SIZES}
+                                    onRecordsPerPageChange={setPageSize}
+                                    sortStatus={sortStatus}
+                                    onSortStatusChange={setSortStatus}
+                                    selectedRecords={selectedRecords}
+                                    onSelectedRecordsChange={setSelectedRecords}
+                                    paginationText={({ from, to, totalRecords }) => `${t('showing')} ${from} ${t('to')} ${to} ${t('of')} ${totalRecords} ${t('entries')}`}
+                                />
+                            </div>
+                        )}
+
+                        {loading && <div className="absolute inset-0 z-10 flex items-center justify-center bg-white dark:bg-black-dark-light bg-opacity-60 backdrop-blur-sm" />}
                     </div>
                 </div>
             </div>

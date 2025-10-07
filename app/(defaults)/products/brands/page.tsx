@@ -14,6 +14,7 @@ import supabase from '@/lib/supabase';
 import { Alert } from '@/components/elements/alerts/elements-alerts-default';
 import ConfirmModal from '@/components/modals/confirm-modal';
 import { getTranslation } from '@/i18n';
+import EditProductBrandDialog from './components/EditProductBrandDialog';
 
 // Brand interface
 interface Brand {
@@ -59,6 +60,10 @@ const BrandsList = () => {
         message: '',
         type: 'success',
     });
+
+    // Edit dialog state
+    const [showEditDialog, setShowEditDialog] = useState(false);
+    const [brandToEdit, setBrandToEdit] = useState<Brand | null>(null);
 
     useEffect(() => {
         const fetchBrands = async () => {
@@ -108,6 +113,25 @@ const BrandsList = () => {
                 setShowConfirmModal(true);
             }
         }
+    };
+
+    const handleEditClick = (brand: Brand) => {
+        setBrandToEdit(brand);
+        setShowEditDialog(true);
+    };
+
+    const handleEditSuccess = () => {
+        // Refresh the brands list
+        const fetchBrands = async () => {
+            try {
+                const { data, error } = await supabase.from('categories_brands').select('*, shops!shop_id(id, shop_name)').order('created_at', { ascending: false });
+                if (error) throw error;
+                setItems(data as Brand[]);
+            } catch (error) {
+                // Error fetching brands
+            }
+        };
+        fetchBrands();
     };
 
     // Confirm deletion callback
@@ -196,8 +220,8 @@ const BrandsList = () => {
                 <div className="relative">
                     {viewMode === 'grid' ? (
                         // Card Grid View
-                        <div className="p-6">
-                            <div className="grid grid-cols-1 gap-6 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-4">
+                        <div className="p-3">
+                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8">
                                 {initialRecords.slice((page - 1) * pageSize, page * pageSize).map((brand) => (
                                     <div
                                         key={brand.id}
@@ -205,45 +229,44 @@ const BrandsList = () => {
                                     >
                                         {/* Brand Image */}
                                         <div className="relative">
-                                            <img className="h-48 w-full object-cover rounded-t-xl" src={brand.image_url || `/assets/images/brand-placeholder.jpg`} alt={brand.brand} />
+                                            <img className="h-20 w-full object-cover rounded-t-xl" src={brand.image_url || `/assets/images/brand-placeholder.jpg`} alt={brand.brand} />
                                         </div>
 
                                         {/* Brand Details */}
-                                        <div className="p-6 flex-1">
-                                            <h3 className="text-lg font-semibold text-gray-900 dark:text-white mb-2 line-clamp-2">{brand.brand}</h3>
-                                            <p className="text-sm text-gray-500 dark:text-gray-400 mb-3 line-clamp-3">{brand.description}</p>
+                                        <div className="p-3 flex-1">
+                                            <h3 className="text-sm font-semibold text-gray-900 dark:text-white mb-1 line-clamp-2">{brand.brand}</h3>
+                                            <p className="text-xs text-gray-500 dark:text-gray-400 mb-2 line-clamp-2">{brand.description}</p>
 
                                             {/* Shop Info */}
-                                            <div className="space-y-2 text-sm">
+                                            <div className="space-y-1 text-xs">
                                                 <div className="flex items-center justify-between">
                                                     <span className="text-gray-500 dark:text-gray-400">Shop</span>
-                                                    <span className="font-medium">{brand.shops?.shop_name || 'Global'}</span>
-                                                </div>
-                                                <div className="flex items-center justify-between">
-                                                    <span className="text-gray-500 dark:text-gray-400">Created</span>
-                                                    <span className="font-medium">{new Date(brand.created_at).toLocaleDateString()}</span>
+                                                    <span className="font-medium truncate">{brand.shops?.shop_name || 'Global'}</span>
                                                 </div>
                                             </div>
                                         </div>
 
                                         {/* Action Buttons */}
-                                        <div className="px-6 py-4 bg-gray-50 dark:bg-gray-700/50 rounded-b-xl">
+                                        <div className="px-3 py-2 bg-gray-50 dark:bg-gray-700/50 rounded-b-xl">
                                             <div className="flex items-center justify-between">
-                                                <div className="flex space-x-3">
-                                                    <Link
-                                                        href={`/products/brands/edit/${brand.id}`}
-                                                        className="inline-flex items-center px-3 py-2 text-sm font-medium text-gray-700 bg-white border border-gray-300 rounded-lg hover:bg-gray-50 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
+                                                <div className="flex space-x-1">
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            handleEditClick(brand);
+                                                        }}
+                                                        className="inline-flex items-center px-2 py-1 text-xs font-medium text-gray-700 bg-white border border-gray-300 rounded hover:bg-gray-50 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-primary dark:bg-gray-800 dark:text-gray-300 dark:border-gray-600 dark:hover:bg-gray-700"
                                                         title="Edit Brand"
                                                     >
-                                                        <IconEdit className="h-4 w-4 mr-1" />
+                                                        <IconEdit className="h-3 w-3 mr-1" />
                                                         Edit
-                                                    </Link>
+                                                    </button>
                                                     <Link
                                                         href={`/products/brands/preview/${brand.id}`}
-                                                        className="inline-flex items-center px-3 py-2 text-sm font-medium text-white bg-primary border border-transparent rounded-lg hover:bg-primary/90 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-primary"
+                                                        className="inline-flex items-center px-2 py-1 text-xs font-medium text-white bg-primary border border-transparent rounded hover:bg-primary/90 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-primary"
                                                         title="View Brand"
                                                     >
-                                                        <IconEye className="h-4 w-4 mr-1" />
+                                                        <IconEye className="h-3 w-3 mr-1" />
                                                         View
                                                     </Link>
                                                 </div>
@@ -253,10 +276,10 @@ const BrandsList = () => {
                                                         setBrandToDelete(brand);
                                                         setShowConfirmModal(true);
                                                     }}
-                                                    className="inline-flex items-center p-2 text-sm font-medium text-red-600 hover:text-red-800 focus:outline-none focus:ring-2 focus:ring-offset-2 focus:ring-red-500"
+                                                    className="inline-flex items-center p-1 text-xs font-medium text-red-600 hover:text-red-800 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-red-500"
                                                     title="Delete Brand"
                                                 >
-                                                    <IconTrashLines className="h-4 w-4" />
+                                                    <IconTrashLines className="h-3 w-3" />
                                                 </button>
                                             </div>
                                         </div>
@@ -382,9 +405,16 @@ const BrandsList = () => {
                                                         />
                                                     </svg>
                                                 </Link>
-                                                <Link href={`/products/brands/edit/${id}`} className="flex hover:text-info" onClick={(e) => e.stopPropagation()}>
+                                                <button
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        const brand = items.find((b) => b.id === id);
+                                                        if (brand) handleEditClick(brand);
+                                                    }}
+                                                    className="flex hover:text-info"
+                                                >
                                                     <IconEdit className="h-4.5 w-4.5" />
-                                                </Link>
+                                                </button>
                                                 <button
                                                     type="button"
                                                     className="flex hover:text-danger"
@@ -433,6 +463,17 @@ const BrandsList = () => {
                 confirmLabel={t('delete')}
                 cancelLabel={t('cancel')}
                 size="sm"
+            />
+
+            {/* Edit Product Brand Dialog */}
+            <EditProductBrandDialog
+                isOpen={showEditDialog}
+                onClose={() => {
+                    setShowEditDialog(false);
+                    setBrandToEdit(null);
+                }}
+                brand={brandToEdit}
+                onSuccess={handleEditSuccess}
             />
         </div>
     );
