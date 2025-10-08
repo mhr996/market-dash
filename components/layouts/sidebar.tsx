@@ -298,8 +298,8 @@ const Sidebar = () => {
                                                 </li>
                                                 <li>
                                                     <Link
-                                                        href="/products/categories/subcategories"
-                                                        className={`group nav-link ${pathname === '/products/categories/subcategories' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}
+                                                        href="/products/subcategories"
+                                                        className={`group nav-link ${pathname === '/products/subcategories' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}
                                                     >
                                                         <div className="flex items-center">
                                                             <IconMenuTables className="shrink-0 group-hover:!text-primary" />

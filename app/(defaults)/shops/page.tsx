@@ -7,6 +7,7 @@ import IconLayoutGrid from '@/components/icon/icon-layout-grid';
 import IconListCheck from '@/components/icon/icon-list-check';
 import IconSettings from '@/components/icon/icon-settings';
 import IconX from '@/components/icon/icon-x';
+import IconCaretDown from '@/components/icon/icon-caret-down';
 import { sortBy } from 'lodash';
 import { DataTableSortStatus, DataTable } from 'mantine-datatable';
 import Link from 'next/link';
@@ -20,6 +21,7 @@ import { getTranslation } from '@/i18n';
 import { useAuth } from '@/hooks/useAuth';
 import CategoryFilters from '@/components/filters/category-filters';
 import HorizontalFilter from '@/components/filters/horizontal-filter';
+import MultiSelect from '@/components/multi-select';
 
 // Updated shop type reflecting the join with profiles, categories, and delivery companies.
 interface ShopDeliveryCompany {
@@ -106,6 +108,7 @@ const ShopsList = () => {
     const [selectedSubcategories, setSelectedSubcategories] = useState<number[]>([]);
     const [availableCategories, setAvailableCategories] = useState<any[]>([]);
     const [availableSubcategories, setAvailableSubcategories] = useState<any[]>([]);
+    const [showFilters, setShowFilters] = useState(false);
     const [sortStatus, setSortStatus] = useState<DataTableSortStatus>({
         columnAccessor: 'created_at',
         direction: 'desc',
@@ -190,7 +193,7 @@ const ShopsList = () => {
 
         const fetchSubcategories = async () => {
             try {
-                const { data: subcategories, error } = await supabase.from('categories_sub_shop').select('id, title, description, category_shop_id').order('title', { ascending: true });
+                const { data: subcategories, error } = await supabase.from('categories_sub_shop').select('id, title, description, category_id').order('title', { ascending: true });
                 if (error) throw error;
                 setAvailableSubcategories(subcategories || []);
             } catch (error) {
@@ -289,51 +292,6 @@ const ShopsList = () => {
                 </div>
             )}
 
-            {/* Filters Panel */}
-            <div className="panel mb-6 w-full max-w-none">
-                <div className="mb-4 flex items-center gap-2">
-                    <IconSettings className="h-5 w-5 text-primary" />
-                    <h3 className="text-lg font-semibold text-black dark:text-white-light">Filters</h3>
-                </div>
-
-                <div className="space-y-6">
-                    {/* Category and Subcategory Filters */}
-                    <CategoryFilters
-                        categories={availableCategories.map((cat) => ({
-                            id: cat.id,
-                            title: cat.title,
-                            desc: cat.description,
-                            image_url: cat.image_url,
-                        }))}
-                        subcategories={availableSubcategories.map((sub) => ({
-                            id: sub.id,
-                            title: sub.title,
-                            desc: sub.description,
-                            category_id: sub.category_shop_id,
-                        }))}
-                        selectedCategories={selectedCategories}
-                        selectedSubcategories={selectedSubcategories}
-                        onCategoriesChange={useCallback((categoryIds: number[]) => setSelectedCategories(categoryIds), [])}
-                        onSubcategoriesChange={useCallback((subcategoryIds: number[]) => setSelectedSubcategories(subcategoryIds), [])}
-                    />
-
-                    {/* Clear Filters */}
-                    <div className="flex justify-end">
-                        <button
-                            type="button"
-                            className="btn btn-outline-danger"
-                            onClick={() => {
-                                setSelectedCategories([]);
-                                setSelectedSubcategories([]);
-                            }}
-                        >
-                            <IconX className="h-4 w-4 mr-2" />
-                            Clear All Filters
-                        </button>
-                    </div>
-                </div>
-            </div>
-
             <div className="invoice-table w-full max-w-none">
                 <div className="mb-4.5 flex flex-col gap-5 px-5 md:flex-row md:items-center">
                     <div className="flex items-center gap-2">
@@ -348,6 +306,38 @@ const ShopsList = () => {
                                 {t('add_new')}
                             </Link>
                         )}
+
+                        {/* Filter Toggle Button */}
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setShowFilters(!showFilters)}
+                                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 border ${
+                                    showFilters
+                                        ? 'bg-primary text-white border-primary'
+                                        : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:border-primary'
+                                }`}
+                            >
+                                <IconSettings className="h-4 w-4" />
+                                Filters
+                                {showFilters ? <IconCaretDown className="h-3 w-3 rotate-180" /> : <IconCaretDown className="h-3 w-3" />}
+                            </button>
+
+                            {/* Clear Filters Button - Only show when filters are toggled on */}
+                            {showFilters && (
+                                <button
+                                    type="button"
+                                    className="btn btn-outline-danger btn-sm"
+                                    onClick={() => {
+                                        setSelectedCategories([]);
+                                        setSelectedSubcategories([]);
+                                    }}
+                                >
+                                    <IconX className="h-4 w-4 mr-1" />
+                                    Clear
+                                </button>
+                            )}
+                        </div>
                     </div>
 
                     {/* View Toggle Buttons */}
@@ -378,6 +368,46 @@ const ShopsList = () => {
                         <input type="text" className="form-input w-auto" placeholder={t('search')} value={search} onChange={(e) => setSearch(e.target.value)} />
                     </div>
                 </div>
+
+                {/* Collapsible Filters Row */}
+                {showFilters && (
+                    <div className="px-5 py-2 mb-4">
+                        <div className="w-full max-w-full overflow-hidden">
+                            <HorizontalFilter
+                                items={availableCategories.map((category) => ({
+                                    id: category.id,
+                                    name: category.title,
+                                    image_url: category.image_url || undefined,
+                                }))}
+                                selectedItems={selectedCategories}
+                                onSelectionChange={setSelectedCategories}
+                                placeholder="No categories available"
+                                showImages={true}
+                            />
+                        </div>
+                    </div>
+                )}
+
+                {/* Subcategories Row - Only show when categories are selected */}
+                {selectedCategories.length > 0 && (
+                    <div className="px-5 py-2 mb-4">
+                        <div className="w-full max-w-full overflow-hidden">
+                            <HorizontalFilter
+                                items={availableSubcategories
+                                    .filter((sub) => selectedCategories.includes(sub.category_id))
+                                    .map((subcategory) => ({
+                                        id: subcategory.id,
+                                        name: subcategory.title,
+                                        image_url: undefined,
+                                    }))}
+                                selectedItems={selectedSubcategories}
+                                onSelectionChange={setSelectedSubcategories}
+                                placeholder="No subcategories available"
+                                showImages={false}
+                            />
+                        </div>
+                    </div>
+                )}
 
                 <div className="relative">
                     {viewMode === 'grid' ? (

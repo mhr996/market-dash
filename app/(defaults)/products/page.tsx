@@ -7,6 +7,8 @@ import IconSettings from '@/components/icon/icon-settings';
 import IconX from '@/components/icon/icon-x';
 import IconLayoutGrid from '@/components/icon/icon-layout-grid';
 import IconListCheck from '@/components/icon/icon-list-check';
+import IconCaretDown from '@/components/icon/icon-caret-down';
+import IconCheck from '@/components/icon/icon-check';
 import { sortBy } from 'lodash';
 import { DataTableSortStatus, DataTable } from 'mantine-datatable';
 import Link from 'next/link';
@@ -19,6 +21,7 @@ import ConfirmModal from '@/components/modals/confirm-modal';
 import { getTranslation } from '@/i18n';
 import EditProductDialog from './components/EditProductDialog';
 import MultiSelect from '@/components/multi-select';
+import UnifiedPagination from '@/components/pagination/unified-pagination';
 import CategoryFilters from '@/components/filters/category-filters';
 import HorizontalFilter from '@/components/filters/horizontal-filter';
 import { useAuth } from '@/hooks/useAuth';
@@ -111,13 +114,22 @@ const ProductsList = () => {
     const [availableShops, setAvailableShops] = useState<any[]>([]);
     const [availableCategories, setAvailableCategories] = useState<Category[]>([]);
     const [availableSubcategories, setAvailableSubcategories] = useState<SubCategory[]>([]);
+    const [availableBrands, setAvailableBrands] = useState<any[]>([]);
+    const [showFilters, setShowFilters] = useState(false);
+
+    // Quick edit states
+    const [quickEditProducts, setQuickEditProducts] = useState<Map<string, Partial<Product>>>(new Map());
+    const [hasChanges, setHasChanges] = useState(false);
+    const [showSalePriceDialog, setShowSalePriceDialog] = useState(false);
+    const [currentProductId, setCurrentProductId] = useState<string | null>(null);
+
     const [sortStatus, setSortStatus] = useState<DataTableSortStatus>({
         columnAccessor: 'created_at',
         direction: 'desc',
     });
 
     // View mode state
-    const [viewMode, setViewMode] = useState<'grid' | 'table'>('grid');
+    const [viewMode, setViewMode] = useState<'grid' | 'table' | 'quick-edit'>('grid');
 
     // Modal and alert states
     const [showConfirmModal, setShowConfirmModal] = useState(false);
@@ -139,6 +151,7 @@ const ProductsList = () => {
         fetchShops();
         fetchCategories();
         fetchSubcategories();
+        fetchBrands();
     }, [user?.role_name, authLoading]);
 
     const fetchProducts = async () => {
@@ -199,15 +212,19 @@ const ProductsList = () => {
         } catch (error) {}
     };
 
+    const fetchBrands = async () => {
+        try {
+            const { data: brands, error } = await supabase.from('brands').select('id, name').order('name', { ascending: true });
+            if (error) throw error;
+            setAvailableBrands(brands || []);
+        } catch (error) {
+            console.error('Error fetching brands:', error);
+        }
+    };
+
     useEffect(() => {
         setPage(1);
     }, [pageSize]);
-
-    useEffect(() => {
-        const from = (page - 1) * pageSize;
-        const to = from + pageSize;
-        setRecords([...initialRecords.slice(from, to)]);
-    }, [page, pageSize, initialRecords]);
 
     useEffect(() => {
         setInitialRecords(
@@ -243,9 +260,11 @@ const ProductsList = () => {
 
     useEffect(() => {
         const sorted = sortBy(initialRecords, sortStatus.columnAccessor);
-        setRecords(sortStatus.direction === 'desc' ? sorted.reverse() : sorted);
-        setPage(1);
-    }, [sortStatus, initialRecords]);
+        const sortedRecords = sortStatus.direction === 'desc' ? sorted.reverse() : sorted;
+        const from = (page - 1) * pageSize;
+        const to = from + pageSize;
+        setRecords([...sortedRecords.slice(from, to)]);
+    }, [sortStatus, initialRecords, page, pageSize]);
 
     const deleteRow = (id: string | null = null) => {
         if (id) {
@@ -265,6 +284,74 @@ const ProductsList = () => {
     const handleEditSuccess = () => {
         // Refresh the products list
         fetchProducts();
+    };
+
+    // Quick edit functions
+    const updateQuickEditProduct = (productId: string, field: keyof Product, value: any) => {
+        setQuickEditProducts((prev) => {
+            const newMap = new Map(prev);
+            const current = newMap.get(productId) || {};
+            newMap.set(productId, { ...current, [field]: value });
+            return newMap;
+        });
+        setHasChanges(true);
+    };
+
+    const getQuickEditValue = (productId: string, field: keyof Product, originalValue: any) => {
+        const edited = quickEditProducts.get(productId);
+        return edited?.[field] !== undefined ? edited[field] : originalValue;
+    };
+
+    const saveQuickEditChanges = async () => {
+        try {
+            setLoading(true);
+            const updates = Array.from(quickEditProducts.entries()).map(([id, changes]) => ({
+                id,
+                ...changes,
+            }));
+
+            for (const update of updates) {
+                const { error } = await supabase.from('products').update(update).eq('id', update.id);
+
+                if (error) throw error;
+            }
+
+            setQuickEditProducts(new Map());
+            setHasChanges(false);
+            await fetchProducts();
+            setAlert({ visible: true, message: 'Products updated successfully!', type: 'success' });
+        } catch (error) {
+            setAlert({ visible: true, message: 'Error updating products', type: 'danger' });
+        } finally {
+            setLoading(false);
+        }
+    };
+
+    const discardQuickEditChanges = () => {
+        setQuickEditProducts(new Map());
+        setHasChanges(false);
+    };
+
+    const deleteQuickEditProduct = async (productId: string) => {
+        try {
+            setLoading(true);
+            const { error } = await supabase.from('products').delete().eq('id', productId);
+
+            if (error) throw error;
+
+            setQuickEditProducts((prev) => {
+                const newMap = new Map(prev);
+                newMap.delete(productId);
+                return newMap;
+            });
+
+            await fetchProducts();
+            setAlert({ visible: true, message: 'Product deleted successfully!', type: 'success' });
+        } catch (error) {
+            setAlert({ visible: true, message: 'Error deleting product', type: 'danger' });
+        } finally {
+            setLoading(false);
+        }
     };
 
     const confirmDeletion = async () => {
@@ -313,57 +400,6 @@ const ProductsList = () => {
                     />
                 </div>
             )}
-            {/* Filters Panel */}
-            <div className="panel mb-6 w-full max-w-none">
-                <div className="mb-4 flex items-center gap-2">
-                    <IconSettings className="h-5 w-5 text-primary" />
-                    <h3 className="text-lg font-semibold text-black dark:text-white-light">Filters</h3>
-                </div>
-
-                <div className="space-y-6">
-                    {/* Shop Filter */}
-                    <div>
-                        <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Filter by Shops</label>
-                        <HorizontalFilter
-                            items={availableShops.map((shop) => ({
-                                id: shop.id,
-                                name: shop.shop_name,
-                                image_url: shop.logo_url || undefined,
-                            }))}
-                            selectedItems={selectedShops}
-                            onSelectionChange={setSelectedShops}
-                            placeholder="No shops available"
-                            showImages={true}
-                        />
-                    </div>
-
-                    {/* Category and Subcategory Filters */}
-                    <CategoryFilters
-                        categories={availableCategories}
-                        subcategories={availableSubcategories}
-                        selectedCategories={selectedCategories}
-                        selectedSubcategories={selectedSubcategories}
-                        onCategoriesChange={useCallback((categoryIds: number[]) => setSelectedCategories(categoryIds), [])}
-                        onSubcategoriesChange={useCallback((subcategoryIds: number[]) => setSelectedSubcategories(subcategoryIds), [])}
-                    />
-
-                    {/* Clear Filters */}
-                    <div className="flex justify-end">
-                        <button
-                            type="button"
-                            className="btn btn-outline-danger"
-                            onClick={() => {
-                                setSelectedShops([]);
-                                setSelectedCategories([]);
-                                setSelectedSubcategories([]);
-                            }}
-                        >
-                            <IconX className="h-4 w-4 mr-2" />
-                            Clear All Filters
-                        </button>
-                    </div>
-                </div>
-            </div>
             <div className="invoice-table w-full max-w-none">
                 <div className="mb-4.5 flex flex-col gap-5 px-5 md:flex-row md:items-center">
                     <div className="flex items-center gap-2">
@@ -378,6 +414,39 @@ const ProductsList = () => {
                                 {t('add_new')}
                             </Link>
                         )}
+
+                        {/* Filter Toggle Button */}
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setShowFilters(!showFilters)}
+                                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 border ${
+                                    showFilters
+                                        ? 'bg-primary text-white border-primary'
+                                        : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:border-primary'
+                                }`}
+                            >
+                                <IconSettings className="h-4 w-4" />
+                                Filters
+                                {showFilters ? <IconCaretDown className="h-3 w-3 rotate-180" /> : <IconCaretDown className="h-3 w-3" />}
+                            </button>
+
+                            {/* Clear Filters Button - Only show when filters are toggled on */}
+                            {showFilters && (
+                                <button
+                                    type="button"
+                                    className="btn btn-outline-danger btn-sm"
+                                    onClick={() => {
+                                        setSelectedShops([]);
+                                        setSelectedCategories([]);
+                                        setSelectedSubcategories([]);
+                                    }}
+                                >
+                                    <IconX className="h-4 w-4 mr-1" />
+                                    Clear
+                                </button>
+                            )}
+                        </div>
                     </div>
 
                     {/* View Toggle Buttons */}
@@ -394,12 +463,21 @@ const ProductsList = () => {
                             </button>
                             <button
                                 onClick={() => setViewMode('table')}
-                                className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-r-lg transition-colors ${
+                                className={`flex items-center gap-2 px-3 py-2 text-sm font-medium transition-colors ${
                                     viewMode === 'table' ? 'bg-primary text-white' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
                                 }`}
                             >
                                 <IconListCheck className="h-4 w-4" />
                                 Table
+                            </button>
+                            <button
+                                onClick={() => setViewMode('quick-edit')}
+                                className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-r-lg transition-colors ${
+                                    viewMode === 'quick-edit' ? 'bg-primary text-white' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                                }`}
+                            >
+                                <IconEdit className="h-4 w-4" />
+                                Quick Edit
                             </button>
                         </div>
                     </div>
@@ -409,12 +487,68 @@ const ProductsList = () => {
                     </div>
                 </div>
 
+                {/* Collapsible Filters Row */}
+                {showFilters && (
+                    <div className="px-5 py-2 mb-4">
+                        {/* Shop Filter */}
+                        <div>
+                            <MultiSelect
+                                options={availableShops.map((shop) => ({ id: shop.id, name: shop.shop_name, logo_url: shop.logo_url }))}
+                                selectedValues={selectedShops}
+                                onChange={setSelectedShops}
+                                placeholder="Select shops"
+                                isRtl={false}
+                            />
+                        </div>
+                    </div>
+                )}
+
+                {/* Categories Row */}
+                {showFilters && (
+                    <div className="px-5 py-2 mb-4">
+                        <div className="w-full max-w-full overflow-hidden">
+                            <HorizontalFilter
+                                items={availableCategories.map((category) => ({
+                                    id: category.id,
+                                    name: category.title,
+                                    image_url: category.image_url || undefined,
+                                }))}
+                                selectedItems={selectedCategories}
+                                onSelectionChange={setSelectedCategories}
+                                placeholder="No categories available"
+                                showImages={true}
+                            />
+                        </div>
+                    </div>
+                )}
+
+                {/* Subcategories Row - Only show when categories are selected */}
+                {selectedCategories.length > 0 && (
+                    <div className="px-5 py-2 mb-4">
+                        <div className="w-full max-w-full overflow-hidden">
+                            <HorizontalFilter
+                                items={availableSubcategories
+                                    .filter((sub) => selectedCategories.includes(sub.category_id))
+                                    .map((subcategory) => ({
+                                        id: subcategory.id,
+                                        name: subcategory.title,
+                                        image_url: undefined,
+                                    }))}
+                                selectedItems={selectedSubcategories}
+                                onSelectionChange={setSelectedSubcategories}
+                                placeholder="No subcategories available"
+                                showImages={false}
+                            />
+                        </div>
+                    </div>
+                )}
+
                 <div className="relative">
-                    {viewMode === 'grid' ? (
+                    {viewMode === 'grid' && (
                         // Card Grid View
-                        <div className="p-3">
-                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8">
-                                {initialRecords.slice((page - 1) * pageSize, page * pageSize).map((product) => {
+                        <div className="datatables pagination-padding relative">
+                            <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4 xl:grid-cols-6 2xl:grid-cols-8 p-3">
+                                {records.map((product) => {
                                     let imageList: any[] = [];
                                     imageList = typeof product.images === 'string' ? JSON.parse(product.images || '[]') : product.images;
 
@@ -515,41 +649,12 @@ const ProductsList = () => {
                                 </div>
                             )}
 
-                            {/* Pagination for Grid View */}
-                            <div className="mt-6 flex items-center justify-between">
-                                <div className="flex items-center space-x-2">
-                                    <span className="text-sm text-gray-700 dark:text-gray-300">
-                                        {t('showing')} {(page - 1) * pageSize + 1} {t('to')} {Math.min(page * pageSize, initialRecords.length)} {t('of')} {initialRecords.length} {t('entries')}
-                                    </span>
-                                </div>
-                                <div className="flex items-center space-x-2">
-                                    <select value={pageSize} onChange={(e) => setPageSize(Number(e.target.value))} className="form-select text-sm">
-                                        {PAGE_SIZES.map((size) => (
-                                            <option key={size} value={size}>
-                                                {size} per page
-                                            </option>
-                                        ))}
-                                    </select>
-                                    <div className="flex space-x-1">
-                                        <button
-                                            onClick={() => setPage(page - 1)}
-                                            disabled={page === 1}
-                                            className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-600 dark:hover:bg-gray-700"
-                                        >
-                                            Previous
-                                        </button>
-                                        <button
-                                            onClick={() => setPage(page + 1)}
-                                            disabled={page * pageSize >= initialRecords.length}
-                                            className="px-3 py-1 text-sm border border-gray-300 rounded-md hover:bg-gray-50 disabled:opacity-50 disabled:cursor-not-allowed dark:border-gray-600 dark:hover:bg-gray-700"
-                                        >
-                                            Next
-                                        </button>
-                                    </div>
-                                </div>
-                            </div>
+                            {/* Grid Pagination */}
+                            <UnifiedPagination page={page} pageSize={pageSize} totalRecords={initialRecords.length} onPageChange={setPage} onPageSizeChange={setPageSize} pageSizes={PAGE_SIZES} />
                         </div>
-                    ) : (
+                    )}
+
+                    {viewMode === 'table' && (
                         // Table View
                         <div className="datatables pagination-padding relative">
                             <DataTable
@@ -702,19 +807,223 @@ const ProductsList = () => {
                                     },
                                 ]}
                                 highlightOnHover
-                                totalRecords={initialRecords.length}
-                                recordsPerPage={pageSize}
-                                page={page}
-                                onPageChange={(p) => setPage(p)}
-                                recordsPerPageOptions={PAGE_SIZES}
-                                onRecordsPerPageChange={setPageSize}
                                 sortStatus={sortStatus}
                                 onSortStatusChange={setSortStatus}
                                 selectedRecords={selectedRecords}
                                 onSelectedRecordsChange={setSelectedRecords}
-                                paginationText={({ from, to, totalRecords }) => `${t('showing')} ${from} ${t('to')} ${to} ${t('of')} ${totalRecords} ${t('entries')}`}
                                 minHeight={300}
                             />
+
+                            {/* Table Pagination */}
+                            <UnifiedPagination page={page} pageSize={pageSize} totalRecords={initialRecords.length} onPageChange={setPage} onPageSizeChange={setPageSize} pageSizes={PAGE_SIZES} />
+                        </div>
+                    )}
+
+                    {viewMode === 'quick-edit' && (
+                        // Quick Edit View
+                        <div className="datatables pagination-padding relative">
+                            {/* Quick Edit Actions */}
+                            <div className="mb-4 flex items-center justify-between px-5 py-2">
+                                <div className="flex items-center gap-2">
+                                    {hasChanges && <span className="text-xs bg-warning/20 text-warning px-2 py-1 rounded-full">{quickEditProducts.size} changes pending</span>}
+                                </div>
+                                <div className="flex items-center gap-2">
+                                    {hasChanges && (
+                                        <>
+                                            <button onClick={discardQuickEditChanges} className="btn btn-outline-danger btn-sm">
+                                                <IconX className="h-4 w-4 mr-1" />
+                                                Discard
+                                            </button>
+                                            <button onClick={saveQuickEditChanges} className="btn btn-primary btn-sm" disabled={loading}>
+                                                <IconCheck className="h-4 w-4 mr-1" />
+                                                Save Changes
+                                            </button>
+                                        </>
+                                    )}
+                                </div>
+                            </div>
+
+                            {/* Quick Edit Table */}
+                            <div className="overflow-x-auto">
+                                <table className="min-w-full table-auto">
+                                    <thead>
+                                        <tr className="bg-gray-50 dark:bg-gray-800">
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Image</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Title</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Shop</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Category</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Subcategory</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Brand</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Price</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Sale Price</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Status</th>
+                                            <th className="px-4 py-3 text-left text-xs font-medium text-gray-500 dark:text-gray-400 uppercase tracking-wider">Actions</th>
+                                        </tr>
+                                    </thead>
+                                    <tbody className="bg-white dark:bg-gray-900 divide-y divide-gray-200 dark:divide-gray-700">
+                                        {records.map((product) => {
+                                            const editedProduct = quickEditProducts.get(product.id);
+                                            const hasChanges = editedProduct && Object.keys(editedProduct).length > 0;
+
+                                            return (
+                                                <tr key={product.id} className={hasChanges ? 'bg-yellow-50 dark:bg-yellow-900/20' : ''}>
+                                                    {/* Image */}
+                                                    <td className="px-4 py-3">
+                                                        <div className="w-12 h-12 rounded-md overflow-hidden">
+                                                            {(() => {
+                                                                let imageList: any[] = [];
+                                                                imageList = typeof product.images === 'string' ? JSON.parse(product.images || '[]') : product.images;
+                                                                return (
+                                                                    <img className="w-full h-full object-cover" src={imageList[0] || `/assets/images/product-placeholder.jpg`} alt={product.title} />
+                                                                );
+                                                            })()}
+                                                        </div>
+                                                    </td>
+
+                                                    {/* Title */}
+                                                    <td className="px-4 py-3">
+                                                        <input
+                                                            type="text"
+                                                            className="form-input w-full text-sm"
+                                                            value={getQuickEditValue(product.id, 'title', product.title)}
+                                                            onChange={(e) => updateQuickEditProduct(product.id, 'title', e.target.value)}
+                                                        />
+                                                    </td>
+
+                                                    {/* Shop */}
+                                                    <td className="px-4 py-3">
+                                                        <select
+                                                            className="form-select w-full text-sm"
+                                                            value={getQuickEditValue(product.id, 'shop', product.shops?.shop_name) || ''}
+                                                            onChange={(e) => updateQuickEditProduct(product.id, 'shop', e.target.value)}
+                                                        >
+                                                            <option value="">Select Shop</option>
+                                                            {availableShops.map((shop) => (
+                                                                <option key={shop.id} value={shop.shop_name}>
+                                                                    {shop.shop_name}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </td>
+
+                                                    {/* Category */}
+                                                    <td className="px-4 py-3">
+                                                        <select
+                                                            className="form-select w-full text-sm"
+                                                            value={getQuickEditValue(product.id, 'category', product.category) || ''}
+                                                            onChange={(e) => updateQuickEditProduct(product.id, 'category', e.target.value ? parseInt(e.target.value) : null)}
+                                                        >
+                                                            <option value="">Select Category</option>
+                                                            {availableCategories.map((category) => (
+                                                                <option key={category.id} value={category.id}>
+                                                                    {category.title}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </td>
+
+                                                    {/* Subcategory */}
+                                                    <td className="px-4 py-3">
+                                                        <select
+                                                            className="form-select w-full text-sm"
+                                                            value={getQuickEditValue(product.id, 'subcategory_id', product.subcategory_id) || ''}
+                                                            onChange={(e) => updateQuickEditProduct(product.id, 'subcategory_id', e.target.value ? parseInt(e.target.value) : null)}
+                                                        >
+                                                            <option value="">Select Subcategory</option>
+                                                            {availableSubcategories
+                                                                .filter((sub) => sub.category_id === getQuickEditValue(product.id, 'category', product.category))
+                                                                .map((subcategory) => (
+                                                                    <option key={subcategory.id} value={subcategory.id}>
+                                                                        {subcategory.title}
+                                                                    </option>
+                                                                ))}
+                                                        </select>
+                                                    </td>
+
+                                                    {/* Brand */}
+                                                    <td className="px-4 py-3">
+                                                        <select
+                                                            className="form-select w-full text-sm"
+                                                            value={getQuickEditValue(product.id, 'brand_id', product.brand_id) || ''}
+                                                            onChange={(e) => updateQuickEditProduct(product.id, 'brand_id', e.target.value ? parseInt(e.target.value) : null)}
+                                                        >
+                                                            <option value="">Select Brand</option>
+                                                            {availableBrands.map((brand) => (
+                                                                <option key={brand.id} value={brand.id}>
+                                                                    {brand.name}
+                                                                </option>
+                                                            ))}
+                                                        </select>
+                                                    </td>
+
+                                                    {/* Price */}
+                                                    <td className="px-4 py-3">
+                                                        <input
+                                                            type="number"
+                                                            step="0.01"
+                                                            className="form-input w-full text-sm"
+                                                            value={getQuickEditValue(product.id, 'price', product.price)}
+                                                            onChange={(e) => updateQuickEditProduct(product.id, 'price', parseFloat(e.target.value) || 0)}
+                                                        />
+                                                    </td>
+
+                                                    {/* Sale Price */}
+                                                    <td className="px-4 py-3">
+                                                        <div className="flex items-center gap-2">
+                                                            <input
+                                                                type="checkbox"
+                                                                className="form-checkbox"
+                                                                checked={getQuickEditValue(product.id, 'onsale', product.onsale) || false}
+                                                                onChange={(e) => {
+                                                                    updateQuickEditProduct(product.id, 'onsale', e.target.checked);
+                                                                    if (e.target.checked) {
+                                                                        setCurrentProductId(product.id);
+                                                                        setShowSalePriceDialog(true);
+                                                                    }
+                                                                }}
+                                                            />
+                                                            {getQuickEditValue(product.id, 'onsale', product.onsale) && (
+                                                                <input
+                                                                    type="number"
+                                                                    step="0.01"
+                                                                    className="form-input w-20 text-sm"
+                                                                    value={getQuickEditValue(product.id, 'sale_price', product.sale_price) || ''}
+                                                                    onChange={(e) => updateQuickEditProduct(product.id, 'sale_price', parseFloat(e.target.value) || 0)}
+                                                                    placeholder="Sale Price"
+                                                                />
+                                                            )}
+                                                        </div>
+                                                    </td>
+
+                                                    {/* Status */}
+                                                    <td className="px-4 py-3">
+                                                        <select
+                                                            className="form-select w-full text-sm"
+                                                            value={getQuickEditValue(product.id, 'active', product.active) ? 'active' : 'inactive'}
+                                                            onChange={(e) => updateQuickEditProduct(product.id, 'active', e.target.value === 'active')}
+                                                        >
+                                                            <option value="active">Active</option>
+                                                            <option value="inactive">Inactive</option>
+                                                        </select>
+                                                    </td>
+
+                                                    {/* Actions */}
+                                                    <td className="px-4 py-3">
+                                                        <div className="flex items-center gap-2">
+                                                            <button onClick={() => deleteQuickEditProduct(product.id)} className="text-danger hover:text-danger-dark" title="Delete Product">
+                                                                <IconTrashLines className="h-4 w-4" />
+                                                            </button>
+                                                        </div>
+                                                    </td>
+                                                </tr>
+                                            );
+                                        })}
+                                    </tbody>
+                                </table>
+                            </div>
+
+                            {/* Quick Edit Pagination */}
+                            <UnifiedPagination page={page} pageSize={pageSize} totalRecords={initialRecords.length} onPageChange={setPage} onPageSizeChange={setPageSize} pageSizes={PAGE_SIZES} />
                         </div>
                     )}
 
@@ -744,6 +1053,89 @@ const ProductsList = () => {
                 product={productToEdit}
                 onSuccess={handleEditSuccess}
             />
+            {/* Sale Price Dialog */}
+            {showSalePriceDialog && currentProductId && (
+                <div className="fixed inset-0 z-50 flex items-center justify-center bg-black bg-opacity-50">
+                    <div className="bg-white dark:bg-gray-800 rounded-lg p-6 w-96 max-w-full mx-4">
+                        <h3 className="text-lg font-semibold mb-4">Set Sale Price</h3>
+                        <div className="space-y-4">
+                            <div>
+                                <label className="block text-sm font-medium mb-2">Sale Price</label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    className="form-input w-full"
+                                    placeholder="Enter sale price"
+                                    value={getQuickEditValue(currentProductId, 'sale_price', '') || ''}
+                                    onChange={(e) => updateQuickEditProduct(currentProductId, 'sale_price', parseFloat(e.target.value) || 0)}
+                                />
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-2">Discount Type</label>
+                                <select
+                                    className="form-select w-full"
+                                    value={getQuickEditValue(currentProductId, 'discount_type', 'percentage') || 'percentage'}
+                                    onChange={(e) => updateQuickEditProduct(currentProductId, 'discount_type', e.target.value)}
+                                >
+                                    <option value="percentage">Percentage</option>
+                                    <option value="fixed">Fixed Amount</option>
+                                </select>
+                            </div>
+                            <div>
+                                <label className="block text-sm font-medium mb-2">Discount Value</label>
+                                <input
+                                    type="number"
+                                    step="0.01"
+                                    className="form-input w-full"
+                                    placeholder="Enter discount value"
+                                    value={getQuickEditValue(currentProductId, 'discount_value', '') || ''}
+                                    onChange={(e) => updateQuickEditProduct(currentProductId, 'discount_value', parseFloat(e.target.value) || 0)}
+                                />
+                            </div>
+                            <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                    <label className="block text-sm font-medium mb-2">Start Date</label>
+                                    <input
+                                        type="date"
+                                        className="form-input w-full"
+                                        value={getQuickEditValue(currentProductId, 'discount_start', '') || ''}
+                                        onChange={(e) => updateQuickEditProduct(currentProductId, 'discount_start', e.target.value)}
+                                    />
+                                </div>
+                                <div>
+                                    <label className="block text-sm font-medium mb-2">End Date</label>
+                                    <input
+                                        type="date"
+                                        className="form-input w-full"
+                                        value={getQuickEditValue(currentProductId, 'discount_end', '') || ''}
+                                        onChange={(e) => updateQuickEditProduct(currentProductId, 'discount_end', e.target.value)}
+                                    />
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex justify-end gap-2 mt-6">
+                            <button
+                                onClick={() => {
+                                    setShowSalePriceDialog(false);
+                                    setCurrentProductId(null);
+                                }}
+                                className="btn btn-outline-secondary"
+                            >
+                                Cancel
+                            </button>
+                            <button
+                                onClick={() => {
+                                    setShowSalePriceDialog(false);
+                                    setCurrentProductId(null);
+                                }}
+                                className="btn btn-primary"
+                            >
+                                Save
+                            </button>
+                        </div>
+                    </div>
+                </div>
+            )}
         </div>
     );
 };

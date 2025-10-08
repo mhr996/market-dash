@@ -187,7 +187,7 @@ const SubCategoriesList = () => {
                             <IconTrashLines />
                             {t('delete')}
                         </button>
-                        <Link href="/categories/subcategories/add" className="btn btn-primary gap-2">
+                        <Link href="/products/subcategories/add" className="btn btn-primary gap-2">
                             <IconPlus />
                             {t('add_new')}
                         </Link>
@@ -271,7 +271,7 @@ const SubCategoriesList = () => {
                                                         Edit
                                                     </button>
                                                     <Link
-                                                        href={`/categories/subcategories/preview/${subcategory.id}`}
+                                                        href={`/products/subcategories/preview/${subcategory.id}`}
                                                         className="inline-flex items-center px-2 py-1 text-xs font-medium text-white bg-primary border border-transparent rounded hover:bg-primary/90 focus:outline-none focus:ring-1 focus:ring-offset-1 focus:ring-primary"
                                                         title="View Subcategory"
                                                     >
@@ -343,7 +343,7 @@ const SubCategoriesList = () => {
                                 className={`${loading ? 'filter blur-sm pointer-events-none' : 'table-hover whitespace-nowrap cursor-pointer'}`}
                                 records={records}
                                 onRowClick={(record) => {
-                                    router.push(`/categories/subcategories/preview/${record.id}`);
+                                    router.push(`/products/subcategories/preview/${record.id}`);
                                 }}
                                 columns={[
                                     {
@@ -420,7 +420,7 @@ const SubCategoriesList = () => {
                                                     >
                                                         <IconEdit className="h-4.5 w-4.5" />
                                                     </button>
-                                                    <Link href={`/categories/subcategories/preview/${id}`} className="flex hover:text-primary" onClick={(e) => e.stopPropagation()}>
+                                                    <Link href={`/products/subcategories/preview/${id}`} className="flex hover:text-primary" onClick={(e) => e.stopPropagation()}>
                                                         <IconEye />
                                                     </Link>
                                                     <button

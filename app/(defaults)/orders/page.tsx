@@ -22,6 +22,7 @@ import IconChevronUp from '@/components/icon/icon-chevron-up';
 import IconInfoCircle from '@/components/icon/icon-info-circle';
 import IconLayoutGrid from '@/components/icon/icon-layout-grid';
 import IconListCheck from '@/components/icon/icon-list-check';
+import IconSearch from '@/components/icon/icon-search';
 import { sortBy } from 'lodash';
 import { DataTableSortStatus, DataTable } from 'mantine-datatable';
 import Link from 'next/link';
@@ -36,7 +37,6 @@ import supabase from '@/lib/supabase';
 import DateRangeSelector from '@/components/date-range-selector';
 import MultiSelect from '@/components/multi-select';
 import HorizontalFilter from '@/components/filters/horizontal-filter';
-import DateRangeInputs from '@/components/filters/date-range-inputs';
 import { useAuth } from '@/hooks/useAuth';
 
 // Tooltip Component for Order Total Breakdown
@@ -928,6 +928,7 @@ const formatOrderForDisplay = (order: OrderData) => {
         image: order.products?.images?.[0] || null,
         buyer: order.profiles?.full_name || shippingAddress.name || 'Unknown Customer',
         shop_name: order.products?.shops?.[0]?.shop_name || 'Unknown Shop',
+        shop: order.products?.shop || null,
         delivery_status: deliveryStatusMap[order.status] || 'pending',
         city: shippingAddress.city || 'Unknown City',
         date: order.created_at,
@@ -1009,14 +1010,13 @@ const OrdersList = () => {
     const [deliveryFilter, setDeliveryFilter] = useState('unconfirmed'); // 'unconfirmed', 'processing', 'on_the_way', 'completed', 'ready_for_pickup', 'archived'
     const [orderTypeFilter, setOrderTypeFilter] = useState('all'); // 'all', 'delivery', 'pickup'
     const [dateRange, setDateRange] = useState<Date[]>([]);
-    const [fromDate, setFromDate] = useState('');
-    const [toDate, setToDate] = useState('');
     const [selectedShops, setSelectedShops] = useState<number[]>([]);
     const [availableShops, setAvailableShops] = useState<any[]>([]);
     const [expandedSections, setExpandedSections] = useState({
         delivery: false,
         completed: false,
     });
+    const [showFilters, setShowFilters] = useState(false);
     const [sortStatus, setSortStatus] = useState<DataTableSortStatus>({
         columnAccessor: 'date',
         direction: 'desc',
@@ -1160,12 +1160,9 @@ const OrdersList = () => {
             // If orderTypeFilter === 'all', no additional filtering needed
 
             // Apply date range filter
-            if (fromDate || toDate) {
+            if (dateRange.length === 2) {
                 const itemDate = new Date(item.date);
-                if (fromDate && itemDate < new Date(fromDate)) {
-                    matchesFilter = false;
-                }
-                if (toDate && itemDate > new Date(toDate)) {
+                if (itemDate < dateRange[0] || itemDate > dateRange[1]) {
                     matchesFilter = false;
                 }
             }
@@ -1180,7 +1177,7 @@ const OrdersList = () => {
             return matchesSearch && matchesFilter;
         });
         setInitialRecords(filtered);
-    }, [search, displayItems, deliveryFilter, orderTypeFilter, fromDate, toDate, selectedShops]);
+    }, [search, displayItems, deliveryFilter, orderTypeFilter, dateRange, selectedShops]);
 
     useEffect(() => {
         const data = sortBy(initialRecords, sortStatus.columnAccessor);
@@ -1827,11 +1824,8 @@ const OrdersList = () => {
             query = query.in('products.shop', accessibleShopIds);
 
             // Apply date range filter
-            if (fromDate) {
-                query = query.gte('created_at', fromDate);
-            }
-            if (toDate) {
-                query = query.lte('created_at', toDate);
+            if (dateRange.length === 2) {
+                query = query.gte('created_at', dateRange[0].toISOString()).lte('created_at', dateRange[1].toISOString());
             }
 
             const { data, error } = await query.order('created_at', { ascending: false });
@@ -2053,65 +2047,6 @@ const OrdersList = () => {
                         />
                     </div>
                 )}
-                {/* Filters Panel */}
-                <div className="panel mb-6 w-full max-w-none">
-                    <div className="mb-4 flex items-center gap-2">
-                        <IconSettings className="h-5 w-5 text-primary" />
-                        <h3 className="text-lg font-semibold text-black dark:text-white-light">Filters</h3>
-                    </div>
-
-                    <div className="space-y-6">
-                        {/* Date Range Filter */}
-                        <div>
-                            <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Date Range</label>
-                            <DateRangeInputs fromDate={fromDate} toDate={toDate} onFromDateChange={setFromDate} onToDateChange={setToDate} />
-                        </div>
-
-                        {/* Order Type Filter */}
-                        <div>
-                            <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Order Type</label>
-                            <select value={orderTypeFilter} onChange={(e) => setOrderTypeFilter(e.target.value)} className="form-select w-full">
-                                <option value="all">All Types</option>
-                                <option value="delivery">Delivery Only</option>
-                                <option value="pickup">Pickup Only</option>
-                            </select>
-                        </div>
-
-                        {/* Shop Filter */}
-                        <div>
-                            <label className="mb-2 block text-sm font-medium text-gray-700 dark:text-gray-300">Filter by Shops</label>
-                            <HorizontalFilter
-                                items={availableShops.map((shop) => ({
-                                    id: shop.id,
-                                    name: shop.shop_name,
-                                    image_url: shop.logo_url || undefined,
-                                }))}
-                                selectedItems={selectedShops}
-                                onSelectionChange={setSelectedShops}
-                                placeholder="No shops available"
-                                showImages={true}
-                            />
-                        </div>
-
-                        {/* Clear Filters */}
-                        <div className="flex justify-end pt-2 border-t border-gray-200 dark:border-gray-700">
-                            <button
-                                type="button"
-                                className="btn btn-outline-danger"
-                                onClick={() => {
-                                    setFromDate('');
-                                    setToDate('');
-                                    setSelectedShops([]);
-                                    setOrderTypeFilter('all');
-                                    setDeliveryFilter('unconfirmed');
-                                }}
-                            >
-                                <IconX className="h-4 w-4 mr-2" />
-                                Clear All Filters
-                            </button>
-                        </div>
-                    </div>
-                </div>
                 <div className="invoice-table overflow-x-auto w-full max-w-none">
                     <div className="mb-4.5 flex flex-col gap-5 px-5 md:flex-row md:items-center">
                         <div className="flex flex-wrap gap-3">
@@ -2231,13 +2166,30 @@ const OrdersList = () => {
                             </div>
                         </div>
 
+                        {/* Filter Toggle Button */}
+                        <div className="flex items-center gap-2">
+                            <button
+                                type="button"
+                                onClick={() => setShowFilters(!showFilters)}
+                                className={`flex items-center gap-2 px-3 py-2 rounded-lg text-sm font-medium transition-all duration-200 border ${
+                                    showFilters
+                                        ? 'bg-primary text-white border-primary'
+                                        : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 border-gray-200 dark:border-gray-600 hover:border-primary'
+                                }`}
+                            >
+                                <IconSettings className="h-4 w-4" />
+                                Filters
+                                {showFilters ? <IconCaretDown className="h-3 w-3 rotate-180" /> : <IconCaretDown className="h-3 w-3" />}
+                            </button>
+                        </div>
+
                         {/* View Toggle Buttons */}
                         <div className="flex items-center gap-2">
                             <div className="flex rounded-lg border border-gray-200 dark:border-gray-700">
                                 <button
                                     onClick={() => setViewMode('grid')}
                                     className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-l-lg transition-colors ${
-                                        viewMode === 'grid' ? 'bg-primary text-white' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                                        viewMode === 'grid' ? 'bg-primary text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
                                     }`}
                                 >
                                     <IconLayoutGrid className="h-4 w-4" />
@@ -2246,7 +2198,7 @@ const OrdersList = () => {
                                 <button
                                     onClick={() => setViewMode('table')}
                                     className={`flex items-center gap-2 px-3 py-2 text-sm font-medium rounded-r-lg transition-colors ${
-                                        viewMode === 'table' ? 'bg-primary text-white' : 'text-gray-500 hover:text-gray-700 dark:text-gray-400 dark:hover:text-gray-200'
+                                        viewMode === 'table' ? 'bg-primary text-white' : 'bg-white dark:bg-gray-800 text-gray-700 dark:text-gray-300 hover:bg-gray-50 dark:hover:bg-gray-700'
                                     }`}
                                 >
                                     <IconListCheck className="h-4 w-4" />
@@ -2255,10 +2207,61 @@ const OrdersList = () => {
                             </div>
                         </div>
 
-                        <div className="ltr:ml-auto rtl:mr-auto">
-                            <input type="text" className="form-input w-auto" placeholder={t('search')} value={search} onChange={(e) => setSearch(e.target.value)} />
+                        {/* Search Input */}
+                        <div className="flex items-center gap-2">
+                            <div className="relative">
+                                <input type="text" placeholder="Search orders..." value={search} onChange={(e) => setSearch(e.target.value)} className="form-input pl-10 pr-4 py-2 w-64" />
+                                <IconSearch className="absolute left-3 top-1/2 transform -translate-y-1/2 h-4 w-4 text-gray-400" />
+                            </div>
                         </div>
                     </div>
+
+                    {/* Collapsible Filters Row */}
+                    {showFilters && (
+                        <div className="flex flex-col lg:flex-row gap-4 px-5 py-4 mb-4">
+                            {/* Date Range */}
+                            <div className="lg:w-64">
+                                <DateRangeSelector value={dateRange} onChange={setDateRange} placeholder="Select date range" isRtl={false} />
+                            </div>
+
+                            {/* Order Type */}
+                            <div className="lg:w-48">
+                                <select value={orderTypeFilter} onChange={(e) => setOrderTypeFilter(e.target.value)} className="form-select w-full">
+                                    <option value="all">All Types</option>
+                                    <option value="delivery">Delivery Only</option>
+                                    <option value="pickup">Pickup Only</option>
+                                </select>
+                            </div>
+
+                            {/* Shop Filter */}
+                            <div className="lg:w-64">
+                                <MultiSelect
+                                    options={availableShops.map((shop) => ({ id: shop.id, name: shop.shop_name, logo_url: shop.logo_url }))}
+                                    selectedValues={selectedShops}
+                                    onChange={setSelectedShops}
+                                    placeholder="Select shops"
+                                    isRtl={false}
+                                />
+                            </div>
+
+                            {/* Clear Filters */}
+                            <div className="lg:w-auto">
+                                <button
+                                    type="button"
+                                    className="btn btn-outline-danger"
+                                    onClick={() => {
+                                        setDateRange([]);
+                                        setSelectedShops([]);
+                                        setOrderTypeFilter('all');
+                                        setDeliveryFilter('unconfirmed');
+                                    }}
+                                >
+                                    <IconX className="h-4 w-4 mr-2" />
+                                    Clear
+                                </button>
+                            </div>
+                        </div>
+                    )}
 
                     <div className="relative">
                         {viewMode === 'grid' ? (

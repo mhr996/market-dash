@@ -45,7 +45,7 @@ const PreviewSubCategory = () => {
     useEffect(() => {
         const fetchSubCategory = async () => {
             try {
-                const { data, error } = await supabase.from('subcategories').select('*, categories(*)').eq('id', subCategoryId).single();
+                const { data, error } = await supabase.from('categories_sub').select('*, categories(*)').eq('id', subCategoryId).single();
                 if (error) throw error;
                 setSubCategory(data);
             } catch (error) {
@@ -74,12 +74,12 @@ const PreviewSubCategory = () => {
             }
 
             // Then delete the subcategory from database
-            const { error } = await supabase.from('subcategories').delete().eq('id', subCategory.id);
+            const { error } = await supabase.from('categories_sub').delete().eq('id', subCategory.id);
             if (error) throw error;
 
             setAlert({ visible: true, message: 'Subcategory deleted successfully', type: 'success' });
             setTimeout(() => {
-                router.push('/products/categories/subcategories');
+                router.push('/products/subcategories');
             }, 1500);
         } catch (error) {
             setAlert({ visible: true, message: 'Error deleting subcategory', type: 'danger' });
@@ -101,7 +101,7 @@ const PreviewSubCategory = () => {
             <div className="panel">
                 <div className="text-center py-8">
                     <h3 className="text-lg font-semibold text-gray-700 dark:text-white">Subcategory not found</h3>
-                    <Link href="/products/categories/subcategories" className="btn btn-primary mt-4">
+                    <Link href="/products/subcategories" className="btn btn-primary mt-4">
                         Back to Subcategories
                     </Link>
                 </div>
@@ -114,14 +114,14 @@ const PreviewSubCategory = () => {
             <div className="mb-5">
                 <div className="flex items-center justify-between">
                     <div className="flex items-center gap-4">
-                        <Link href="/products/categories/subcategories" className="btn btn-outline-primary gap-2">
+                        <Link href="/products/subcategories" className="btn btn-outline-primary gap-2">
                             <IconArrowLeft />
                             Back to Subcategories
                         </Link>
                         <h5 className="text-lg font-semibold dark:text-white-light">Subcategory Preview</h5>
                     </div>
                     <div className="flex items-center gap-2">
-                        <Link href={`/products/categories/subcategories/edit/${subCategory.id}`} className="btn btn-primary gap-2">
+                        <Link href={`/products/subcategories/edit/${subCategory.id}`} className="btn btn-primary gap-2">
                             <IconEdit />
                             Edit
                         </Link>

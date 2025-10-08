@@ -54,7 +54,7 @@ const EditSubCategory = () => {
         const fetchData = async () => {
             try {
                 // Fetch subcategory
-                const { data: subCategoryData, error: subCategoryError } = await supabase.from('subcategories').select('*, categories(*)').eq('id', subCategoryId).single();
+                const { data: subCategoryData, error: subCategoryError } = await supabase.from('categories_sub').select('*, categories(*)').eq('id', subCategoryId).single();
                 if (subCategoryError) throw subCategoryError;
 
                 // Fetch categories
@@ -102,7 +102,7 @@ const EditSubCategory = () => {
 
             // Update subcategory
             const { error } = await supabase
-                .from('subcategories')
+                .from('categories_sub')
                 .update({
                     title: form.title.trim(),
                     desc: form.desc.trim(),
@@ -144,7 +144,7 @@ const EditSubCategory = () => {
         <div className="panel">
             <div className="mb-5">
                 <div className="flex items-center gap-4">
-                    <Link href="/products/categories/subcategories" className="btn btn-outline-primary gap-2">
+                    <Link href="/products/subcategories" className="btn btn-outline-primary gap-2">
                         <IconArrowLeft />
                         Back to Subcategories
                     </Link>
@@ -212,7 +212,7 @@ const EditSubCategory = () => {
                 </div>
 
                 <div className="flex justify-end gap-4">
-                    <Link href="/products/categories/subcategories" className="btn btn-outline-secondary">
+                    <Link href="/products/subcategories" className="btn btn-outline-secondary">
                         Cancel
                     </Link>
                     <button type="submit" className="btn btn-primary" disabled={saving}>

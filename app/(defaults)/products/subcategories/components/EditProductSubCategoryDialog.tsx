@@ -108,7 +108,7 @@ const EditProductSubCategoryDialog: React.FC<EditProductSubCategoryDialogProps> 
 
     const handleOpenFullEdit = () => {
         if (subcategory) {
-            window.open(`/products/categories/subcategories/edit/${subcategory.id}`, '_blank');
+            window.open(`/products/subcategories/edit/${subcategory.id}`, '_blank');
         }
     };
 
@@ -147,7 +147,16 @@ const EditProductSubCategoryDialog: React.FC<EditProductSubCategoryDialogProps> 
                             <label htmlFor="title" className="block text-sm font-medium text-gray-700 dark:text-white mb-1">
                                 {t('subcategory_title')} <span className="text-red-500">*</span>
                             </label>
-                            <input id="title" name="title" type="text" value={form.title} onChange={handleInputChange} placeholder={t('enter_subcategory_title')} required className="form-input w-full" />
+                            <input
+                                id="title"
+                                name="title"
+                                type="text"
+                                value={form.title}
+                                onChange={handleInputChange}
+                                placeholder={t('enter_subcategory_title')}
+                                required
+                                className="form-input w-full"
+                            />
                         </div>
 
                         <div>
@@ -168,7 +177,15 @@ const EditProductSubCategoryDialog: React.FC<EditProductSubCategoryDialogProps> 
                             <label htmlFor="description" className="block text-sm font-medium text-gray-700 dark:text-white mb-1">
                                 {t('description')}
                             </label>
-                            <textarea id="description" name="description" value={form.description} onChange={handleInputChange} placeholder={t('enter_description')} rows={3} className="form-textarea w-full" />
+                            <textarea
+                                id="description"
+                                name="description"
+                                value={form.description}
+                                onChange={handleInputChange}
+                                placeholder={t('enter_description')}
+                                rows={3}
+                                className="form-textarea w-full"
+                            />
                         </div>
 
                         <div className="flex justify-end space-x-3 pt-4">

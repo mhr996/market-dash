@@ -23,7 +23,12 @@ const AddSubCategoryPage = () => {
                         </Link>
                     </li>
                     <li className="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
-                        <Link href="/categories/subcategories" className="text-primary hover:underline">
+                        <Link href="/products" className="text-primary hover:underline">
+                            {t('products')}
+                        </Link>
+                    </li>
+                    <li className="before:content-['/'] ltr:before:mr-2 rtl:before:ml-2">
+                        <Link href="/products/subcategories" className="text-primary hover:underline">
                             {t('sub_categories')}
                         </Link>
                     </li>

@@ -174,7 +174,7 @@ const EditShop = () => {
                             company_name,
                             logo_url
                         )
-                    ),
+                    )
                 `,
                 )
                 .eq('id', id)
