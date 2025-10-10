@@ -321,84 +321,109 @@ const CustomersList = () => {
                         </div>
                     ) : (
                         // Table View
-                        <DataTable
-                            className="whitespace-nowrap table-hover"
-                            records={records}
-                            columns={[
-                                {
-                                    accessor: 'full_name',
-                                    title: 'Name',
-                                    sortable: true,
-                                    render: ({ full_name, avatar_url }) => (
-                                        <div className="flex items-center gap-2">
-                                            <img className="h-8 w-8 rounded-full object-cover" src={avatar_url || `/assets/images/user-placeholder.webp`} alt={full_name} />
-                                            <div>
-                                                <div className="font-semibold">{full_name}</div>
-                                            </div>
-                                        </div>
-                                    ),
-                                },
-                                {
-                                    accessor: 'email',
-                                    title: 'Email',
-                                    sortable: true,
-                                },
-                                {
-                                    accessor: 'user_roles',
-                                    title: 'Role',
-                                    render: ({ user_roles }) => <span className="badge badge-secondary">{user_roles?.display_name || 'Customer'}</span>,
-                                },
-                                {
-                                    accessor: 'status',
-                                    title: 'Status',
-                                    sortable: true,
-                                    render: ({ status }) => <span className={`badge ${status === 'Active' ? 'badge-success' : 'badge-danger'}`}>{status}</span>,
-                                },
-                                {
-                                    accessor: 'registration_date',
-                                    title: 'Joined',
-                                    sortable: true,
-                                    render: ({ registration_date }) => <div>{registration_date ? new Date(registration_date).toLocaleDateString('TR') : 'N/A'}</div>,
-                                },
-                                {
-                                    accessor: 'actions',
-                                    title: 'Actions',
-                                    titleClassName: '!text-center',
-                                    render: ({ id }) => {
-                                        const customer = items.find((c) => c.id === id);
-                                        return (
-                                            <div className="flex items-center gap-2 justify-center">
-                                                <button
-                                                    onClick={(e) => {
-                                                        e.stopPropagation();
-                                                        if (customer) handleEditClick(customer);
-                                                    }}
-                                                    className="btn btn-sm btn-outline-primary"
-                                                >
-                                                    <IconEdit className="h-4 w-4" />
-                                                </button>
-                                                <Link href={`/customers/preview/${id}`} className="btn btn-sm btn-outline-info">
-                                                    <IconEye className="h-4 w-4" />
-                                                </Link>
-                                            </div>
-                                        );
+                        <div className="datatables pagination-padding relative">
+                            <DataTable
+                                className={`${loading ? 'filter blur-sm pointer-events-none' : 'table-hover whitespace-nowrap cursor-pointer'}`}
+                                records={records}
+                                onRowClick={(record) => {
+                                    router.push(`/customers/preview/${record.id}`);
+                                }}
+                                columns={[
+                                    {
+                                        accessor: 'id',
+                                        title: t('id'),
+                                        sortable: true,
+                                        render: ({ id }) => <strong className="text-info">#{id.toString().slice(0, 6)}</strong>,
                                     },
-                                },
-                            ]}
-                            totalRecords={initialRecords.length}
-                            recordsPerPage={pageSize}
-                            page={page}
-                            onPageChange={(p) => setPage(p)}
-                            recordsPerPageOptions={PAGE_SIZES}
-                            onRecordsPerPageChange={setPageSize}
-                            sortStatus={sortStatus}
-                            onSortStatusChange={setSortStatus}
-                            selectedRecords={selectedRecords}
-                            onSelectedRecordsChange={setSelectedRecords}
-                            minHeight={200}
-                            paginationText={({ from, to, totalRecords }) => `Showing ${from} to ${to} of ${totalRecords} entries`}
-                        />
+                                    {
+                                        accessor: 'full_name',
+                                        title: t('full_name'),
+                                        sortable: true,
+                                        render: ({ full_name, avatar_url }) => (
+                                            <div className="flex items-center font-semibold">
+                                                <div className="w-max rounded-full ltr:mr-2 rtl:ml-2 flex items-center justify-center">
+                                                    <img className="h-8 w-8 rounded-full object-cover" src={avatar_url || `/assets/images/user-placeholder.webp`} alt="" />
+                                                </div>
+                                                <div>{full_name}</div>
+                                            </div>
+                                        ),
+                                    },
+                                    {
+                                        accessor: 'user_roles.display_name',
+                                        title: 'Role',
+                                        sortable: true,
+                                        render: ({ user_roles }) => <span className="badge badge-secondary">{user_roles?.display_name || 'Customer'}</span>,
+                                    },
+                                    {
+                                        accessor: 'email',
+                                        title: t('email'),
+                                        sortable: true,
+                                    },
+                                    {
+                                        accessor: 'registration_date',
+                                        title: t('registration_date'),
+                                        sortable: true,
+                                        render: ({ registration_date }) => <span>{registration_date ? new Date(registration_date).toLocaleDateString('TR') : ''}</span>,
+                                    },
+                                    {
+                                        accessor: 'status',
+                                        title: t('status'),
+                                        sortable: true,
+                                        render: ({ status }) => <span className={`badge badge-outline-${status === 'Active' ? 'success' : 'danger'} `}>{status}</span>,
+                                    },
+                                    {
+                                        accessor: 'action',
+                                        title: t('actions'),
+                                        sortable: false,
+                                        textAlignment: 'center',
+                                        render: ({ id }) => {
+                                            const customer = items.find((c) => c.id === id);
+                                            return (
+                                                <div className="mx-auto flex w-max items-center gap-4">
+                                                    <button
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            if (customer) handleEditClick(customer);
+                                                        }}
+                                                        className="flex hover:text-info"
+                                                    >
+                                                        <IconEdit className="h-4.5 w-4.5" />
+                                                    </button>
+                                                    <Link href={`/customers/preview/${id}`} className="flex hover:text-primary" onClick={(e) => e.stopPropagation()}>
+                                                        <IconEye />
+                                                    </Link>
+                                                    <button
+                                                        type="button"
+                                                        className="flex hover:text-danger"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            if (customer) handleDeleteClick(customer);
+                                                        }}
+                                                    >
+                                                        <IconTrashLines />
+                                                    </button>
+                                                </div>
+                                            );
+                                        },
+                                    },
+                                ]}
+                                highlightOnHover
+                                totalRecords={initialRecords.length}
+                                recordsPerPage={pageSize}
+                                page={page}
+                                onPageChange={(p) => setPage(p)}
+                                recordsPerPageOptions={PAGE_SIZES}
+                                onRecordsPerPageChange={setPageSize}
+                                sortStatus={sortStatus}
+                                onSortStatusChange={setSortStatus}
+                                selectedRecords={selectedRecords}
+                                onSelectedRecordsChange={setSelectedRecords}
+                                paginationText={({ from, to, totalRecords }) => `${t('showing')} ${from} ${t('to')} ${to} ${t('of')} ${totalRecords} ${t('entries')}`}
+                                minHeight={300}
+                            />
+                        </div>
                     )}
+                    {loading && <div className="absolute inset-0 z-10 flex items-center justify-center bg-white dark:bg-black-dark-light bg-opacity-60 backdrop-blur-sm" />}
                 </div>
             </div>
 

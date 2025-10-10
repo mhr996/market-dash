@@ -318,6 +318,17 @@ const Sidebar = () => {
                                                         </div>
                                                     </Link>
                                                 </li>
+                                                <li>
+                                                    <Link
+                                                        href="/products/discounts"
+                                                        className={`group nav-link ${pathname === '/products/discounts' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}
+                                                    >
+                                                        <div className="flex items-center">
+                                                            <IconMenuCharts className="shrink-0 group-hover:!text-primary" />
+                                                            <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Discounts</span>
+                                                        </div>
+                                                    </Link>
+                                                </li>
                                             </ul>
                                         </AnimateHeight>
                                     </li>
@@ -489,6 +500,24 @@ const Sidebar = () => {
                                                 <div className="flex items-center">
                                                     <IconMenuCharts className="shrink-0 group-hover:!text-primary" />
                                                     <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">{t('reports')}</span>
+                                                </div>
+                                            </Link>
+                                        </li>
+                                    ) : null}
+                                    {/* Homepage section - Only for super_admin and shop_owner */}
+                                    {user?.role_name === 'super_admin' || user?.role_name === 'shop_owner' ? (
+                                        <li className="nav-item">
+                                            <Link href="/homepage" className={`group ${pathname === '/homepage' ? 'bg-primary/5 text-primary border-r-2 border-primary' : ''}`}>
+                                                <div className="flex items-center">
+                                                    <svg className="shrink-0 group-hover:!text-primary h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                                        <path
+                                                            strokeLinecap="round"
+                                                            strokeLinejoin="round"
+                                                            strokeWidth={2}
+                                                            d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                                                        />
+                                                    </svg>
+                                                    <span className="text-black ltr:pl-3 rtl:pr-3 dark:text-[#506690] dark:group-hover:text-white-dark">Homepage</span>
                                                 </div>
                                             </Link>
                                         </li>

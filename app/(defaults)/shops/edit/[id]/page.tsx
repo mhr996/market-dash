@@ -684,6 +684,7 @@ const EditShop = () => {
                             { name: t('working_hours'), icon: 'clock' },
                             { name: t('gallery'), icon: 'image' },
                             { name: t('delivery'), icon: 'truck' },
+                            { name: 'Homepage', icon: 'home' },
                         ]}
                         onTabClick={(tab) => setActiveTab(tab)}
                         activeTab={activeTab}
@@ -1213,6 +1214,28 @@ const EditShop = () => {
                                     </div>
                                 </div>
                             )}
+                        </div>
+                    </div>
+                )}
+                {activeTab === 5 && (
+                    <div className="panel mb-5 w-full max-w-none">
+                        <div className="mb-5">
+                            <h5 className="text-lg font-semibold dark:text-white-light">Homepage</h5>
+                            <p className="text-gray-500 dark:text-gray-400 mt-1">Configure your shop's homepage settings</p>
+                        </div>
+                        <div className="text-center py-8">
+                            <div className="text-gray-400 mb-4">
+                                <svg className="h-16 w-16 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                    <path
+                                        strokeLinecap="round"
+                                        strokeLinejoin="round"
+                                        strokeWidth={1}
+                                        d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                                    />
+                                </svg>
+                            </div>
+                            <h6 className="text-lg font-semibold text-gray-500 dark:text-gray-400">Homepage Configuration</h6>
+                            <p className="text-gray-400 dark:text-gray-500">Homepage settings will be available here soon.</p>
                         </div>
                     </div>
                 )}

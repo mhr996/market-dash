@@ -132,7 +132,7 @@ const ShopPreview = () => {
     const router = useRouter();
     const [shop, setShop] = useState<Shop | null>(null);
     const [loading, setLoading] = useState(true);
-    const [activeTab, setActiveTab] = useState<'owner' | 'details' | 'revenue' | 'transactions' | 'delivery'>('owner');
+    const [activeTab, setActiveTab] = useState<'owner' | 'details' | 'revenue' | 'transactions' | 'delivery' | 'homepage'>('owner');
     const [shopCategories, setShopCategories] = useState<ShopCategory[]>([]);
     const [shopSubCategories, setShopSubCategories] = useState<ShopSubCategory[]>([]);
 
@@ -780,6 +780,23 @@ const ShopPreview = () => {
                         <div className="flex items-center gap-2">
                             <IconCreditCard className="h-5 w-5" />
                             {t('shop_transactions')}
+                        </div>
+                    </button>
+                    <button
+                        type="button"
+                        className={`p-4 border-b-2 ${activeTab === 'homepage' ? 'border-primary text-primary' : 'border-transparent hover:border-gray-300'}`}
+                        onClick={() => setActiveTab('homepage')}
+                    >
+                        <div className="flex items-center gap-2">
+                            <svg className="h-5 w-5" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                <path
+                                    strokeLinecap="round"
+                                    strokeLinejoin="round"
+                                    strokeWidth={2}
+                                    d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                                />
+                            </svg>
+                            Homepage
                         </div>
                     </button>
                 </div>
@@ -1645,6 +1662,31 @@ const ShopPreview = () => {
                                 </div>
                             </div>
                         )}
+                    </div>
+                )}
+
+                {activeTab === 'homepage' && (
+                    <div className="lg:col-span-3">
+                        <div className="panel">
+                            <div className="mb-5">
+                                <h5 className="text-lg font-semibold dark:text-white-light">Homepage</h5>
+                                <p className="text-gray-500 dark:text-gray-400 mt-1">Shop homepage configuration and preview</p>
+                            </div>
+                            <div className="text-center py-8">
+                                <div className="text-gray-400 mb-4">
+                                    <svg className="h-16 w-16 mx-auto" fill="none" viewBox="0 0 24 24" stroke="currentColor">
+                                        <path
+                                            strokeLinecap="round"
+                                            strokeLinejoin="round"
+                                            strokeWidth={1}
+                                            d="M3 12l2-2m0 0l7-7 7 7M5 10v10a1 1 0 001 1h3m10-11l2 2m-2-2v10a1 1 0 01-1 1h-3m-6 0a1 1 0 001-1v-4a1 1 0 011-1h2a1 1 0 011 1v4a1 1 0 001 1m-6 0h6"
+                                        />
+                                    </svg>
+                                </div>
+                                <h6 className="text-lg font-semibold text-gray-500 dark:text-gray-400">Homepage Preview</h6>
+                                <p className="text-gray-400 dark:text-gray-500">Homepage content will be displayed here soon.</p>
+                            </div>
+                        </div>
                     </div>
                 )}
             </div>
