@@ -22,6 +22,7 @@ interface FeatureValue {
 interface FeatureValueOption {
     id?: number;
     option_name: string;
+    image?: string | null;
     is_active?: boolean;
 }
 
@@ -107,7 +108,7 @@ const ProductFeatures: React.FC<ProductFeaturesProps> = ({ features, onChange, d
                 if (type === 'value') {
                     updateFeatureValue(featureIndex, valueIndex, 'image', imageUrl);
                 } else if (optionIndex !== undefined) {
-                    // Image upload for options is not supported
+                    updateFeatureValueOption(featureIndex, valueIndex, optionIndex, 'image', imageUrl);
                 }
             }
         } finally {
@@ -158,7 +159,7 @@ const ProductFeatures: React.FC<ProductFeaturesProps> = ({ features, onChange, d
         onChange(newFeatures);
     };
 
-    const updateFeatureValueOption = (featureIndex: number, valueIndex: number, optionIndex: number, field: 'option_name', value: string) => {
+    const updateFeatureValueOption = (featureIndex: number, valueIndex: number, optionIndex: number, field: 'option_name' | 'image', value: string | null) => {
         const newFeatures = features.map((feature, i) =>
             i === featureIndex
                 ? {
@@ -344,29 +345,75 @@ const ProductFeatures: React.FC<ProductFeaturesProps> = ({ features, onChange, d
                                                     </div>
 
                                                     {value.options && value.options.length > 0 ? (
-                                                        <div className="space-y-2">
+                                                        <div className="space-y-3">
                                                             {value.options.map((option, optionIndex) => (
-                                                                <div
-                                                                    key={optionIndex}
-                                                                    className="flex items-center gap-2 p-2 bg-white dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-600"
-                                                                >
-                                                                    <input
-                                                                        type="text"
-                                                                        className="form-input text-sm flex-1"
-                                                                        placeholder="Option name"
-                                                                        value={option.option_name}
-                                                                        onChange={(e) => updateFeatureValueOption(featureIndex, valueIndex, optionIndex, 'option_name', e.target.value)}
-                                                                        disabled={disabled}
-                                                                    />
-                                                                    <button
-                                                                        type="button"
-                                                                        onClick={() => removeFeatureValueOption(featureIndex, valueIndex, optionIndex)}
-                                                                        disabled={disabled}
-                                                                        className="text-red-500 hover:text-red-700 p-1"
-                                                                        title="Remove Option"
-                                                                    >
-                                                                        <IconTrashLines className="w-3 h-3" />
-                                                                    </button>
+                                                                <div key={optionIndex} className="bg-white dark:bg-gray-900 rounded border border-gray-200 dark:border-gray-600 p-3">
+                                                                    <div className="flex items-center gap-2 mb-2">
+                                                                        <input
+                                                                            type="text"
+                                                                            className="form-input text-sm flex-1"
+                                                                            placeholder="Option name"
+                                                                            value={option.option_name}
+                                                                            onChange={(e) => updateFeatureValueOption(featureIndex, valueIndex, optionIndex, 'option_name', e.target.value)}
+                                                                            disabled={disabled}
+                                                                        />
+                                                                        <button
+                                                                            type="button"
+                                                                            onClick={() => removeFeatureValueOption(featureIndex, valueIndex, optionIndex)}
+                                                                            disabled={disabled}
+                                                                            className="text-red-500 hover:text-red-700 p-1"
+                                                                            title="Remove Option"
+                                                                        >
+                                                                            <IconTrashLines className="w-3 h-3" />
+                                                                        </button>
+                                                                    </div>
+
+                                                                    {/* Option Image */}
+                                                                    <div className="mt-2">
+                                                                        <label className="block text-xs font-medium text-gray-600 dark:text-gray-400 mb-1">Option Image</label>
+                                                                        {option.image ? (
+                                                                            <div className="flex items-center gap-2">
+                                                                                <img
+                                                                                    src={option.image}
+                                                                                    alt={option.option_name}
+                                                                                    className="w-8 h-8 rounded object-cover border border-gray-200 dark:border-gray-600"
+                                                                                />
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => updateFeatureValueOption(featureIndex, valueIndex, optionIndex, 'image', null)}
+                                                                                    disabled={disabled}
+                                                                                    className="btn btn-outline-danger btn-xs"
+                                                                                >
+                                                                                    Remove
+                                                                                </button>
+                                                                            </div>
+                                                                        ) : (
+                                                                            <div className="flex items-center gap-2">
+                                                                                <input
+                                                                                    ref={(el) => {
+                                                                                        fileInputRefs.current[`option-${featureIndex}-${valueIndex}-${optionIndex}`] = el;
+                                                                                    }}
+                                                                                    type="file"
+                                                                                    accept="image/*"
+                                                                                    className="hidden"
+                                                                                    onChange={(e) => {
+                                                                                        const file = e.target.files?.[0];
+                                                                                        if (file) handleImageUpload(file, featureIndex, valueIndex, 'option', optionIndex);
+                                                                                    }}
+                                                                                    disabled={disabled}
+                                                                                />
+                                                                                <button
+                                                                                    type="button"
+                                                                                    onClick={() => fileInputRefs.current[`option-${featureIndex}-${valueIndex}-${optionIndex}`]?.click()}
+                                                                                    disabled={disabled || uploadingImages.has(`${featureIndex}-${valueIndex}-option-${optionIndex}`)}
+                                                                                    className="btn btn-outline-primary btn-xs"
+                                                                                >
+                                                                                    <IconCamera className="w-3 h-3 mr-1" />
+                                                                                    {uploadingImages.has(`${featureIndex}-${valueIndex}-option-${optionIndex}`) ? 'Uploading...' : 'Upload'}
+                                                                                </button>
+                                                                            </div>
+                                                                        )}
+                                                                    </div>
                                                                 </div>
                                                             ))}
                                                         </div>

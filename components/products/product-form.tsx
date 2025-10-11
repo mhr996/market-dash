@@ -194,6 +194,7 @@ const ProductForm: React.FC<ProductFormProps> = ({ productId }) => {
                                         .map((option) => ({
                                             feature_value_id: valueData.id,
                                             option_name: option.option_name.trim(),
+                                            image: option.image || null,
                                             is_active: option.is_active !== false,
                                         }));
 
